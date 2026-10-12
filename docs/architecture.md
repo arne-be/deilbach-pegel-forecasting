@@ -1,6 +1,6 @@
 # Architecture
 
-How the forecast gets from the gauges to the website. Why we picked these parts is in [decisions/0001-architecture.md](decisions/0001-architecture.md).
+How the forecast gets from the gauges to the website. Why we picked these parts is in [decisions/](decisions/).
 
 ## Overview
 
@@ -8,13 +8,13 @@ How the forecast gets from the gauges to the website. Why we picked these parts 
 EventBridge Scheduler (hourly, weekly, nightly)
         │
         ▼
-Lambda functions, all from one Docker image (Python)
+Lambda functions from one Python codebase (one Dockerfile, two images)
   ingest    client DB (mTLS, read only), public gauges, DWD rain
   clean     raw → cleaned series
   forecast  48 h forecast, ranges, category chances
   train     weekly; promotes a new model only if it beats the current one
   backup    nightly pg_dump of Neon to S3
-  api       read-only HTTP endpoints for the website
+  api       FastAPI app, read-only endpoints for the website
         │                         │
         ▼                         ▼
 Neon Postgres (Frankfurt)    S3 "data": raw files, models, backups,
@@ -31,7 +31,7 @@ Everything on AWS runs in `eu-central-1` (Frankfurt).
 
 ## Jobs
 
-One Python codebase, built into one Docker image. Each Lambda runs the same image with a different entry point. The Lambda handlers stay thin: they read the time window and call a plain Python function. So the same image also runs locally, on a VPS cron or on another cloud.
+One Python codebase and one Dockerfile with two build targets: a jobs image and an API image. Each job Lambda runs the jobs image with a different entry point. The Lambda handlers stay thin: they read the time window and call a plain Python function. So the images also run locally, on a VPS cron or on another cloud.
 
 | Job | Schedule | Does |
 |---|---|---|
@@ -45,7 +45,7 @@ Every job takes its time window as a parameter and upserts on natural keys, so r
 
 The Lambdas run outside a VPC. That gives them internet access without a NAT gateway (~€35/month). If the client's database needs a fixed source IP, we add a small NAT instance (~€7/month).
 
-If training ever takes longer than Lambda's 15 minutes, the same image runs as an ECS Fargate task instead.
+If training ever takes longer than Lambda's 15 minutes, the jobs image runs as an ECS Fargate task instead.
 
 ## Storage
 
@@ -70,6 +70,8 @@ Data comes from two places:
 - **`/data/*.json` on S3.** The hourly forecast job writes the latest forecast and the last few days of observations here. The main page only needs these, so normal visits never touch the database.
 - **`/api/history?from=…&to=…`.** API Gateway and a small Lambda query Neon for any past range. The history selector uses this.
 
+The API is a FastAPI app. On Lambda it runs through the AWS Lambda Web Adapter, which starts it as a normal web server inside the container. Only the API image contains the adapter. The API image also runs locally with `uvicorn` or on any server. FastAPI checks the query parameters (valid dates, maximum range) before anything reaches the database.
+
 Caching keeps Neon within its free hours:
 - The selector rounds ranges to whole days, so repeat requests hit the cache.
 - Responses for ranges that are fully in the past are cached for days. Ranges that include today are cached for an hour at most.
@@ -79,7 +81,7 @@ Every forecast shows when it was made and the time of the newest reading it used
 ## Infrastructure
 
 - **OpenTofu** describes everything on AWS. No manual changes in the console.
-- **ECR** stores the Docker image.
+- **ECR** stores the Docker images.
 - **Secrets Manager** holds the mTLS certificate and key, the client DB credentials and the Neon connection strings.
 - **GitHub Actions** builds, tests and deploys.
 
