@@ -1,5 +1,6 @@
 """Loads and validates config/pegel.json, the one place for thresholds, horizons and stations."""
 
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -43,6 +44,8 @@ class Freshness(_Frozen):
 
 
 class ApiSettings(_Frozen):
+    # The first day with data. Earlier requests are rejected instead of querying for nothing.
+    history_first_day: date
     # Whole days, counting the first and the last day of a history request.
     history_default_days: int = Field(gt=0)
     history_max_days: int = Field(gt=0)

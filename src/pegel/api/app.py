@@ -14,6 +14,9 @@ from pegel.api.schemas import HistoryPoint, HistoryResponse
 from pegel.config import PegelConfig, load_config
 from pegel.core.history import DISPLAY_TIME_ZONE, history_days, utc_window
 
+# Only plain dates, so a day has one spelling and one cache entry (no times, no timestamps).
+DAY_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+
 app = FastAPI(
     title="Deilbach Pegel",
     docs_url="/api/docs",
@@ -47,21 +50,27 @@ def history(
     config: Annotated[PegelConfig, Depends(get_config)],
     today: Annotated[date, Depends(get_today)],
     database_url: Annotated[str, Depends(get_database_url)],
-    first_day: Annotated[
-        date | None, Query(alias="from", description="First day (YYYY-MM-DD, Europe/Berlin)")
+    from_text: Annotated[
+        str | None,
+        Query(
+            alias="from",
+            pattern=DAY_PATTERN,
+            description="First day (YYYY-MM-DD, Europe/Berlin)",
+        ),
     ] = None,
-    last_day: Annotated[
-        date | None, Query(alias="to", description="Last day, included; defaults to today")
+    to_text: Annotated[
+        str | None,
+        Query(alias="to", pattern=DAY_PATTERN, description="Last day, included; defaults to today"),
     ] = None,
 ) -> HistoryResponse:
     """Observed levels for whole days. Without a range, the last days up to today."""
     try:
+        # fromisoformat also rejects days that don't exist, like 2026-02-30.
         first_day, last_day = history_days(
-            first_day,
-            last_day,
+            date.fromisoformat(from_text) if from_text else None,
+            date.fromisoformat(to_text) if to_text else None,
             today,
-            config.api.history_default_days,
-            config.api.history_max_days,
+            config.api,
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error

@@ -3,29 +3,34 @@
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from pegel.config import ApiSettings
+
 # Days are calendar days as shown on the page, not UTC days.
 DISPLAY_TIME_ZONE = ZoneInfo("Europe/Berlin")
 
 
 def history_days(
-    first_day: date | None,
-    last_day: date | None,
-    today: date,
-    default_days: int,
-    max_days: int,
+    first_day: date | None, last_day: date | None, today: date, settings: ApiSettings
 ) -> tuple[date, date]:
-    """The requested days, both included. Without a range, the last `default_days` up to today.
+    """The requested days, both included. Without a range, the default days up to today.
 
-    Raises ValueError for a range that is reversed, reaches past today or is too long.
+    Raises ValueError for a range that is reversed, outside the days with data or too long.
     """
+    earliest_day = settings.history_first_day
     last_day = last_day or today
-    first_day = first_day or last_day - timedelta(days=default_days - 1)
     if last_day > today:
         raise ValueError("'to' must not be after today")
+    # Checked before any date arithmetic, which overflows near year 1.
+    if last_day < earliest_day:
+        raise ValueError(f"'to' must not be before {earliest_day}")
+    default_first_day = last_day - timedelta(days=settings.history_default_days - 1)
+    first_day = first_day or max(default_first_day, earliest_day)
+    if first_day < earliest_day:
+        raise ValueError(f"'from' must not be before {earliest_day}")
     if first_day > last_day:
         raise ValueError("'from' must not be after 'to'")
-    if (last_day - first_day).days + 1 > max_days:
-        raise ValueError(f"at most {max_days} days per request")
+    if (last_day - first_day).days + 1 > settings.history_max_days:
+        raise ValueError(f"at most {settings.history_max_days} days per request")
     return first_day, last_day
 
 

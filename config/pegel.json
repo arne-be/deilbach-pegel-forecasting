@@ -26,6 +26,7 @@
     "forecast_max_age_minutes": 90
   },
   "api": {
+    "history_first_day": "2023-03-06",
     "history_default_days": 7,
     "history_max_days": 31
   }
