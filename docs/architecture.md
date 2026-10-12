@@ -1,6 +1,6 @@
 # Architecture
 
-How the forecast gets from the gauges to the website. Why we picked these parts is in [decisions/0001-architecture.md](decisions/0001-architecture.md).
+How the forecast gets from the gauges to the website. Why we picked these parts is in [decisions/](decisions/).
 
 ## Overview
 
@@ -14,7 +14,7 @@ Lambda functions, all from one Docker image (Python)
   forecast  48 h forecast, ranges, category chances
   train     weekly; promotes a new model only if it beats the current one
   backup    nightly pg_dump of Neon to S3
-  api       read-only HTTP endpoints for the website
+  api       FastAPI app, read-only endpoints for the website
         │                         │
         ▼                         ▼
 Neon Postgres (Frankfurt)    S3 "data": raw files, models, backups,
@@ -69,6 +69,8 @@ Data comes from two places:
 
 - **`/data/*.json` on S3.** The hourly forecast job writes the latest forecast and the last few days of observations here. The main page only needs these, so normal visits never touch the database.
 - **`/api/history?from=…&to=…`.** API Gateway and a small Lambda query Neon for any past range. The history selector uses this.
+
+The API is a FastAPI app. On Lambda it runs through the AWS Lambda Web Adapter, which starts it as a normal web server inside the container. So the same image also runs locally with `uvicorn` or on any server. FastAPI checks the query parameters (valid dates, maximum range) before anything reaches the database.
 
 Caching keeps Neon within its free hours:
 - The selector rounds ranges to whole days, so repeat requests hit the cache.
