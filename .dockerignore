@@ -1,0 +1,7 @@
+# Only pyproject.toml, uv.lock, config/ and src/ go into the image.
+*
+!pyproject.toml
+!uv.lock
+!config/
+!src/
+**/__pycache__
