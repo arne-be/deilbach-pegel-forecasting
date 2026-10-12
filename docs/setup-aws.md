@@ -38,7 +38,7 @@ aws secretsmanager put-secret-value --secret-id deilbach-pegel/influx --secret-s
 rm "$tmp"
 ```
 
-Jobs database: the pooled connection string of the Neon `prod` branch for the role `pegel_jobs` ([setup-neon.md](setup-neon.md)). Same pattern:
+Jobs database: the pooled connection string of the Neon `prod` branch for the role `pegel_jobs` ([setup-neon.md](setup-neon.md)). The password is the one you set with `CREATE ROLE`, not the one the console shows; URL-encode special characters. Same pattern:
 
 ```
 tmp=$(mktemp)
@@ -47,7 +47,17 @@ aws secretsmanager put-secret-value --secret-id deilbach-pegel/jobs-database-url
 rm "$tmp"
 ```
 
-## 2. Test run
+## 2. Migrate prod
+
+The `prod` branch starts empty. Migrate it with the direct (not pooled) `pegel_owner` string from the console, set for this one command only:
+
+```
+DATABASE_URL='<direct prod pegel_owner string>' mise exec -- dbmate --no-dump-schema migrate
+```
+
+Do the same after every merged migration.
+
+## 3. Test run
 
 Start a run and print its result:
 
@@ -65,4 +75,4 @@ After that, the schedule runs the job every hour at :30 UTC.
 
 ## Changing a secret later
 
-Put the new value the same way. The next run picks it up; nothing needs to be deployed.
+Put the new value the same way. The next run reads it; nothing needs to be deployed.

@@ -104,6 +104,11 @@ To migrate the Neon `dev` branch (`DATABASE_URL` in `.env.local`, direct string)
 mise exec -- dbmate --env-file .env.local --no-dump-schema migrate
 ```
 
+To migrate `prod` after a merged migration, pass its direct `pegel_owner` string for that one command only (`docs/setup-aws.md`):
+```
+DATABASE_URL='<direct prod pegel_owner string>' mise exec -- dbmate --no-dump-schema migrate
+```
+
 ### Run locally
 
 Local runs use the Neon `dev` branch. Its connection strings go in `.env.local`; never put the `prod` ones there.

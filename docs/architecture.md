@@ -42,7 +42,7 @@ Ingest, clean and forecast stay separate modules and can each run alone, for exa
 
 Each job Lambda should have a reserved concurrency of 1, so a run can never overlap with itself. AWS refuses that while the account's concurrency limit is 10, so it waits for a quota increase; until then an overlap is harmless because every write is an upsert. Timeouts are set per job, close to what the job needs.
 
-The Lambdas run outside a VPC. That gives them internet access without a NAT gateway (~€35/month). If the client's database needs a fixed source IP, we add a small NAT instance (~€7/month).
+The Lambdas run outside a VPC. That gives them internet access without a NAT gateway (~€35/month). The client's database needs only the mTLS certificate, no fixed source IP.
 
 If training ever takes longer than Lambda's 15 minutes, the jobs image runs as an ECS Fargate task instead.
 
@@ -156,14 +156,13 @@ Two things run from a laptop on purpose:
 | Neon | €0 (free plan) |
 | **Total** | **~€2–3** |
 
-Plus ~€7 if the client needs a fixed IP. Plus the domain itself.
+Plus the domain itself.
 
 If Neon's free plan stops being enough, its paid plan is pay-as-you-go with no minimum. For us that's a few euros a month.
 
 ## Open questions
 
 - **Domain:** not decided. Until then the site runs on its `*.cloudfront.net` address. In OpenTofu the domain is an optional variable.
-- **Fixed IP:** does the client's database need a fixed source IP besides the mTLS certificate?
 - **Upstream gauges:** who runs the Langenberg gauge, is there an API, and may we show its data?
 - **Rain data:** DWD open data is the recommendation (RADOLAN for observed rain, ICON-D2 for forecasts). Open-Meteo is out: its free API is non-commercial, and historical forecasts need its Professional plan.
 - **Training without past rain forecasts:** how the model learns before we have our own archive of forecasts.
