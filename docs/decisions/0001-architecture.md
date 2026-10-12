@@ -1,6 +1,6 @@
 # 0001 · Architecture and hosting
 
-- **Status:** accepted
+- **Status:** accepted. API Gateway and the S3 JSON for the website replaced by [0003](0003-api-and-endpoints.md); alerts revisited in [0006](0006-operations.md).
 - **Date:** 2026-10-12
 
 ## Context

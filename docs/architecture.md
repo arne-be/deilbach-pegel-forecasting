@@ -5,43 +5,42 @@ How the forecast gets from the gauges to the website. Why we picked these parts 
 ## Overview
 
 ```
-EventBridge Scheduler (hourly, weekly, nightly)
+EventBridge Scheduler
+  hourly at :30 → run_hourly    weekly → train    nightly → backup
         │
         ▼
-Lambda functions from one Python codebase (one Dockerfile, two images)
-  ingest    client DB (mTLS, read only), public gauges, DWD rain
-  clean     raw → cleaned series
-  forecast  48 h forecast, ranges, category chances
-  train     weekly; promotes a new model only if it beats the current one
-  backup    nightly pg_dump of Neon to S3
-  api       FastAPI app, read-only endpoints for the website
-        │                         │
-        ▼                         ▼
-Neon Postgres (Frankfurt)    S3 "data": raw files, models, backups,
-observations, forecasts,     precomputed JSON for the website
-model metadata
+Lambda, two Docker images from one Dockerfile (Python)
+  jobs image   run_hourly: ingest → clean → forecast
+               train, backup
+  API image    FastAPI app behind the AWS Lambda Web Adapter
+        │                              │
+        ▼                              ▼
+Neon Postgres (Frankfurt)         S3 "data" (private)
+observations, forecasts,          raw files, models, backups,
+model metadata                    forecast.json, recent.json
 
 CloudFront (one domain)
   /        → S3 "site": static Astro build
-  /api/*   → API Gateway → api Lambda → Neon
-  /data/*  → S3 "data": latest forecast and recent history as JSON
+  /api/*   → API Lambda (function URL) → S3 files or Neon
 ```
 
 Everything on AWS runs in `eu-central-1` (Frankfurt).
 
 ## Jobs
 
-One Python codebase and one Dockerfile with two build targets: a jobs image and an API image. Each job Lambda runs the jobs image with a different entry point. The Lambda handlers stay thin: they read the time window and call a plain Python function. So the images also run locally, on a VPS cron or on another cloud.
+One Python codebase and one Dockerfile with two build targets: a jobs image and an API image. Each job Lambda runs the jobs image with a different entry point. The handlers stay thin: they read the time window and call a plain Python function. So the images also run locally, on a VPS cron or on another cloud.
 
 | Job | Schedule | Does |
 |---|---|---|
-| ingest | hourly | Fetches new readings and rain data, stores them raw |
-| clean | hourly, after ingest | Removes spikes, fills short gaps, keeps levels down to −0.25 m |
-| forecast | hourly, after clean | Writes the forecast to Neon and the website JSON to S3 |
-| train | weekly | Retrains, compares with the current model and the baseline, promotes if better |
+| run_hourly | hourly at :30 | Ingest, clean and forecast, one after the other. Writes the forecast to Neon and `forecast.json` and `recent.json` to S3 |
+| train | weekly | Retrains and promotes a new model only if it beats the current one |
 | backup | nightly | `pg_dump` of Neon to S3 |
 
-Every job takes its time window as a parameter and upserts on natural keys, so reruns and backfills are safe.
+The Deilbach gauge reports at about :22, so the run at :30 normally has the newest reading. If it's missing, the job still publishes a forecast. It carries the older observation time, so the page shows it as delayed. The next run catches up.
+
+Ingest, clean and forecast stay separate modules and can each run alone, for example for backfills. Every step takes its time window as a parameter and upserts on natural keys, so reruns are safe.
+
+Each job Lambda has a reserved concurrency of 1, so a run can never overlap with itself. Timeouts are set per job, close to what the job needs.
 
 The Lambdas run outside a VPC. That gives them internet access without a NAT gateway (~€35/month). If the client's database needs a fixed source IP, we add a small NAT instance (~€7/month).
 
@@ -49,54 +48,113 @@ If training ever takes longer than Lambda's 15 minutes, the jobs image runs as a
 
 ## Storage
 
-**Neon Postgres (Free plan, Frankfurt)** holds observations (raw and cleaned), forecasts and model metadata. That's about 100 MB per year; the free plan allows 1 GB.
+**Neon Postgres (free plan, Frankfurt)** holds observations (raw and cleaned), forecasts and model metadata. That's about 100 MB per year; the free plan allows 1 GB.
 
-Neon suspends the database when it's idle and wakes it on the next connection. The free plan includes 100 compute hours per month. If they run out, the database stays off until the next month. That's why the website mostly reads JSON from S3 instead of hitting the database (see below).
+Neon suspends the database when it's idle and wakes it on the next connection. The free plan includes 100 compute hours per month. If they run out, the database stays off until the next month. That's why normal page visits never touch the database (see below).
 
-Two database roles: the jobs write, and the API can only read. Neon is set up by hand once, following [setup-neon.md](setup-neon.md); the schema and grants come from migrations.
+Neon is set up by hand once, following [setup-neon.md](setup-neon.md). The schema and grants come from migrations. Three roles: one for migrations, one for the jobs (read and write) and one for the API (read only).
 
-**S3** holds what doesn't belong in a database:
-- raw rain grids and other raw files
-- trained models with their metadata
+**S3** holds what doesn't belong in a database. The bucket is private; only our Lambdas read and write it.
+- raw files as received
+- trained models
 - nightly database backups
-- the precomputed JSON for the website
+- `forecast.json` (newest 48 h forecast) and `recent.json` (last 7 days of observations), written by every hourly run
 
-## API and website
+## API
 
-The website is static: Astro with React (TypeScript), built to plain HTML/JS/CSS and served from S3 through CloudFront. Texts like the category table are plain HTML. The interactive part (current level, forecast chart, history selector) is one React component that loads data in the browser.
+The API is a FastAPI app. On Lambda it runs through the AWS Lambda Web Adapter, which starts it as a normal web server inside the container. CloudFront calls the Lambda's function URL directly and signs its requests, so the function URL accepts nothing else. There is no API Gateway.
 
-Data comes from two places:
+| Endpoint | Returns | Data from |
+|---|---|---|
+| `GET /api/forecast` | newest 48 h forecast, hourly, with timestamps | `forecast.json` on S3 |
+| `GET /api/history?from=…&to=…` | observations for a time range | `recent.json` if the range is within the last 7 days, otherwise Neon |
+| `GET /api/docs` | interactive API docs | generated by FastAPI |
+| `GET /api/openapi.json` | machine-readable API description | generated by FastAPI |
 
-- **`/data/*.json` on S3.** The hourly forecast job writes the latest forecast and the last few days of observations here. The main page only needs these, so normal visits never touch the database.
-- **`/api/history?from=…&to=…`.** API Gateway and a small Lambda query Neon for any past range. The history selector uses this.
+The forecast and recent history come from S3 files, so the database only wakes for older history.
 
-The API is a FastAPI app. On Lambda it runs through the AWS Lambda Web Adapter, which starts it as a normal web server inside the container. Only the API image contains the adapter. The API image also runs locally with `uvicorn` or on any server. FastAPI checks the query parameters (valid dates, maximum range) before anything reaches the database.
+Every response carries `issued_at` and `newest_observation_at` (UTC, ISO 8601) and a `stale` flag. FastAPI checks the query parameters (valid dates, maximum range) before anything reaches the database. The generated `openapi.json` is committed, and CI checks that it's current.
 
-Caching keeps Neon within its free hours:
-- The selector rounds ranges to whole days, so repeat requests hit the cache.
-- Responses for ranges that are fully in the past are cached for days. Ranges that include today are cached for an hour at most.
+Caching in CloudFront:
+- `/api/forecast` and recent history: 5 minutes.
+- History ranges that are fully in the past: days. The history selector rounds ranges to whole days, so repeat requests hit the cache.
+- All API responses allow `stale-if-error` for a day. If the Lambda fails, CloudFront serves the last good response instead of an error.
 
-Every forecast shows when it was made and the time of the newest reading it used. If data is late, the page says so.
+The API Lambda has a reserved concurrency of 5. That caps both costs and the load on Neon.
 
-## Infrastructure
+## Website
 
-- **OpenTofu** describes everything on AWS. No manual changes in the console.
-- **ECR** stores the Docker images.
-- **Secrets Manager** holds the mTLS certificate and key, the client DB credentials and the Neon connection strings.
-- **GitHub Actions** builds, tests and deploys.
+Astro with React and TypeScript, built to static HTML/JS/CSS and served from S3 through CloudFront. Texts like the category table are plain HTML. The interactive part (current level, forecast chart, history selector) is one React component that gets all its data from the API.
 
-No alerting for now. The website shows stale data clearly; a CloudWatch alarm with email can be added later at no cost.
+The browser checks freshness itself, because a cached response may be old. It compares `newest_observation_at` and `issued_at` with the current time. If either is older than the thresholds in `config/pegel.json`, the page shows a notice, and for an outdated forecast it greys the forecast out.
+
+## Configuration
+
+`config/pegel.json` holds category thresholds, horizons, stations and the freshness thresholds. Python reads it and validates it with Pydantic; Astro imports it at build time. Secrets and environment-specific values (URLs, connection strings) are not in it. They come from environment variables locally and from Secrets Manager on AWS.
+
+## Code
+
+One repo for everything:
+
+```
+src/pegel/
+  core/        cleaning, features, model, categories (pure logic, no I/O)
+  adapters/    data sources, storage, logging (everything that talks to the outside)
+  api/         FastAPI app and response schemas
+  jobs/        entry points that wire adapters to core
+  config.py
+tests/
+db/migrations/, db/schema.sql
+web/           Astro + React
+infra/         bootstrap/ (applied by hand once), prod/
+config/        pegel.json
+scripts/
+docs/
+```
+
+The database is accessed with psycopg 3 and plain SQL, no ORM. Migrations are plain SQL files run by dbmate. `db/schema.sql` is generated after each migration. The Python record types in `adapters/storage/records.py` are generated from the schema, and CI fails if they're out of date.
+
+Tests run against a throwaway Postgres container, never against Neon.
+
+Tools and commands are listed in `AGENTS.md`.
+
+## Environments and deployment
+
+There are two environments: local and prod.
+- **Local** runs against the Neon `dev` branch, a copy of prod with its own passwords.
+- **Prod** is the only AWS environment.
+
+GitHub Actions does everything:
+- **On every pull request:** type checks, tests, lint, gitleaks and `tofu plan`.
+- **On merge to `main`:** build and push both images, `tofu apply`, build the website, sync it to S3 and clear the HTML from the CloudFront cache.
+
+CI logs in to AWS with GitHub's OIDC, with no stored keys, and uses two roles:
+- **`github-plan`**, read only, for pull requests from this repo.
+- **`github-deploy`**, for `main` only, limited to our own resources.
+
+Pull requests from forks get no AWS access. The repo is public; workflows from outside contributors need approval.
+
+The OpenTofu state lives in S3 with OpenTofu's built-in locking. The state bucket and the OIDC roles come from `infra/bootstrap/`, the only part applied by hand.
+
+Two things run from a laptop on purpose:
+- **The first backfill** of history: the normal ingest code, in monthly chunks. The prod connection string is used only for that run, as a temporary environment variable.
+- **Training experiments**, against a fresh copy of prod in the `dev` branch.
+
+## Operations
+
+- **Logs:** JSON lines to stdout via Python's `logging`, with job, time window and station on every line. CloudWatch keeps them for 30 days. No secrets, request headers or full URLs in logs. No CloudFront access logs.
+- **Costs:** an AWS Budget at €10/month sends an email at 80 % of actual or 100 % of forecast spend. That's the only alert. No WAF.
+- **Freshness:** the page and the API's `stale` flag show late data. There is no server-side alerting.
 
 ## Costs
 
 | Part | per month |
 |---|---|
-| Lambda, API Gateway, EventBridge, CloudFront | €0 (free tier) |
+| Lambda, EventBridge, CloudFront, CloudWatch Logs | €0 (free tier) |
 | S3, ECR | < €1 |
-| Secrets Manager (3 secrets) | ~€1.20 |
-| Route 53 hosted zone | €0.50 |
-| Neon | €0 (Free plan) |
-| **Total** | **~€2–4** |
+| Secrets Manager (4 secrets) | ~€1.60 |
+| Neon | €0 (free plan) |
+| **Total** | **~€2–3** |
 
 Plus ~€7 if the client needs a fixed IP. Plus the domain itself.
 
@@ -104,7 +162,10 @@ If Neon's free plan stops being enough, its paid plan is pay-as-you-go with no m
 
 ## Open questions
 
-- Does the client's database need a fixed source IP besides the mTLS certificate?
-- Which domain do we use?
-- Who runs the Langenberg gauge, is there an API, and may we show its data?
-- Where do we get historical rain forecasts for training? DWD keeps them only briefly; Open-Meteo has an archive.
+- **Domain:** not decided. Until then the site runs on its `*.cloudfront.net` address. In OpenTofu the domain is an optional variable.
+- **Fixed IP:** does the client's database need a fixed source IP besides the mTLS certificate?
+- **Upstream gauges:** who runs the Langenberg gauge, is there an API, and may we show its data?
+- **Rain data:** DWD open data is the recommendation (RADOLAN for observed rain, ICON-D2 for forecasts). Open-Meteo is out: its free API is non-commercial, and historical forecasts need its Professional plan.
+- **Training without past rain forecasts:** how the model learns before we have our own archive of forecasts.
+- **Model registry:** where trained models and their metadata live, and how the active model switches.
+- **Raw data retention:** how much raw rain data we keep, and S3 lifecycle rules.
