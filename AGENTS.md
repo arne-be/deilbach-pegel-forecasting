@@ -14,6 +14,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - JSON-lines logging: `src/pegel/adapters/logging.py`
 - Database: `db/`, `src/pegel/adapters/storage/`, `scripts/refresh-schema.sh`, `scripts/generate_records.py`
 - Local CLI `pegel` with `backfill` and `run-hourly`: `src/pegel/jobs/`
+- AWS state bucket and GitHub OIDC roles: `infra/bootstrap/` (applied by hand once)
 - `scripts/influx-query.sh` and the docs
 
 ## Layout

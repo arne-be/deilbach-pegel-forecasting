@@ -28,3 +28,8 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+
+# OpenTofu: state stays out of the repo, .terraform.lock.hcl is committed
+.terraform/
+*.tfstate
+*.tfstate.*
