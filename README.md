@@ -86,4 +86,4 @@ On AWS, credentials and the client key come from AWS Secrets Manager, not from e
 
 ## Status
 
-Planning. No code yet; tech stack beyond AWS is not decided.
+Planning. No code yet. The architecture is in [docs/architecture.md](docs/architecture.md), and the reasons behind it in [docs/decisions/](docs/decisions/).
