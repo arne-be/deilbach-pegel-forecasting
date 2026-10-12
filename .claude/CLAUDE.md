@@ -2,7 +2,7 @@
 deilbach-pegel-prediction — hourly 48-hour water level forecast for the Deilbach gauge at Kupferdreh, with flood categories and uncertainty ranges, shown on a public German-language web page. See `README.md` for categories and plan.
 
 ## Stack
-- Jobs and API: Python, one Docker image, run as AWS Lambda (eu-central-1), scheduled by EventBridge. The API is FastAPI behind the AWS Lambda Web Adapter.
+- Jobs and API: Python, one Dockerfile with a jobs image and an API image, run as AWS Lambda (eu-central-1), scheduled by EventBridge. The API is FastAPI behind the AWS Lambda Web Adapter.
 - Database: Neon Postgres (free plan, Frankfurt). Files, models and backups: S3.
 - Website: Astro + React + TypeScript, static on S3 + CloudFront.
 - Infrastructure: OpenTofu.

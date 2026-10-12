@@ -11,7 +11,7 @@ The website needs one real endpoint: `/api/history`, which queries Neon for any 
 
 We write the API with FastAPI and run it on Lambda through the AWS Lambda Web Adapter.
 
-The adapter starts FastAPI as a normal web server inside the container. So the same image runs on Lambda, locally with `uvicorn`, or on any server. That fits our wish not to be locked into one cloud.
+The adapter starts FastAPI as a normal web server inside the container. So the API image runs on Lambda, locally with `uvicorn`, or on any server. That fits our wish not to be locked into one cloud.
 
 FastAPI also gives us input checks through Pydantic, a test client for local tests, and OpenAPI docs for free.
 
@@ -24,4 +24,4 @@ Rejected:
 
 - One more dependency to keep updated.
 - Cold starts get a few hundred milliseconds slower. CloudFront caching hides most of that.
-- The Dockerfile copies in the Web Adapter (one line). The jobs ignore it.
+- The Dockerfile gets a second build target for the API, which adds the Web Adapter. The jobs image stays without it, because the adapter expects a web server and would get in the way of plain job handlers.
