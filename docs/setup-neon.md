@@ -87,7 +87,7 @@ Repeat for the other two secrets.
 
 ## 7. Local development
 
-Put the **`dev`** connection strings in `.env.local`, never the `prod` ones. The variable names will be added to `.env.example` together with the first code that uses them.
+Put the **`dev`** connection strings in `.env.local`, never the `prod` ones: `DATABASE_URL` (direct, owner role), `JOBS_DATABASE_URL` and `API_DATABASE_URL` (pooled). `.env.example` lists them.
 
 ## Good to know
 

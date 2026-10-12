@@ -4,7 +4,7 @@ Hourly 48-hour water level forecast for the Deilbach gauge at Kupferdreh, shown 
 
 ## What exists now
 
-The Python project skeleton exists (`pyproject.toml`, `mise.toml`, `src/pegel/config.py`, the shared types in `src/pegel/core/`, `config/pegel.json`), the persistence baseline forecast, flood categories and the per-horizon summary in `src/pegel/core/` (`persistence.py`, `categories.py`, `summary.py`), the InfluxDB source adapter (`src/pegel/adapters/sources/influx.py`), JSON-lines logging (`src/pegel/adapters/logging.py`), the database layer (`db/`, `src/pegel/adapters/storage/`, `scripts/refresh-schema.sh`, `scripts/generate_records.py`), plus `scripts/influx-query.sh` and the docs. Everything else below is the agreed plan. The folders and commands become real as the code lands, so don't assume a command works until its folder exists. Update this file when that happens.
+The Python project skeleton exists (`pyproject.toml`, `mise.toml`, `src/pegel/config.py`, the shared types in `src/pegel/core/`, `config/pegel.json`), the persistence baseline forecast, flood categories and the per-horizon summary in `src/pegel/core/` (`persistence.py`, `categories.py`, `summary.py`), the InfluxDB source adapter (`src/pegel/adapters/sources/influx.py`), JSON-lines logging (`src/pegel/adapters/logging.py`), the database layer (`db/`, `src/pegel/adapters/storage/`, `scripts/refresh-schema.sh`, `scripts/generate_records.py`), the local CLI `pegel` with `backfill` and `run-hourly` (`src/pegel/jobs/`), plus `scripts/influx-query.sh` and the docs. Everything else below is the agreed plan. The folders and commands become real as the code lands, so don't assume a command works until its folder exists. Update this file when that happens.
 
 ## Layout
 
@@ -100,6 +100,13 @@ Local runs use the Neon `dev` branch. Its connection strings go in `.env.local`;
 uv run uvicorn pegel.api.app:app --reload      # API on localhost:8000, docs at /api/docs
 cd web && pnpm dev                             # website, talks to the local API
 scripts/influx-query.sh                        # check access to the source database
+```
+
+The CLI reads `.env` and `.env.local` from the main checkout (also from a worktree); variables already set in the shell win.
+
+```
+uv run pegel run-hourly                        # ingest the last hours, save a persistence forecast
+uv run pegel run-hourly --issued-at 2026-10-12T13:30Z   # rerun a past issue time
 ```
 
 ### Backfill

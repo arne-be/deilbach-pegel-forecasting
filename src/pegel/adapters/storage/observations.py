@@ -32,7 +32,7 @@ FETCH_SQL = """
 NEWEST_SQL = """
     SELECT station_id, observed_at, level_m, source, ingested_at
     FROM raw_observations
-    WHERE station_id = %s
+    WHERE station_id = %s AND observed_at <= %s
     ORDER BY observed_at DESC
     LIMIT 1
 """
@@ -74,9 +74,16 @@ def fetch_observations(
         return [_to_observation(record) for record in cursor]
 
 
-def newest_observation(conn: psycopg.Connection[TupleRow], station_id: str) -> Observation | None:
+def newest_observation(
+    conn: psycopg.Connection[TupleRow], station_id: str, at_or_before: datetime
+) -> Observation | None:
+    """The newest observation no later than `at_or_before`.
+
+    The bound keeps reruns for past issue times from using data that wasn't there yet.
+    """
+    require_utc(at_or_before, "at_or_before")
     with conn.cursor(row_factory=class_row(RawObservationRecord)) as cursor:
-        cursor.execute(NEWEST_SQL, (station_id,))
+        cursor.execute(NEWEST_SQL, (station_id, at_or_before))
         record = cursor.fetchone()
     return None if record is None else _to_observation(record)
 

@@ -23,6 +23,10 @@ class ForecastSettings(_Frozen):
     station_id: str
     horizon_hours: int = Field(gt=0)
     summary_horizons_hours: tuple[int, ...]
+    # The hourly run is scheduled at this minute; it is also the issue time of its forecast.
+    issue_minute: int = Field(ge=0, le=59)
+    # Each hourly run refetches this many hours, so readings that arrive late are picked up.
+    ingest_lookback_hours: int = Field(gt=0)
 
 
 class Category(_Frozen):
