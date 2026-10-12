@@ -18,7 +18,7 @@ SECRETS = {
     ),
     "deilbach-pegel/influx-client-cert": "CERT PEM",
     "deilbach-pegel/influx-client-key": "KEY PEM",
-    "deilbach-pegel/jobs-database-url": "postgresql://jobs@db.test/pegel",
+    "deilbach-pegel/jobs-database-url": "postgresql://jobs@db.test/pegel\n",
 }
 
 

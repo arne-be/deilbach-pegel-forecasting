@@ -45,7 +45,8 @@ def load_secrets(
     """
     for name_variable, target in _PLAIN_SECRETS.items():
         if not environ.get(target):
-            environ[target] = get_secret(_secret_name(environ, name_variable))
+            # Editors add a trailing newline, which would break a connection string.
+            environ[target] = get_secret(_secret_name(environ, name_variable)).strip()
     for name_variable, (target, file_name) in _FILE_SECRETS.items():
         if not environ.get(target):
             path = files_directory / file_name
