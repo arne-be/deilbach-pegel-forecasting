@@ -13,4 +13,5 @@ description: Infrastructure, security and monitoring standards
 - **Local secrets** live in `.env.local` (gitignored, mode 600), and so does the source DB host, because the repo is public. Other connection settings go in `.env`. Certificates and keys stay outside the repo in `~/.config/deilbach-pegel/`. `.env.example` lists every variable without values.
 - **Secret scanning:** gitleaks runs as a pre-commit hook (`.githooks/`) and in CI. Never bypass it with `--no-verify`.
 - **Never put credentials in URLs.** InfluxDB 1.x accepts `u=`/`p=` query parameters; use HTTP basic auth instead, so credentials can't leak into logs, tracebacks or proxy logs. Don't log full request URLs or headers.
+- **Commands that output secrets write them straight into their destination**, never to the terminal or a chat. For example `neon cs` prints a full connection string with password: capture it in a variable and write it into `.env.local`. Checks print the role and host only, never the URL.
 - **Source DB access is read-only by design:** use an InfluxDB user with only `READ` on `level`.
