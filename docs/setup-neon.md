@@ -27,9 +27,11 @@ We need three roles:
 
 | Role | Used by | Can |
 |---|---|---|
-| `neondb_owner` (exists already) | migrations in CI | change the schema |
+| `pegel_owner` (exists already) | migrations in CI | change the schema |
 | `pegel_jobs` | ingest, clean, forecast, train, backup | read and write data |
 | `pegel_api` | the FastAPI app | read only |
+
+Neon names the owner role after the database, so with `pegel` it is `pegel_owner`.
 
 Create `pegel_jobs` and `pegel_api` in the **SQL editor** on the `prod` branch, not under "Roles" in the console. Roles created in the console become members of `neon_superuser`, which is far more than they need.
 
@@ -45,6 +47,8 @@ The grants (`USAGE`, `SELECT`, `INSERT`, …) come from the migrations, not from
 ## 4. Dev branch
 
 Create a branch `dev` from `prod`. It gets a copy of the data and of the roles.
+
+The branch gets its own compute. Set it to **0.25–0.25 CU** as well, as in step 2: both branches share the 100 CU-hours a month.
 
 Then give the roles on `dev` new passwords, so local credentials can never reach production. Run this in the SQL editor with the `dev` branch selected:
 
@@ -70,7 +74,7 @@ OpenTofu creates three empty secrets in AWS Secrets Manager. Run `tofu apply` be
 
 | Secret | Value |
 |---|---|
-| `deilbach-pegel/neon/migrations` | direct string, `neondb_owner`, branch `prod` |
+| `deilbach-pegel/neon/migrations` | direct string, `pegel_owner`, branch `prod` |
 | `deilbach-pegel/neon/jobs` | pooled string, `pegel_jobs`, branch `prod` |
 | `deilbach-pegel/neon/api` | pooled string, `pegel_api`, branch `prod` |
 
