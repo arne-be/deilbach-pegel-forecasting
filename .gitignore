@@ -1,1 +1,14 @@
+# Claude Code personal overrides
 CLAUDE.local.md
+.claude/settings.local.json
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
+*.swp

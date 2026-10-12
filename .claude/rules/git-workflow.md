@@ -5,7 +5,7 @@ description: Branching, commit message and pull request rules
 # Git Workflow
 
 ## Worktrees and branches
-- **Never commit on `main`.** The main checkout stays on `main`, clean, and is only used to pull.
+- **Never commit on `main`.** The main checkout stays on `main`, clean, and is only used to pull. Enforced by `.claude/hooks/block-main-commit.sh` and branch protection on GitHub.
 - **All work happens in a git worktree** on its own branch, created from the newest `origin/main`:
   ```
   git fetch origin

@@ -6,6 +6,8 @@ deilbach-pegel-prediction — hourly 48-hour water level forecast for the Deilba
 
 ## Structure
 - `.claude/rules/` — focused standards (code style, testing, git, API, pipelines, ML, operations)
+- `.claude/hooks/` — Claude Code hooks (registered in `.claude/settings.json`)
+- `.github/` — PR template
 - No code yet. Update this section when the layout exists.
 
 ## Commands
