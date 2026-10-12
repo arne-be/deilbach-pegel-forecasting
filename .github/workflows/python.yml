@@ -23,3 +23,7 @@ jobs:
         run: uv run pytest
       - name: Lint
         run: uv run ruff check . && uv run ruff format --check .
+      - name: Schema and records are up to date
+        run: |
+          scripts/refresh-schema.sh
+          git diff --exit-code db/schema.sql src/pegel/adapters/storage/records.py

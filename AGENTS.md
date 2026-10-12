@@ -4,7 +4,7 @@ Hourly 48-hour water level forecast for the Deilbach gauge at Kupferdreh, shown 
 
 ## What exists now
 
-The Python project skeleton exists (`pyproject.toml`, `mise.toml`, `src/pegel/config.py`, the shared types in `src/pegel/core/`, `config/pegel.json`), the persistence baseline forecast, flood categories and the per-horizon summary in `src/pegel/core/` (`persistence.py`, `categories.py`, `summary.py`), the InfluxDB source adapter (`src/pegel/adapters/sources/influx.py`), JSON-lines logging (`src/pegel/adapters/logging.py`), plus `scripts/influx-query.sh` and the docs. Everything else below is the agreed plan. The folders and commands become real as the code lands, so don't assume a command works until its folder exists. Update this file when that happens.
+The Python project skeleton exists (`pyproject.toml`, `mise.toml`, `src/pegel/config.py`, the shared types in `src/pegel/core/`, `config/pegel.json`), the persistence baseline forecast, flood categories and the per-horizon summary in `src/pegel/core/` (`persistence.py`, `categories.py`, `summary.py`), the InfluxDB source adapter (`src/pegel/adapters/sources/influx.py`), JSON-lines logging (`src/pegel/adapters/logging.py`), the database layer (`db/`, `src/pegel/adapters/storage/`, `scripts/refresh-schema.sh`, `scripts/generate_records.py`), plus `scripts/influx-query.sh` and the docs. Everything else below is the agreed plan. The folders and commands become real as the code lands, so don't assume a command works until its folder exists. Update this file when that happens.
 
 ## Layout
 
@@ -27,7 +27,7 @@ infra/
   bootstrap/                state bucket and GitHub OIDC roles, applied by hand once
   prod/                     everything else
 config/pegel.json           categories, horizons, stations, freshness thresholds
-scripts/                    influx-query.sh, generate_records.py
+scripts/                    influx-query.sh, refresh-schema.sh, generate_records.py
 docs/                       architecture, setup guides, decision records
 ```
 
@@ -60,7 +60,7 @@ Always in this order: type check, then tests, then lint.
 Python, from the repo root:
 ```
 uv run mypy src tests
-uv run pytest                # starts a throwaway Postgres container
+uv run pytest                # starts a throwaway Postgres container (needs Docker)
 uv run ruff check . && uv run ruff format --check .
 ```
 
@@ -80,12 +80,17 @@ tflint
 
 ### Database
 
+After every new migration in `db/migrations/`:
 ```
-dbmate migrate
-uv run python scripts/generate_records.py
+scripts/refresh-schema.sh
 ```
 
-The second command rewrites `src/pegel/storage/records.py` from the schema. Run both after every new migration and commit the result. CI fails if `records.py` or `db/schema.sql` is out of date.
+It migrates a throwaway Postgres container with the pinned dbmate image, rewrites `db/schema.sql` and then `src/pegel/adapters/storage/records.py` (via `scripts/generate_records.py`). Needs Docker; never touches Neon. Commit both files. CI reruns it and fails if either is out of date.
+
+To migrate the Neon `dev` branch (`DATABASE_URL` in `.env.local`, direct string):
+```
+mise exec -- dbmate --env-file .env.local --no-dump-schema migrate
+```
 
 ### Run locally
 
