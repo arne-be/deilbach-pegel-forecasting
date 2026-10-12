@@ -24,5 +24,9 @@
   "freshness": {
     "observation_max_age_minutes": 90,
     "forecast_max_age_minutes": 90
+  },
+  "api": {
+    "history_default_days": 7,
+    "history_max_days": 31
   }
 }

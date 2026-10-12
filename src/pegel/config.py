@@ -42,11 +42,18 @@ class Freshness(_Frozen):
     forecast_max_age_minutes: int = Field(gt=0)
 
 
+class ApiSettings(_Frozen):
+    # Whole days, counting the first and the last day of a history request.
+    history_default_days: int = Field(gt=0)
+    history_max_days: int = Field(gt=0)
+
+
 class PegelConfig(_Frozen):
     stations: tuple[Station, ...]
     forecast: ForecastSettings
     categories: tuple[Category, ...]
     freshness: Freshness
+    api: ApiSettings
 
     @model_validator(mode="after")
     def _check_consistency(self) -> "PegelConfig":
@@ -62,6 +69,8 @@ class PegelConfig(_Frozen):
         set_bounds = [bound for bound in bounds if bound is not None]
         if len(set_bounds) != len(bounds) or set_bounds != sorted(set_bounds):
             raise ValueError("category bounds must be set and ascending after the first one")
+        if self.api.history_default_days > self.api.history_max_days:
+            raise ValueError("the default history range must not exceed the maximum")
         return self
 
     def station(self, station_id: str) -> Station:
