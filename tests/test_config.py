@@ -1,0 +1,41 @@
+import json
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from pegel.config import DEFAULT_CONFIG_PATH, PegelConfig, load_config
+
+
+def test_repo_config_is_valid() -> None:
+    config = load_config()
+    assert config.station(config.forecast.station_id).source == "influx"
+
+
+def _config_with(path: Path, **changes: object) -> Path:
+    data = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+    data.update(changes)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+def test_descending_category_bounds_are_rejected(tmp_path: Path) -> None:
+    categories = [
+        {"number": 1, "name": "a", "above_m": None},
+        {"number": 2, "name": "b", "above_m": 1.2},
+        {"number": 3, "name": "c", "above_m": 1.0},
+    ]
+    with pytest.raises(ValidationError):
+        load_config(_config_with(tmp_path / "pegel.json", categories=categories))
+
+
+def test_unknown_forecast_station_is_rejected(tmp_path: Path) -> None:
+    forecast = {"station_id": "nowhere", "horizon_hours": 48, "summary_horizons_hours": [3]}
+    with pytest.raises(ValidationError):
+        load_config(_config_with(tmp_path / "pegel.json", forecast=forecast))
+
+
+def test_unknown_station_lookup_raises() -> None:
+    config: PegelConfig = load_config()
+    with pytest.raises(KeyError):
+        config.station("nowhere")
