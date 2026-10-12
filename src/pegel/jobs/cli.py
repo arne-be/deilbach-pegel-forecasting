@@ -3,7 +3,8 @@
 import argparse
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, time
 from functools import partial
 from zoneinfo import ZoneInfo
@@ -18,7 +19,7 @@ from pegel.config import PegelConfig, load_config
 from pegel.core.forecasts import Forecast
 from pegel.core.schedule import issue_time
 from pegel.core.summary import summarize
-from pegel.jobs.pipeline import FetchLevels, backfill, run_hourly
+from pegel.jobs.pipeline import Conn, FetchLevels, backfill, run_hourly
 
 DISPLAY_TIME_ZONE = ZoneInfo("Europe/Berlin")
 
@@ -28,6 +29,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_logging()
     load_env_files(main_checkout())
     config = load_config()
+    if arguments.command == "backfill":
+        station = config.station(config.forecast.station_id)
+        start = _utc_midnight(arguments.start)
+        end = _utc_midnight(arguments.end) if arguments.end else datetime.now(UTC)
+        with sources_from_env() as (fetch, conn):
+            changed = backfill(fetch, conn, station, start, end)
+        print(f"Backfill {start:%Y-%m-%d} to {end:%Y-%m-%d %H:%M} UTC: {changed} rows stored")
+        return 0
+    print(_describe(run_hourly_from_env(config, arguments.issued_at), config))
+    return 0
+
+
+def run_hourly_from_env(config: PegelConfig, issued_at: datetime | None = None) -> Forecast:
+    """The hourly run, as scheduled. Without an issue time, it uses the latest scheduled run."""
+    issued_at = issued_at or issue_time(datetime.now(UTC), config.forecast.issue_minute)
+    with sources_from_env() as (fetch, conn):
+        return run_hourly(fetch, conn, config, issued_at)
+
+
+@contextmanager
+def sources_from_env() -> Iterator[tuple[FetchLevels, Conn]]:
+    """The Influx source and the jobs database, set up from environment variables."""
     database_url = _required_env("JOBS_DATABASE_URL")
     influx_settings = influx_settings_from_env(os.environ)
     with (
@@ -36,19 +59,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ):
         # Each storage call commits on its own, so a failed backfill month keeps the others.
         conn.autocommit = True
-        fetch: FetchLevels = partial(fetch_levels, influx_settings, client=client)
-        if arguments.command == "backfill":
-            station = config.station(config.forecast.station_id)
-            start = _utc_midnight(arguments.start)
-            end = _utc_midnight(arguments.end) if arguments.end else datetime.now(UTC)
-            changed = backfill(fetch, conn, station, start, end)
-            print(f"Backfill {start:%Y-%m-%d} to {end:%Y-%m-%d %H:%M} UTC: {changed} rows stored")
-            return 0
-        issued_at = arguments.issued_at or issue_time(
-            datetime.now(UTC), config.forecast.issue_minute
-        )
-        print(_describe(run_hourly(fetch, conn, config, issued_at), config))
-        return 0
+        yield partial(fetch_levels, influx_settings, client=client), conn
 
 
 def _parser() -> argparse.ArgumentParser:
