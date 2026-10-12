@@ -39,24 +39,22 @@ def load_secrets(
     files_directory: Path = Path("/tmp"),  # the only writable place on Lambda
     environ: MutableMapping[str, str] = os.environ,
 ) -> None:
-    """Sets variables from the secrets named in `environ`, without overriding set ones.
+    """Sets variables from the secrets named in `environ`, overriding earlier values.
 
+    Called on every invocation: a warm Lambda keeps `os.environ`, so skipping set variables
+    would keep an old secret until the container is replaced.
     Errors name the secret or variable, never a value.
     """
     for name_variable, target in _PLAIN_SECRETS.items():
-        if not environ.get(target):
-            # Editors add a trailing newline, which would break a connection string.
-            environ[target] = get_secret(_secret_name(environ, name_variable)).strip()
+        # Editors add a trailing newline, which would break a connection string.
+        environ[target] = get_secret(_secret_name(environ, name_variable)).strip()
     for name_variable, (target, file_name) in _FILE_SECRETS.items():
-        if not environ.get(target):
-            path = files_directory / file_name
-            _write_private(path, get_secret(_secret_name(environ, name_variable)))
-            environ[target] = str(path)
+        path = files_directory / file_name
+        _write_private(path, get_secret(_secret_name(environ, name_variable)))
+        environ[target] = str(path)
     for name_variable in _JSON_SECRETS:
         secret_name = _secret_name(environ, name_variable)
-        for key, value in _parse_json_secret(secret_name, get_secret(secret_name)).items():
-            if not environ.get(key):
-                environ[key] = value
+        environ.update(_parse_json_secret(secret_name, get_secret(secret_name)))
 
 
 def _secret_name(environ: MutableMapping[str, str], name_variable: str) -> str:

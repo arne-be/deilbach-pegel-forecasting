@@ -34,12 +34,12 @@ def test_secrets_become_variables_and_files(tmp_path: Path) -> None:
     assert stat.S_IMODE(key.stat().st_mode) == 0o600
 
 
-def test_set_variables_are_not_overridden(tmp_path: Path) -> None:
-    environ = {**SECRET_NAMES, "JOBS_DATABASE_URL": "local", "INFLUX_CLIENT_KEY": "/my/key"}
+def test_changed_secrets_replace_values_from_an_earlier_run(tmp_path: Path) -> None:
+    environ = dict(SECRET_NAMES)
     load_secrets(SECRETS.__getitem__, tmp_path, environ)
-    assert environ["JOBS_DATABASE_URL"] == "local"
-    assert environ["INFLUX_CLIENT_KEY"] == "/my/key"
-    assert not (tmp_path / "influx-client.key").exists()
+    changed = {**SECRETS, "deilbach-pegel/jobs-database-url": "postgresql://new@db.test/pegel"}
+    load_secrets(changed.__getitem__, tmp_path, environ)
+    assert environ["JOBS_DATABASE_URL"] == "postgresql://new@db.test/pegel"
 
 
 def test_missing_secret_name_is_named(tmp_path: Path) -> None:

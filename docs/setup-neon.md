@@ -70,24 +70,9 @@ Always keep `sslmode=require` in the string.
 
 ## 6. Production secrets
 
-OpenTofu creates three empty secrets in AWS Secrets Manager. Run `tofu apply` before this step. The values are set by hand, so they never end up in the OpenTofu state.
+The jobs Lambda reads the pooled `prod` string for `pegel_jobs` from the secret `deilbach-pegel/jobs-database-url`. How to set it is in [setup-aws.md](setup-aws.md). The API secret follows when the API is deployed.
 
-| Secret | Value |
-|---|---|
-| `deilbach-pegel/neon/migrations` | direct string, `pegel_owner`, branch `prod` |
-| `deilbach-pegel/neon/jobs` | pooled string, `pegel_jobs`, branch `prod` |
-| `deilbach-pegel/neon/api` | pooled string, `pegel_api`, branch `prod` |
-
-To set a value without it showing up in your shell history or the process list:
-
-```
-read -rs NEON_URL          # paste the string, press Enter
-tmp=$(mktemp) && chmod 600 "$tmp" && printf '%s' "$NEON_URL" > "$tmp"
-aws secretsmanager put-secret-value --secret-id deilbach-pegel/neon/jobs --secret-string "file://$tmp"
-rm "$tmp"; unset NEON_URL
-```
-
-Repeat for the other two secrets.
+The console doesn't know the passwords of `pegel_jobs` and `pegel_api`, because you set them in SQL. Its connection strings for these roles carry the wrong password; use the one from your password manager.
 
 ## 7. Local development
 
