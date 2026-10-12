@@ -9,8 +9,14 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 
 from pegel.adapters.env_files import load_env_files, main_checkout
 from pegel.adapters.storage.connection import connect
+from pegel.adapters.storage.forecasts import newest_forecast
 from pegel.adapters.storage.observations import fetch_observations
-from pegel.api.schemas import HistoryPoint, HistoryResponse
+from pegel.api.schemas import (
+    ForecastPointResponse,
+    ForecastResponse,
+    HistoryPoint,
+    HistoryResponse,
+)
 from pegel.config import PegelConfig, load_config
 from pegel.core.history import DISPLAY_TIME_ZONE, history_days, utc_window
 
@@ -43,6 +49,28 @@ def get_database_url() -> str:
     if not database_url:
         raise RuntimeError("API_DATABASE_URL is not set")
     return database_url
+
+
+@app.get("/api/forecast", responses={404: {"description": "No forecast stored yet"}})
+def forecast(
+    config: Annotated[PegelConfig, Depends(get_config)],
+    database_url: Annotated[str, Depends(get_database_url)],
+) -> ForecastResponse:
+    """The newest forecast, with its issue time and the newest reading it used."""
+    with connect(database_url) as conn:
+        newest = newest_forecast(conn, config.forecast.station_id, config.forecast.model)
+    if newest is None:
+        raise HTTPException(status_code=404, detail="no forecast yet")
+    return ForecastResponse(
+        station_id=newest.station_id,
+        model=newest.model,
+        issued_at=newest.issued_at,
+        newest_observation_at=newest.newest_observation_at,
+        points=[
+            ForecastPointResponse(valid_at=point.valid_at, level_m=point.level_m)
+            for point in newest.points
+        ],
+    )
 
 
 @app.get("/api/history")
