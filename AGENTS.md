@@ -16,7 +16,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Local CLI `pegel` with `backfill` and `run-hourly`: `src/pegel/jobs/`
 - AWS state bucket and GitHub OIDC roles: `infra/bootstrap/` (applied by hand once)
 - Hourly job on Lambda: `Dockerfile` (jobs target), `src/pegel/jobs/lambda_handler.py`, `src/pegel/adapters/secrets.py`, `infra/prod/`, `.github/workflows/infra.yml`, `docs/setup-aws.md`
-- History API `GET /api/history` (FastAPI): `src/pegel/api/`, `src/pegel/core/history.py`
+- API `GET /api/history` and `GET /api/forecast` (FastAPI): `src/pegel/api/`, `src/pegel/core/history.py`
 - `scripts/influx-query.sh` and the docs
 
 ## Layout

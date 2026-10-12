@@ -22,6 +22,8 @@ class Station(_Frozen):
 
 class ForecastSettings(_Frozen):
     station_id: str
+    # The model the page shows. Only models the hourly job can build are allowed.
+    model: Literal["persistence"]
     horizon_hours: int = Field(gt=0)
     summary_horizons_hours: tuple[int, ...]
     # The hourly run is scheduled at this minute; it is also the issue time of its forecast.
