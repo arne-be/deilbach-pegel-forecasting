@@ -10,7 +10,9 @@
   "forecast": {
     "station_id": "kupferdreh",
     "horizon_hours": 48,
-    "summary_horizons_hours": [3, 24, 48]
+    "summary_horizons_hours": [3, 24, 48],
+    "issue_minute": 30,
+    "ingest_lookback_hours": 6
   },
   "categories": [
     { "number": 1, "name": "unkritisch", "above_m": null },

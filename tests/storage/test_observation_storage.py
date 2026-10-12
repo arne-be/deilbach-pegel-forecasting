@@ -13,6 +13,7 @@ from pegel.core.observations import Observation
 
 STATION = "kupferdreh"
 START = datetime(2026, 10, 12, 0, 0, tzinfo=UTC)
+FAR_FUTURE = datetime(2100, 1, 1, tzinfo=UTC)
 
 Conn = psycopg.Connection[TupleRow]
 
@@ -73,17 +74,17 @@ def test_window_comes_back_oldest_first(conn: Conn) -> None:
 def test_timestamps_come_back_utc_whatever_the_session_time_zone(conn: Conn) -> None:
     upsert_observations(conn, hourly([0.1]), "influx")
     conn.execute("SET TIME ZONE 'Europe/Berlin'")
-    stored = newest_observation(conn, STATION)
+    stored = newest_observation(conn, STATION, FAR_FUTURE)
     assert stored == Observation(STATION, START, 0.1)
 
 
 def test_newest_observation_is_the_latest(conn: Conn) -> None:
     upsert_observations(conn, hourly([0.1, 0.2, 0.3]), "influx")
-    assert newest_observation(conn, STATION) == hourly([0.1, 0.2, 0.3])[-1]
+    assert newest_observation(conn, STATION, FAR_FUTURE) == hourly([0.1, 0.2, 0.3])[-1]
 
 
 def test_newest_observation_of_empty_station_is_none(conn: Conn) -> None:
-    assert newest_observation(conn, STATION) is None
+    assert newest_observation(conn, STATION, FAR_FUTURE) is None
 
 
 def test_naive_window_is_rejected(conn: Conn) -> None:
@@ -101,3 +102,9 @@ def test_api_role_cannot_insert(conn: Conn) -> None:
 def test_jobs_role_can_upsert(conn: Conn) -> None:
     conn.execute("SET ROLE pegel_jobs")
     assert upsert_observations(conn, hourly([0.1, 0.2]), "influx") == 2
+
+
+def test_newest_observation_ignores_readings_after_the_bound(conn: Conn) -> None:
+    upsert_observations(conn, hourly([0.1, 0.2, 0.3]), source="influx")
+    bound = START + timedelta(hours=1)
+    assert newest_observation(conn, STATION, bound) == hourly([0.1, 0.2])[-1]

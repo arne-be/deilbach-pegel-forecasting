@@ -167,12 +167,12 @@ def fetch_levels(
     if start >= end:
         raise ValueError("start must be before end")
     if client is None:
-        with httpx.Client(verify=_ssl_context(settings)) as own_client:
+        with httpx.Client(verify=ssl_context(settings)) as own_client:
             return _fetch_with_retries(own_client, settings, station, start, end, sleep)
     return _fetch_with_retries(client, settings, station, start, end, sleep)
 
 
-def _ssl_context(settings: InfluxSettings) -> ssl.SSLContext:
+def ssl_context(settings: InfluxSettings) -> ssl.SSLContext:
     context = ssl.create_default_context()
     context.load_cert_chain(certfile=settings.client_cert, keyfile=settings.client_key)
     return context
