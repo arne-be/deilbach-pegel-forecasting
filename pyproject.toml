@@ -5,6 +5,7 @@ description = "Hourly 48-hour water level forecast for the Deilbach gauge at Kup
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "boto3==1.43.111",
     "httpx==0.28.1",
     "psycopg[binary]==3.3.6",
     "pydantic==2.14.0",
@@ -39,3 +40,7 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers"
+
+[[tool.mypy.overrides]]
+module = ["boto3"]
+ignore_missing_imports = true
