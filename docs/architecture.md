@@ -40,7 +40,7 @@ The Deilbach gauge reports at about :22, so the run at :30 normally has the newe
 
 Ingest, clean and forecast stay separate modules and can each run alone, for example for backfills. Every step takes its time window as a parameter and upserts on natural keys, so reruns are safe.
 
-Each job Lambda has a reserved concurrency of 1, so a run can never overlap with itself. Timeouts are set per job, close to what the job needs.
+Each job Lambda should have a reserved concurrency of 1, so a run can never overlap with itself. AWS refuses that while the account's concurrency limit is 10, so it waits for a quota increase; until then an overlap is harmless because every write is an upsert. Timeouts are set per job, close to what the job needs.
 
 The Lambdas run outside a VPC. That gives them internet access without a NAT gateway (~€35/month). If the client's database needs a fixed source IP, we add a small NAT instance (~€7/month).
 

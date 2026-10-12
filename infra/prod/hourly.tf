@@ -64,8 +64,9 @@ resource "aws_lambda_function" "hourly" {
   architectures = ["arm64"]
   timeout       = 300
   memory_size   = 512
-  # One run at a time, so a slow run never overlaps with the next.
-  reserved_concurrent_executions = 1
+  # shortcut: no reserved concurrency of 1, because AWS refuses any reservation while the
+  # account limit is 10. Overlapping runs are safe since every write is an upsert. Add it
+  # back once the Lambda concurrency quota is raised.
 
   environment {
     variables = {
