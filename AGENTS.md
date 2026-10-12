@@ -4,7 +4,7 @@ Hourly 48-hour water level forecast for the Deilbach gauge at Kupferdreh, shown 
 
 ## What exists now
 
-Only `scripts/influx-query.sh` and the docs exist. Everything below is the agreed plan. The folders and commands become real as the code lands, so don't assume a command works until its folder exists. Update this file when that happens.
+The Python project skeleton exists (`pyproject.toml`, `mise.toml`, `src/pegel/config.py`, the shared types in `src/pegel/core/`, `config/pegel.json`), plus `scripts/influx-query.sh` and the docs. Everything else below is the agreed plan. The folders and commands become real as the code lands, so don't assume a command works until its folder exists. Update this file when that happens.
 
 ## Layout
 
@@ -36,7 +36,7 @@ docs/                       architecture, setup guides, decision records
 Already there today:
 - `.claude/rules/` — standards for code style, testing, git, pipelines, ML and operations
 - `.claude/hooks/` — Claude Code hooks, registered in `.claude/settings.json`
-- `.github/` — PR template and CI workflows (`secret-scan.yml`: gitleaks)
+- `.github/` — PR template and CI workflows (`secret-scan.yml`: gitleaks; `python.yml`: mypy, pytest, ruff)
 - `.githooks/` — gitleaks pre-commit hook; enable with `git config core.hooksPath .githooks`
 - `.env.example` — template for local config; real values go in the gitignored `.env` and `.env.local`
 - `docs/setup-neon.md` — one-time manual Neon setup
