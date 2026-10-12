@@ -4,7 +4,7 @@ Hourly 48-hour water level forecast for the Deilbach gauge at Kupferdreh, shown 
 
 ## What exists now
 
-The Python project skeleton exists (`pyproject.toml`, `mise.toml`, `src/pegel/config.py`, the shared types in `src/pegel/core/`, `config/pegel.json`), plus `scripts/influx-query.sh` and the docs. Everything else below is the agreed plan. The folders and commands become real as the code lands, so don't assume a command works until its folder exists. Update this file when that happens.
+The Python project skeleton exists (`pyproject.toml`, `mise.toml`, `src/pegel/config.py`, the shared types in `src/pegel/core/`, `config/pegel.json`), the persistence baseline forecast, flood categories and the per-horizon summary in `src/pegel/core/` (`persistence.py`, `categories.py`, `summary.py`), plus `scripts/influx-query.sh` and the docs. Everything else below is the agreed plan. The folders and commands become real as the code lands, so don't assume a command works until its folder exists. Update this file when that happens.
 
 ## Layout
 
