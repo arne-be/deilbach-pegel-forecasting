@@ -27,8 +27,11 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  account_id  = data.aws_caller_identity.current.account_id
-  github_repo = "arne-be/deilbach-pegel-prediction"
+  account_id = data.aws_caller_identity.current.account_id
+  # GitHub's immutable OIDC subject: owner and repo names with their IDs, so a renamed or
+  # recreated repo can't take over these roles. From
+  # `gh api repos/arne-be/deilbach-pegel-prediction/actions/oidc/customization/sub`.
+  github_subject_prefix = "repo:arne-be@42965806/deilbach-pegel-prediction@1415234162"
 }
 
 # --- State bucket for infra/prod (OpenTofu native S3 locking, no DynamoDB) ---
