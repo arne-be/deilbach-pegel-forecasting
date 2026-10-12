@@ -53,7 +53,7 @@ If training ever takes longer than Lambda's 15 minutes, the jobs image runs as a
 
 Neon suspends the database when it's idle and wakes it on the next connection. The free plan includes 100 compute hours per month. If they run out, the database stays off until the next month. That's why the website mostly reads JSON from S3 instead of hitting the database (see below).
 
-Two database roles: the jobs write, and the API can only read.
+Two database roles: the jobs write, and the API can only read. Neon is set up by hand once, following [setup-neon.md](setup-neon.md); the schema and grants come from migrations.
 
 **S3** holds what doesn't belong in a database:
 - raw rain grids and other raw files
