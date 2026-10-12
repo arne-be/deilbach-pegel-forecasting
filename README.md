@@ -11,7 +11,7 @@ Hourly water level forecast for the **Deilbach at Kupferdreh** (Essen), 48 hours
 - Water levels from public gauges further upstream (e.g. Langenberg).
 - Observed rain and rain forecasts for the Deilbach catchment around Velbert.
 - Everything is stored in our own database on AWS. Source systems are **read only**.
-- Spikes and gaps are cleaned automatically. Levels down to **−0.25 m** are valid and kept.
+- Spikes and gaps are cleaned automatically. Negative levels are valid and kept.
 
 **Forecast**
 - A new forecast every hour for the next 48 hours.
