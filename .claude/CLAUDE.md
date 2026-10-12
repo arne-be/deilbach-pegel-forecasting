@@ -27,7 +27,7 @@ After every change, run in this order:
 
 ## Project rules
 - **Source systems are read only.** Never write to the client's database or any upstream API.
-- **Negative levels are real.** Values down to −0.25 m are valid; don't clean them away.
+- **Negative levels are real.** The level is relative to the staff gauge zero, so values below 0 are valid. Don't clip or drop them.
 - **Never present stale data as current.** Every forecast carries its issue time and the time of the newest observation it used.
 - **Time:** store and compute in UTC; display in Europe/Berlin.
 - **Units:** metres relative to the local zero point. German formatting (`0,68 m`) only in the UI.

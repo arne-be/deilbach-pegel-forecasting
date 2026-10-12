@@ -29,7 +29,7 @@ Use Conventional Commits:
 - Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`, `style`.
 - Examples:
   - `feat(ingest): fetch hourly levels from upstream gauges`
-  - `fix(cleaning): keep valid levels down to -0.25 m`
+  - `fix(cleaning): keep negative levels`
   - `chore(deps): pin pandas to 2.2.3`
 - The summary says what the commit does; the body says why.
 - Small, logical commits; each one leaves the repo in a working state.
