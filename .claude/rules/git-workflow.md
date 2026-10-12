@@ -15,7 +15,7 @@ description: Branching, commit message and pull request rules
 - Before starting work, check `git branch --show-current`. If it says `main`, stop and create a worktree.
 - One topic per branch and worktree. Keep branches short-lived.
 - Before opening or updating a PR, rebase onto the newest main: `git fetch origin && git rebase origin/main`.
-- After the PR is merged, remove the worktree and branch: `git worktree remove <path> && git branch -D <branch>`.
+- After the PR is merged, clean up (see below).
 
 ## Commit messages
 Use Conventional Commits:
@@ -41,3 +41,16 @@ Use Conventional Commits:
 - Keep PRs small and focused. Tests and linters must pass before merging.
 - Review your own diff before opening the PR: no debug code, stray files or secrets.
 - **Always squash merge.** Delete the branch after merging.
+
+## Cleanup after merge
+Once the PR is merged, run from the main checkout:
+
+```
+git worktree remove ../deilbach-pegel-prediction.worktrees/<short-description>
+git branch -D <type>/<short-description>
+git switch main && git pull
+```
+
+- Use `-D` because squash merges leave the branch looking unmerged to git.
+- Only clean up after confirming the PR is merged (`gh pr view <number> --json state`). Never remove a worktree with uncommitted changes.
+- Run `git worktree prune` to drop entries for worktrees deleted by hand.
