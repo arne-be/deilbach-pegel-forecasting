@@ -15,6 +15,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Database: `db/`, `src/pegel/adapters/storage/`, `scripts/refresh-schema.sh`, `scripts/generate_records.py`
 - Local CLI `pegel` with `backfill` and `run-hourly`: `src/pegel/jobs/`
 - AWS state bucket and GitHub OIDC roles: `infra/bootstrap/` (applied by hand once)
+- Hourly job on Lambda: `Dockerfile` (jobs target), `src/pegel/jobs/lambda_handler.py`, `src/pegel/adapters/secrets.py`, `infra/prod/`, `.github/workflows/infra.yml`, `docs/setup-aws.md`
 - `scripts/influx-query.sh` and the docs
 
 ## Layout
@@ -85,7 +86,7 @@ pnpm biome check .
 Infrastructure, in `infra/prod/`:
 ```
 tofu fmt -check -recursive
-tofu validate
+tofu init -backend=false && tofu validate
 tflint
 ```
 
@@ -111,6 +112,7 @@ Local runs use the Neon `dev` branch. Its connection strings go in `.env.local`;
 uv run uvicorn pegel.api.app:app --reload      # API on localhost:8000, docs at /api/docs
 cd web && pnpm dev                             # website, talks to the local API
 scripts/influx-query.sh                        # check access to the source database
+docker build --platform linux/arm64 --target jobs .   # the Lambda jobs image
 ```
 
 The CLI reads `.env` and `.env.local` from the main checkout (also from a worktree); variables already set in the shell win.
