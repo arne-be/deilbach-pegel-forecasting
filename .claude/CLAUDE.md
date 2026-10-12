@@ -2,7 +2,11 @@
 deilbach-pegel-prediction — hourly 48-hour water level forecast for the Deilbach gauge at Kupferdreh, with flood categories and uncertainty ranges, shown on a public German-language web page. See `README.md` for categories and plan.
 
 ## Stack
-- Not decided yet, except: deployed on AWS. Ask before adding major dependencies or infrastructure.
+- Jobs and API: Python, one Docker image, run as AWS Lambda (eu-central-1), scheduled by EventBridge.
+- Database: Neon Postgres (free plan, Frankfurt). Files, models and backups: S3.
+- Website: Astro + React + TypeScript, static on S3 + CloudFront.
+- Infrastructure: OpenTofu.
+- Details in `docs/architecture.md`, reasons in `docs/decisions/`. Ask before adding major dependencies or infrastructure.
 
 ## Structure
 - `.claude/rules/` — focused standards (code style, testing, git, API, pipelines, ML, operations)
@@ -11,6 +15,8 @@ deilbach-pegel-prediction — hourly 48-hour water level forecast for the Deilba
 - `.githooks/` — git hooks (gitleaks pre-commit); enable with `git config core.hooksPath .githooks`
 - `scripts/influx-query.sh` — run a read-only InfluxQL query against the source DB (connection check)
 - `.env.example` — template for local config; real values in gitignored `.env` / `.env.local`
+- `docs/architecture.md` — how the system fits together
+- `docs/decisions/` — decision records, numbered (`0001-…`)
 - No code yet. Update this section when the layout exists.
 
 ## Commands
