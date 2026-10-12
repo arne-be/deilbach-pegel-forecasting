@@ -12,7 +12,14 @@ block() {
   exit 2
 }
 
-if grep -Eq 'git[[:space:]].*push.*[[:space:]:](main|master)([[:space:]]|$)' <<<"$cmd"; then
+# Check each part of a chained command on its own, so `git push origin feat/x && gh pr edit
+# --base main` isn't mistaken for a push to main.
+segments=$cmd
+for separator in '&&' '||' ';' '|'; do
+  segments=${segments//"$separator"/$'\n'}
+done
+
+if grep -Eq 'git[[:space:]].*push.*[[:space:]:](main|master)([[:space:]]|$)' <<<"$segments"; then
   block "pushing to main is not allowed."
 fi
 

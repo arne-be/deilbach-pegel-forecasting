@@ -20,6 +20,6 @@ description: Universal code style and design principles for the entire project
 - Environment-specific values come from config or environment variables, not constants in code.
 - Keep files under 300 lines. If a file is growing, extract a module.
 - Imports go at the top, grouped: stdlib, external packages, internal modules.
-- Pin dependencies. Add a library only when it clearly saves work.
+- Pin dependencies. Add a library only when it clearly saves work. Add it with `uv add` (or `pnpm add`), then pin the exact version that resolved, not the newest one on the registry: a minimum package age policy can block the newest release.
 - Don't mix refactors with feature work in one commit.
 - Update `README.md` and `.claude/` when behaviour, setup or conventions change.
