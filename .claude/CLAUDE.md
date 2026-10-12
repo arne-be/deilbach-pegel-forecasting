@@ -7,7 +7,9 @@ deilbach-pegel-prediction — hourly 48-hour water level forecast for the Deilba
 ## Structure
 - `.claude/rules/` — focused standards (code style, testing, git, API, pipelines, ML, operations)
 - `.claude/hooks/` — Claude Code hooks (registered in `.claude/settings.json`)
-- `.github/` — PR template
+- `.github/` — PR template, CI workflows (`secret-scan.yml`: gitleaks)
+- `.githooks/` — git hooks (gitleaks pre-commit); enable with `git config core.hooksPath .githooks`
+- `.env.example` — template for local config; real values in gitignored `.env` / `.env.local`
 - No code yet. Update this section when the layout exists.
 
 ## Commands

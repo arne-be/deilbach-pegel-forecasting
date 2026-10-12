@@ -47,6 +47,35 @@ Levels are relative to the local zero point: the concrete ledge of the sewer out
 | 4 | Run it hourly on AWS, add weekly retraining, test. |
 | 5 | Build the website. |
 
+## Local setup
+
+**Access to the source database** (InfluxDB 1.8 at `tsdb.hottis.de`) needs a client certificate *and* a read-only username/password.
+
+1. Store the certificate and key outside the repo:
+   ```
+   mkdir -p ~/.config/deilbach-pegel && chmod 700 ~/.config/deilbach-pegel
+   mv deilbach-pegel.crt deilbach-pegel.key ~/.config/deilbach-pegel/
+   chmod 600 ~/.config/deilbach-pegel/deilbach-pegel.key
+   ```
+2. Create the config files from the template (both are gitignored):
+   ```
+   cp .env.example .env && touch .env.local && chmod 600 .env .env.local
+   ```
+   Put the cert/key paths in `.env`, and only `INFLUX_USERNAME` / `INFLUX_PASSWORD` in `.env.local`. Your password manager stays the source of truth; `.env.local` is a copy.
+3. Check the connection (no credentials needed for `/ping`; expect `204`):
+   ```
+   set -a; source .env; set +a
+   curl -s -o /dev/null -w '%{http_code}\n' --cert "$INFLUX_CLIENT_CERT" --key "$INFLUX_CLIENT_KEY" "$INFLUX_URL/ping"
+   ```
+4. Enable the secret scan before your first commit:
+   ```
+   brew install gitleaks
+   git config core.hooksPath .githooks
+   ```
+   CI runs the same scan on every pull request.
+
+On AWS, credentials and the client key come from AWS Secrets Manager, not from env files.
+
 ## Known limitations
 
 - **Few floods in the data.** Records start in March 2023. The highest level so far was 1.20 m on 19.11.2024; there are no examples of category 3 or higher. The model will be reliable in normal conditions and much less certain in the situations that matter most.
