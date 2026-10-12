@@ -62,11 +62,12 @@ Levels are relative to the local zero point: the concrete ledge of the sewer out
    cp .env.example .env && touch .env.local && chmod 600 .env .env.local
    ```
    Put the cert/key paths in `.env`, and only `INFLUX_USERNAME` / `INFLUX_PASSWORD` in `.env.local`. Your password manager stays the source of truth; `.env.local` is a copy.
-3. Check the connection (no credentials needed for `/ping`; expect `204`):
+3. Check the connection with a read-only query (needs `jq`). With no argument it lists the measurements:
    ```
-   set -a; source .env; set +a
-   curl -s -o /dev/null -w '%{http_code}\n' --cert "$INFLUX_CLIENT_CERT" --key "$INFLUX_CLIENT_KEY" "$INFLUX_URL/ping"
+   scripts/influx-query.sh
+   scripts/influx-query.sh "SELECT * FROM \"level\" WHERE \"label\" = 'Deilbach' ORDER BY time DESC LIMIT 5"
    ```
+   The data is in measurement `level`, tags `label` and `device`, fields `level` (mm, relative to the staff gauge zero, so negative values are real) and `battery`. Readings are hourly, starting 2023-03-06.
 4. Enable the secret scan before your first commit:
    ```
    brew install gitleaks
