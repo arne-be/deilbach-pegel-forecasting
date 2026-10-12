@@ -16,6 +16,7 @@ deilbach-pegel-prediction — hourly 48-hour water level forecast for the Deilba
 - `scripts/influx-query.sh` — run a read-only InfluxQL query against the source DB (connection check)
 - `.env.example` — template for local config; real values in gitignored `.env` / `.env.local`
 - `docs/architecture.md` — how the system fits together
+- `docs/setup-neon.md` — one-time manual Neon setup (project, roles, branches, secrets)
 - `docs/decisions/` — decision records, numbered (`0001-…`)
 - No code yet. Update this section when the layout exists.
 
