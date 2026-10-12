@@ -8,20 +8,10 @@ deilbach-pegel-prediction — hourly 48-hour water level forecast for the Deilba
 - Infrastructure: OpenTofu.
 - Details in `docs/architecture.md`, reasons in `docs/decisions/`. Ask before adding major dependencies or infrastructure.
 
-## Structure
-- `.claude/rules/` — focused standards (code style, testing, git, API, pipelines, ML, operations)
-- `.claude/hooks/` — Claude Code hooks (registered in `.claude/settings.json`)
-- `.github/` — PR template, CI workflows (`secret-scan.yml`: gitleaks)
-- `.githooks/` — git hooks (gitleaks pre-commit); enable with `git config core.hooksPath .githooks`
-- `scripts/influx-query.sh` — run a read-only InfluxQL query against the source DB (connection check)
-- `.env.example` — template for local config; real values in gitignored `.env` / `.env.local`
-- `docs/architecture.md` — how the system fits together
-- `docs/setup-neon.md` — one-time manual Neon setup (project, roles, branches, secrets)
-- `docs/decisions/` — decision records, numbered (`0001-…`)
-- No code yet. Update this section when the layout exists.
+## Layout and commands
+The repo layout and all commands live in `AGENTS.md`, shared with other coding agents.
 
-## Commands
-- Not set up yet. Fill in dev, test, lint, type check once the stack is chosen.
+@../AGENTS.md
 
 ## Verification
 After every change, run in this order:
