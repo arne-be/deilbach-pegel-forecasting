@@ -49,7 +49,7 @@ Levels are relative to the local zero point: the concrete ledge of the sewer out
 
 ## Local setup
 
-**Access to the source database** (InfluxDB 1.8 at `tsdb.hottis.de`) needs a client certificate *and* a read-only username/password.
+**Access to the source database** (InfluxDB 1.8, host on request) needs a client certificate *and* a read-only username/password.
 
 1. Store the certificate and key outside the repo:
    ```
@@ -61,7 +61,7 @@ Levels are relative to the local zero point: the concrete ledge of the sewer out
    ```
    cp .env.example .env && touch .env.local && chmod 600 .env .env.local
    ```
-   Put the cert/key paths in `.env`, and only `INFLUX_USERNAME` / `INFLUX_PASSWORD` in `.env.local`. Your password manager stays the source of truth; `.env.local` is a copy.
+   Put the cert/key paths in `.env`, and `INFLUX_URL`, `INFLUX_USERNAME` and `INFLUX_PASSWORD` in `.env.local`. The repo is public, so the host stays out of it too. Your password manager stays the source of truth; `.env.local` is a copy.
 3. Check the connection with a read-only query (needs `jq`). With no argument it lists the measurements:
    ```
    scripts/influx-query.sh
