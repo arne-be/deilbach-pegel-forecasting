@@ -17,6 +17,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - AWS state bucket and GitHub OIDC roles: `infra/bootstrap/` (applied by hand once)
 - Hourly job on Lambda: `Dockerfile` (jobs target), `src/pegel/jobs/lambda_handler.py`, `src/pegel/adapters/secrets.py`, `infra/prod/`, `.github/workflows/infra.yml`, `docs/setup-aws.md`
 - API `GET /api/history` and `GET /api/forecast` (FastAPI): `src/pegel/api/`, `src/pegel/core/history.py`
+- LANUV stations and value parser: `config/pegel.json`, `src/pegel/adapters/sources/lanuv.py`
 - `scripts/influx-query.sh` and the docs
 
 ## Layout

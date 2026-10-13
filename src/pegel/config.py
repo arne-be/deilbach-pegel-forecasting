@@ -16,7 +16,8 @@ class _Frozen(BaseModel):
 class Station(_Frozen):
     id: str
     name: str
-    source: Literal["influx"]
+    source: Literal["influx", "lanuv"]
+    # The station's name or number at its source, e.g. the LANUV station_no.
     source_label: str
 
 
