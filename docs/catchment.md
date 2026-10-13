@@ -25,17 +25,17 @@ The last sub-catchment runs to the Deilbach mouth at the Ruhr, a little past the
 
 The catchment is split at the gauges into five zones. Rain on a zone passes the gauge at its outlet before it reaches Kupferdreh. Zones without a usable gauge give no such early signal, so for them rain data is the only warning.
 
-| Zone id | Area | Outlet gauge | Radar cells | Model points |
-|---|---|---|---|---|
-| `neviges` | 20.3 km² | Neviges | 21 | 8 |
-| `upper_deilbach` | 37.9 km² | Langenberg 2 | 41 | 12 |
-| `felderbach` | 22.5 km² | Nierenhof | 25 | 7 |
-| `middle` | 12.5 km² | Grenzweg (BRW, not used yet) | 14 | 3 |
-| `lower` | 18.2 km² | Kupferdreh | 18 | 6 |
+| Zone id | Area | Outlet gauge | Radar cells |
+|---|---|---|---|
+| `neviges` | 20.3 km² | Neviges | 21 |
+| `upper_deilbach` | 37.9 km² | Langenberg 2 | 41 |
+| `felderbach` | 22.5 km² | Nierenhof | 25 |
+| `middle` | 12.5 km² | Grenzweg (BRW, not used yet) | 14 |
+| `lower` | 18.2 km² | Kupferdreh | 18 |
 
 `middle` only drains through Grenzweg. Until BRW allows us to use that gauge, `middle` behaves like `lower`: no gauge sees its water before Kupferdreh.
 
-Radar cells are the 1 km RADOLAN cells whose centre lies in the zone. Model points are the ICON-D2 grid points (every 0.02°, about 2.2 km) inside the zone.
+Radar cells are the 1 km RADOLAN cells whose centre lies in the zone.
 
 ## Forecast ring
 
