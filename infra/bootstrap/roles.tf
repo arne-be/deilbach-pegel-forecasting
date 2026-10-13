@@ -78,6 +78,8 @@ resource "aws_iam_role_policy" "github_plan" {
 
 locals {
   region_account = "eu-central-1:${local.account_id}"
+  # ?????? is the random suffix Secrets Manager adds; not *, so similarly named secrets don't match.
+  migrate_secret_arn = "arn:aws:secretsmanager:${local.region_account}:secret:deilbach-pegel/migrate-database-url-??????"
 }
 
 data "aws_iam_policy_document" "github_deploy" {
@@ -163,11 +165,19 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = ["*"]
   }
 
+  # The deploy job migrates the prod database; ReadOnlyAccess doesn't include secret values.
   statement {
-    sid       = "NoSecretValues"
-    effect    = "Deny"
+    sid       = "MigrateDatabaseUrl"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = ["*"]
+    resources = [local.migrate_secret_arn]
+  }
+
+  # An explicit deny beats any allow, so it has to leave out the one secret above.
+  statement {
+    sid           = "NoSecretValues"
+    effect        = "Deny"
+    actions       = ["secretsmanager:GetSecretValue"]
+    not_resources = [local.migrate_secret_arn]
   }
 
   # The CI roles must not be able to widen their own permissions or trust.

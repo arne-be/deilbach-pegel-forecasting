@@ -5,7 +5,7 @@ Creates what `infra/prod` and CI need before they can run:
 - the S3 bucket for the `infra/prod` state (`deilbach-pegel-tofu-state-<account id>`, key `prod/terraform.tfstate`, OpenTofu's S3 locking),
 - the GitHub OIDC provider,
 - the role `deilbach-pegel-github-plan` for `tofu plan` in pull requests (read only, no secret values),
-- the role `deilbach-pegel-github-deploy` for deploys from `main` (only resources named `deilbach-pegel*`).
+- the role `deilbach-pegel-github-deploy` for deploys from `main` (only resources named `deilbach-pegel*`). It reads exactly one secret value, `deilbach-pegel/migrate-database-url`, to migrate the prod database.
 
 You apply it by hand once, with admin credentials. CI never touches it. The state of this folder stays local, because it creates the bucket a remote backend would need.
 
