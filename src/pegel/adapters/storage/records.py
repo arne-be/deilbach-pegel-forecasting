@@ -29,6 +29,7 @@ class InputForecastRecord:
     value: float
     fetched_at: datetime
     kind: str
+    available_at: datetime
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,7 @@ class ObservationRecord:
     coverage: float | None
     ingested_at: datetime
     kind: str
+    available_at: datetime
 
 
 @dataclass(frozen=True)
@@ -52,3 +54,4 @@ class SeriesRecord:
     period: timedelta | None
     description: str
     kind: str
+    available_after: timedelta

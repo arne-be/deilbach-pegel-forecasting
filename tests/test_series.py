@@ -21,32 +21,56 @@ def test_level_series_of_a_station() -> None:
     assert series.kind == "observation"
 
 
+def test_level_series_is_available_after_its_station_delay() -> None:
+    station = load_config().station("kupferdreh")
+    assert level_series(station).available_after == timedelta(
+        minutes=station.available_after_minutes
+    )
+
+
 @pytest.mark.parametrize("value", [math.nan, math.inf])
 def test_value_must_be_finite(value: float) -> None:
     with pytest.raises(ValueError, match="finite"):
-        SeriesValue("kupferdreh:level", AT, value)
+        SeriesValue("kupferdreh:level", AT, value, AT)
 
 
 def test_negative_value_is_allowed() -> None:
-    assert SeriesValue("kupferdreh:level", AT, -0.3).value == -0.3
+    assert SeriesValue("kupferdreh:level", AT, -0.3, AT).value == -0.3
 
 
 @pytest.mark.parametrize("coverage", [0.0, 1.01, -0.5])
 def test_coverage_must_be_a_share(coverage: float) -> None:
     with pytest.raises(ValueError, match="coverage"):
-        SeriesValue("zone:rain", AT, 1.0, coverage)
+        SeriesValue("zone:rain", AT, 1.0, AT, coverage)
 
 
 def test_naive_time_is_rejected() -> None:
     with pytest.raises(ValueError, match="UTC"):
-        SeriesValue("kupferdreh:level", datetime(2026, 10, 12), 0.1)  # noqa: DTZ001
+        SeriesValue("kupferdreh:level", datetime(2026, 10, 12), 0.1, AT)  # noqa: DTZ001
 
 
 def test_forecast_value_must_be_after_its_run() -> None:
     with pytest.raises(ValueError, match="after run_at"):
-        InputForecastValue("icon_d2:rain", AT, AT, 0.1)
+        InputForecastValue("icon_d2:rain", AT, AT, 0.1, AT)
+
+
+def test_value_cannot_be_available_before_its_time() -> None:
+    with pytest.raises(ValueError, match="available_at"):
+        SeriesValue("kupferdreh:level", AT, 0.1, AT - timedelta(seconds=1))
+
+
+def test_forecast_cannot_be_available_before_its_run() -> None:
+    with pytest.raises(ValueError, match="available_at"):
+        InputForecastValue(
+            "icon_d2:rain", AT, AT + timedelta(hours=1), 0.1, AT - timedelta(seconds=1)
+        )
+
+
+def test_available_after_must_not_be_negative() -> None:
+    with pytest.raises(ValueError, match="available_after"):
+        Series("x", "rain", "mm", "radar", "zone", "observation", timedelta(minutes=-1))
 
 
 def test_period_must_be_positive() -> None:
     with pytest.raises(ValueError, match="period"):
-        Series("x", "rain", "mm", "radar", "zone", "observation", period=timedelta(0))
+        Series("x", "rain", "mm", "radar", "zone", "observation", timedelta(0), period=timedelta(0))

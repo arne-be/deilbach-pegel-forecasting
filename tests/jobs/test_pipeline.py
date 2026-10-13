@@ -8,6 +8,8 @@ from pegel.adapters.storage.forecasts import newest_forecast
 from pegel.adapters.storage.observations import fetch_observations
 from pegel.config import Station, load_config
 from pegel.core.observations import Observation
+from pegel.core.schedule import scheduled_available_at
+from pegel.core.series import level_series
 from pegel.jobs.pipeline import (
     NoObservationError,
     backfill,
@@ -21,6 +23,7 @@ CONFIG = load_config()
 STATION = CONFIG.station(CONFIG.forecast.station_id)
 ISSUED_AT = datetime(2026, 10, 12, 13, 30, tzinfo=UTC)
 LONG_AGO = datetime(2000, 1, 1, tzinfo=UTC)
+MINUTE = CONFIG.forecast.issue_minute
 
 
 class FakeSource:
@@ -113,7 +116,7 @@ def test_rerun_gives_the_same_forecast(conn: Conn) -> None:
 
 def test_stale_data_keeps_its_observation_time(conn: Conn) -> None:
     old_reading = ISSUED_AT - timedelta(hours=3, minutes=8)
-    backfill(FakeSource({old_reading: 30.0}), conn, STATION, LONG_AGO, ISSUED_AT)
+    backfill(FakeSource({old_reading: 30.0}), conn, STATION, LONG_AGO, ISSUED_AT, MINUTE)
     assert forecast(conn, CONFIG, ISSUED_AT).newest_observation_at == old_reading
 
 
@@ -125,7 +128,7 @@ def test_forecast_without_any_observation_fails(conn: Conn) -> None:
 def test_backfill_stores_every_month(conn: Conn) -> None:
     start = datetime(2026, 1, 1, tzinfo=UTC)
     readings = {start + timedelta(days=day, minutes=22): 0.1 for day in range(0, 90, 10)}
-    backfill(FakeSource(readings), conn, STATION, start, ISSUED_AT)
+    backfill(FakeSource(readings), conn, STATION, start, ISSUED_AT, MINUTE)
     stored = fetch_observations(conn, STATION.id, start, ISSUED_AT)
     assert [o.observed_at for o in stored] == sorted(readings)
 
@@ -133,5 +136,37 @@ def test_backfill_stores_every_month(conn: Conn) -> None:
 def test_backfill_twice_adds_nothing(conn: Conn) -> None:
     start = datetime(2026, 9, 1, tzinfo=UTC)
     source = FakeSource(readings_before(ISSUED_AT, [10.0, 20.0, 30.0]))
-    backfill(source, conn, STATION, start, ISSUED_AT)
-    assert backfill(source, conn, STATION, start, ISSUED_AT) == 0
+    backfill(source, conn, STATION, start, ISSUED_AT, MINUTE)
+    assert backfill(source, conn, STATION, start, ISSUED_AT, MINUTE) == 0
+
+
+def available_at(conn: Conn) -> list[datetime]:
+    rows = conn.execute(
+        "SELECT available_at FROM observations WHERE series_id = %s ORDER BY valid_at",
+        (f"{STATION.id}:level",),
+    ).fetchall()
+    return [row[0] for row in rows]
+
+
+def test_hourly_run_stamps_new_values_with_the_fetch_time(conn: Conn) -> None:
+    before = datetime.now(UTC)
+    run_hourly(FakeSource(readings_before(ISSUED_AT, [10.0])), conn, CONFIG, ISSUED_AT)
+    [stamp] = available_at(conn)
+    assert before <= stamp <= datetime.now(UTC)
+
+
+def test_hourly_run_keeps_the_stamp_of_an_unchanged_value(conn: Conn) -> None:
+    source = FakeSource(readings_before(ISSUED_AT, [10.0]))
+    run_hourly(source, conn, CONFIG, ISSUED_AT)
+    first = available_at(conn)
+    run_hourly(source, conn, CONFIG, ISSUED_AT)
+    assert available_at(conn) == first
+
+
+def test_backfill_stamps_the_first_scheduled_run_after_the_delay(conn: Conn) -> None:
+    readings = readings_before(ISSUED_AT, [10.0, 20.0])
+    backfill(FakeSource(readings), conn, STATION, LONG_AGO, ISSUED_AT, MINUTE)
+    delay = level_series(STATION).available_after
+    assert available_at(conn) == [
+        scheduled_available_at(valid_at, delay, MINUTE) for valid_at in sorted(readings)
+    ]

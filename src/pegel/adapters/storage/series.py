@@ -10,18 +10,19 @@ from pegel.core.series import Series
 # Unchanged rows are skipped, so the returned count says what actually changed.
 # Kind, variable and unit are never updated here: ensure_series rejects a change first.
 ENSURE_SQL = """
-    INSERT INTO series (id, variable, unit, source, location, kind, aggregation, period,
-                        description)
+    INSERT INTO series (id, variable, unit, source, location, kind, available_after,
+                        aggregation, period, description)
     SELECT *
     FROM unnest(%s::text[], %s::text[], %s::text[], %s::text[], %s::text[], %s::text[],
-                %s::text[], %s::interval[], %s::text[])
+                %s::interval[], %s::text[], %s::interval[], %s::text[])
     ON CONFLICT (id) DO UPDATE
     SET source = excluded.source, location = excluded.location,
-        aggregation = excluded.aggregation, period = excluded.period,
-        description = excluded.description
-    WHERE (series.source, series.location, series.aggregation, series.period, series.description)
-        IS DISTINCT FROM (excluded.source, excluded.location, excluded.aggregation,
-                          excluded.period, excluded.description)
+        available_after = excluded.available_after, aggregation = excluded.aggregation,
+        period = excluded.period, description = excluded.description
+    WHERE (series.source, series.location, series.available_after, series.aggregation,
+           series.period, series.description)
+        IS DISTINCT FROM (excluded.source, excluded.location, excluded.available_after,
+                          excluded.aggregation, excluded.period, excluded.description)
 """
 
 STORED_DEFINITIONS_SQL = (
@@ -40,9 +41,9 @@ class SeriesDefinitionChangeError(Exception):
 def ensure_series(conn: psycopg.Connection[TupleRow], series: Sequence[Series]) -> int:
     """Insert or update series rows; return how many were new or changed.
 
-    Source, location, aggregation, period and description may change. Raises
-    SeriesDefinitionChangeError, and changes nothing, if a stored series has another kind,
-    variable or unit.
+    Source, location, available_after, aggregation, period and description may change.
+    Raises SeriesDefinitionChangeError, and changes nothing, if a stored series has another
+    kind, variable or unit.
     """
     if not series:
         return 0
@@ -53,6 +54,7 @@ def ensure_series(conn: psycopg.Connection[TupleRow], series: Sequence[Series]) 
         [one.source for one in series],
         [one.location for one in series],
         [one.kind for one in series],
+        [one.available_after for one in series],
         [one.aggregation for one in series],
         [one.period for one in series],
         [one.description for one in series],

@@ -57,6 +57,21 @@ Measured and forecast inputs live in three generic tables, so a new input needs 
 
 Our own level forecasts stay in `forecasts` and `forecast_points`.
 
+**Availability for training.** A model may only learn from inputs that were there at the issue time. `ingested_at` doesn't say that: it moves when a value changes, and for backfilled rows it's the backfill date. So every value in `observations` and `input_forecasts` has `available_at`, and training uses a value only if `available_at <= issue time`.
+- **Live runs** stamp new values with the time the run fetched them.
+- **Backfills** can't know when a value first appeared, so they imitate the live system: live data only ever enters through the hourly run at :30. A value gets the first run at or after `valid_at + available_after` (observations) or `run_at + available_after` (forecast runs), where `available_after` is the series' typical delay until its values are reliably at the source (`scheduled_available_at` in `core/schedule.py`). The migration that added the column filled all older rows the same way, because we can't tell which were live.
+- An unchanged value keeps its first `available_at` on every rerun. A revised value, e.g. LANUV replacing a raw reading with a checked one, gets the time of the revision.
+
+`available_after` is measured per source, with a margin, and lives in `config/pegel.json` (`available_after_minutes`, on each station). `ensure_series` copies it into `series`, so the database describes itself and training code never holds a delay of its own. Measured on 2026-10-13:
+
+| Source | Measured | `available_after` |
+|---|---|---|
+| Influx (Kupferdreh) | the :22 reading is queryable within a minute | 5 min |
+| LANUV Nierenhof, Neviges | 5-minute values, the portal file is rewritten every 5 minutes; newest value 1 to 12 minutes old | 15 min |
+| LANUV Langenberg | sends once an hour: the batch for hh:10 to hh+1:05 appeared at 13:06–13:11 and 14:15 UTC, so its oldest value was 56 to 65 minutes old | 75 min |
+
+A delay only matters up to the next :30 run, so a generous margin rarely costs a run.
+
 Neon suspends the database when it's idle and wakes it on the next connection. The free plan includes 100 compute hours per month. If they run out, the database stays off until the next month. That's why normal page visits never touch the database (see below).
 
 Neon is set up by hand once, following [setup-neon.md](setup-neon.md). The schema and grants come from migrations. Three roles: one for migrations, one for the jobs (read and write) and one for the API (read only).

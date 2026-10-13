@@ -8,12 +8,11 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
-from pegel.adapters.storage.observations import upsert_observations
+from pegel.adapters.storage.observations import upsert_values
 from pegel.adapters.storage.series import ensure_series
 from pegel.api.app import app, get_database_url, get_today
 from pegel.config import load_config
-from pegel.core.observations import Observation
-from pegel.core.series import level_series
+from pegel.core.series import SeriesValue, level_series
 
 Conn = psycopg.Connection[TupleRow]
 STATION = "kupferdreh"
@@ -28,13 +27,13 @@ def client(database_url: str) -> Iterator[TestClient]:
     app.dependency_overrides.clear()
 
 
-def observation(observed_at: datetime, level_cm: float) -> Observation:
-    return Observation(STATION, observed_at, level_cm)
+def observation(observed_at: datetime, level_cm: float) -> SeriesValue:
+    return SeriesValue(f"{STATION}:level", observed_at, level_cm, observed_at)
 
 
 def test_returns_readings_of_whole_berlin_days(client: TestClient, conn: Conn) -> None:
     ensure_series(conn, [level_series(load_config().station(STATION))])
-    upsert_observations(
+    upsert_values(
         conn,
         [
             observation(datetime(2026, 10, 9, 21, 59, tzinfo=UTC), 10.0),  # Oct 9, 23:59 Berlin

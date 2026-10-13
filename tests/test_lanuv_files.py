@@ -69,7 +69,7 @@ def test_source_returns_the_window_only() -> None:
 def test_backfill_from_files_is_idempotent(conn: psycopg.Connection[TupleRow]) -> None:
     fetch = LevelFiles(FIXTURES / "lanuv")
     start, end = datetime(2019, 12, 1, tzinfo=UTC), datetime(2020, 3, 1, tzinfo=UTC)
-    assert backfill(fetch, conn, NIERENHOF, start, end) == 4
-    assert backfill(fetch, conn, NIERENHOF, start, end) == 0
+    assert backfill(fetch, conn, NIERENHOF, start, end, 30) == 4
+    assert backfill(fetch, conn, NIERENHOF, start, end, 30) == 0
     series = conn.execute("SELECT id, source FROM series").fetchall()
     assert series == [("nierenhof:level", "lanuv")]

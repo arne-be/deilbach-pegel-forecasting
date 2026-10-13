@@ -9,10 +9,14 @@ from pegel.adapters.storage.series import ensure_series
 from pegel.core.series import InputForecastValue, Series
 
 Conn = psycopg.Connection[TupleRow]
-RAIN = Series("icon_d2:catchment:mean", "rain", "mm", "icon_d2", "catchment", "forecast", "mean")
-RADAR = Series("radar:catchment:mean", "rain", "mm", "radar", "catchment", "observation", "mean")
-RUN_AT = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
 HOUR = timedelta(hours=1)
+RAIN = Series(
+    "icon_d2:catchment:mean", "rain", "mm", "icon_d2", "catchment", "forecast", HOUR, "mean"
+)
+RADAR = Series(
+    "radar:catchment:mean", "rain", "mm", "radar", "catchment", "observation", HOUR, "mean"
+)
+RUN_AT = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
 
 
 @pytest.fixture(autouse=True)
@@ -20,11 +24,20 @@ def series(conn: Conn) -> None:
     ensure_series(conn, [RAIN, RADAR])
 
 
-def run(run_at: datetime, values: list[float]) -> list[InputForecastValue]:
+def run(
+    run_at: datetime, values: list[float], available_at: datetime | None = None
+) -> list[InputForecastValue]:
     return [
-        InputForecastValue(RAIN.id, run_at, run_at + (hour + 1) * HOUR, value)
+        InputForecastValue(
+            RAIN.id, run_at, run_at + (hour + 1) * HOUR, value, available_at or run_at
+        )
         for hour, value in enumerate(values)
     ]
+
+
+def stored_available_at(conn: Conn) -> list[datetime]:
+    rows = conn.execute("SELECT available_at FROM input_forecasts ORDER BY valid_at").fetchall()
+    return [row[0] for row in rows]
 
 
 def stored_values(conn: Conn) -> list[float]:
@@ -42,6 +55,18 @@ def test_changed_value_is_updated(conn: Conn) -> None:
     upsert_input_forecasts(conn, run(RUN_AT, [0.1, 0.2]))
     assert upsert_input_forecasts(conn, run(RUN_AT, [0.1, 0.3])) == 1
     assert stored_values(conn) == [0.1, 0.3]
+
+
+def test_unchanged_value_keeps_its_first_available_at(conn: Conn) -> None:
+    upsert_input_forecasts(conn, run(RUN_AT, [0.1], RUN_AT + HOUR))
+    upsert_input_forecasts(conn, run(RUN_AT, [0.1], RUN_AT + 2 * HOUR))
+    assert stored_available_at(conn) == [RUN_AT + HOUR]
+
+
+def test_changed_value_takes_the_new_available_at(conn: Conn) -> None:
+    upsert_input_forecasts(conn, run(RUN_AT, [0.1], RUN_AT + HOUR))
+    upsert_input_forecasts(conn, run(RUN_AT, [0.2], RUN_AT + 2 * HOUR))
+    assert stored_available_at(conn) == [RUN_AT + 2 * HOUR]
 
 
 def test_runs_are_kept_side_by_side(conn: Conn) -> None:
@@ -62,7 +87,7 @@ def test_newest_run_at_of_empty_series_is_none(conn: Conn) -> None:
 
 
 def test_unknown_series_is_rejected(conn: Conn) -> None:
-    unknown = InputForecastValue("nowhere:rain", RUN_AT, RUN_AT + HOUR, 0.1)
+    unknown = InputForecastValue("nowhere:rain", RUN_AT, RUN_AT + HOUR, 0.1, RUN_AT)
     with pytest.raises(psycopg.errors.ForeignKeyViolation):
         upsert_input_forecasts(conn, [unknown])
 
@@ -74,6 +99,6 @@ def test_api_role_cannot_insert(conn: Conn) -> None:
 
 
 def test_forecast_value_for_an_observation_series_is_rejected(conn: Conn) -> None:
-    value = InputForecastValue(RADAR.id, RUN_AT, RUN_AT + HOUR, 0.1)
+    value = InputForecastValue(RADAR.id, RUN_AT, RUN_AT + HOUR, 0.1, RUN_AT)
     with pytest.raises(psycopg.errors.ForeignKeyViolation, match="forecast"):
         upsert_input_forecasts(conn, [value])

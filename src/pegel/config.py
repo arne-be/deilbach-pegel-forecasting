@@ -19,6 +19,8 @@ class Station(_Frozen):
     source: Literal["influx", "lanuv"]
     # The station's name or number at its source, e.g. the LANUV station_no.
     source_label: str
+    # How long after its time a reading is reliably at the source (measured, see the docs).
+    available_after_minutes: int = Field(ge=0)
 
 
 class ForecastSettings(_Frozen):

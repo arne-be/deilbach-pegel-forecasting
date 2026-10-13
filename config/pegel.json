@@ -4,25 +4,29 @@
       "id": "kupferdreh",
       "name": "Deilbach Kupferdreh",
       "source": "influx",
-      "source_label": "Deilbach"
+      "source_label": "Deilbach",
+      "available_after_minutes": 5
     },
     {
       "id": "langenberg",
       "name": "Deilbach Langenberg 2",
       "source": "lanuv",
-      "source_label": "2769630000200"
+      "source_label": "2769630000200",
+      "available_after_minutes": 75
     },
     {
       "id": "nierenhof",
       "name": "Felderbach Nierenhof",
       "source": "lanuv",
-      "source_label": "2769649000100"
+      "source_label": "2769649000100",
+      "available_after_minutes": 15
     },
     {
       "id": "neviges",
       "name": "Hardenberger Bach Neviges",
       "source": "lanuv",
-      "source_label": "2769629000100"
+      "source_label": "2769629000100",
+      "available_after_minutes": 15
     }
   ],
   "forecast": {

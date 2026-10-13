@@ -16,6 +16,22 @@ def issue_time(now: datetime, issue_minute: int) -> datetime:
     return candidate if candidate <= now else candidate - timedelta(hours=1)
 
 
+def scheduled_available_at(
+    known_at: datetime, available_after: timedelta, issue_minute: int
+) -> datetime:
+    """When the live system would first have used a value: the first hourly run
+    (hh:issue_minute UTC) at or after `known_at + available_after`.
+
+    `known_at` is an observation's valid_at or a forecast's run_at. Backfills and the
+    migration of old rows use this, so training never sees a value earlier than the live
+    system could have. The migration that added `available_at` repeats it in SQL.
+    """
+    require_utc(known_at, "known_at")
+    ready_at = known_at + available_after
+    candidate = ready_at.replace(minute=issue_minute, second=0, microsecond=0)
+    return candidate if candidate >= ready_at else candidate + timedelta(hours=1)
+
+
 def monthly_windows(start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
     """Splits [start, end) into windows that end at the start of each calendar month (UTC)."""
     require_utc(start, "start")

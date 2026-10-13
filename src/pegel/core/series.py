@@ -26,6 +26,9 @@ class Series:
     source: str
     location: str
     kind: SeriesKind
+    # How long after valid_at (observations) or run_at (forecasts) values are reliably there.
+    # Training uses only values available at the issue time. Comes from config/pegel.json.
+    available_after: timedelta
     # How an area value combines cells or points, e.g. 'mean'. None for one gauge.
     aggregation: str | None = None
     # None for a reading at one moment; otherwise a total over the period ending at valid_at.
@@ -37,6 +40,8 @@ class Series:
             raise ValueError("series id must not be empty")
         if self.period is not None and self.period <= timedelta(0):
             raise ValueError(f"period must be positive, got {self.period!r}")
+        if self.available_after < timedelta(0):
+            raise ValueError(f"available_after must not be negative, got {self.available_after!r}")
 
 
 @dataclass(frozen=True)
@@ -46,11 +51,15 @@ class SeriesValue:
     series_id: str
     valid_at: datetime
     value: float
+    # When the value was first there for us: the fetch time in live runs, the scheduled rule
+    # for backfills (core.schedule.scheduled_available_at). Training uses it, not ingested_at.
+    available_at: datetime
     # Share of the cells or points behind an area value that had data. None for one gauge.
     coverage: float | None = None
 
     def __post_init__(self) -> None:
         require_utc(self.valid_at, "valid_at")
+        _require_available_after(self.available_at, self.valid_at, "valid_at")
         _require_finite(self.value)
         if self.coverage is not None and not 0 < self.coverage <= 1:
             raise ValueError(f"coverage must be in (0, 1], got {self.coverage!r}")
@@ -64,10 +73,13 @@ class InputForecastValue:
     run_at: datetime
     valid_at: datetime
     value: float
+    # When the run was first there for us, as for SeriesValue.available_at.
+    available_at: datetime
 
     def __post_init__(self) -> None:
         require_utc(self.run_at, "run_at")
         require_utc(self.valid_at, "valid_at")
+        _require_available_after(self.available_at, self.run_at, "run_at")
         _require_finite(self.value)
         if self.valid_at <= self.run_at:
             raise ValueError(f"valid_at {self.valid_at} must be after run_at {self.run_at}")
@@ -86,8 +98,15 @@ def level_series(station: Station) -> Series:
         source=station.source,
         location=station.id,
         kind="observation",
+        available_after=timedelta(minutes=station.available_after_minutes),
         description=f"Water level at {station.name}",
     )
+
+
+def _require_available_after(available_at: datetime, known_at: datetime, field_name: str) -> None:
+    require_utc(available_at, "available_at")
+    if available_at < known_at:
+        raise ValueError(f"available_at {available_at} must not be before {field_name} {known_at}")
 
 
 def _require_finite(value: float) -> None:

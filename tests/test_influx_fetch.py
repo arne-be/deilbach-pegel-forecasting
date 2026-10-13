@@ -22,7 +22,11 @@ SETTINGS = InfluxSettings(
     timeout_seconds=5,
 )
 STATION = Station(
-    id="kupferdreh", name="Deilbach Kupferdreh", source="influx", source_label="Deilbach"
+    id="kupferdreh",
+    name="Deilbach Kupferdreh",
+    source="influx",
+    source_label="Deilbach",
+    available_after_minutes=5,
 )
 START = datetime(2026, 10, 12, 10, 0, tzinfo=UTC)
 END = datetime(2026, 10, 12, 16, 0, tzinfo=UTC)

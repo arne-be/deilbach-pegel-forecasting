@@ -1,6 +1,8 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from pegel.core.schedule import issue_time, monthly_windows
+import pytest
+
+from pegel.core.schedule import issue_time, monthly_windows, scheduled_available_at
 
 
 def at(month: int, day: int, hour: int = 0, minute: int = 0) -> datetime:
@@ -41,3 +43,41 @@ def test_monthly_windows_cross_the_year_end() -> None:
 
 def test_empty_range_has_no_windows() -> None:
     assert monthly_windows(at(1, 1), at(1, 1)) == []
+
+
+ISSUE_MINUTE = 30
+
+
+@pytest.mark.parametrize(
+    ("known_at", "available_after", "expected"),
+    [
+        # Ready exactly at the run: that run uses it.
+        (datetime(2026, 10, 12, 13, 10, tzinfo=UTC), timedelta(minutes=20), (13, 30)),
+        # A microsecond late waits a whole hour.
+        (
+            datetime(2026, 10, 12, 13, 10, 0, 1, tzinfo=UTC),
+            timedelta(minutes=20),
+            (14, 30),
+        ),
+        (datetime(2026, 10, 12, 13, 29, 59, tzinfo=UTC), timedelta(0), (13, 30)),
+        (datetime(2026, 10, 12, 13, 50, tzinfo=UTC), timedelta(minutes=35), (14, 30)),
+        (datetime(2026, 10, 12, 13, 0, tzinfo=UTC), timedelta(minutes=90), (14, 30)),
+    ],
+)
+def test_scheduled_available_at_is_the_first_run_after_the_delay(
+    known_at: datetime, available_after: timedelta, expected: tuple[int, int]
+) -> None:
+    result = scheduled_available_at(known_at, available_after, ISSUE_MINUTE)
+    assert (result.hour, result.minute, result.second, result.microsecond) == (*expected, 0, 0)
+
+
+def test_scheduled_available_at_crosses_midnight_into_the_next_day() -> None:
+    result = scheduled_available_at(
+        datetime(2026, 10, 12, 23, 40, tzinfo=UTC), timedelta(minutes=5), ISSUE_MINUTE
+    )
+    assert result == datetime(2026, 10, 13, 0, 30, tzinfo=UTC)
+
+
+def test_scheduled_available_at_rejects_naive_times() -> None:
+    with pytest.raises(ValueError, match="UTC"):
+        scheduled_available_at(datetime(2026, 10, 12), timedelta(0), ISSUE_MINUTE)  # noqa: DTZ001

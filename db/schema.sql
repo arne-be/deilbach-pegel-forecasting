@@ -69,7 +69,9 @@ CREATE TABLE public.input_forecasts (
     value double precision NOT NULL,
     fetched_at timestamp with time zone DEFAULT now() NOT NULL,
     kind text DEFAULT 'forecast'::text NOT NULL,
+    available_at timestamp with time zone NOT NULL,
     CONSTRAINT input_forecasts_check CHECK ((valid_at > run_at)),
+    CONSTRAINT input_forecasts_check1 CHECK ((available_at >= run_at)),
     CONSTRAINT input_forecasts_kind_check CHECK ((kind = 'forecast'::text))
 );
 
@@ -85,6 +87,8 @@ CREATE TABLE public.observations (
     coverage double precision,
     ingested_at timestamp with time zone DEFAULT now() NOT NULL,
     kind text DEFAULT 'observation'::text NOT NULL,
+    available_at timestamp with time zone NOT NULL,
+    CONSTRAINT observations_check CHECK ((available_at >= valid_at)),
     CONSTRAINT observations_coverage_check CHECK (((coverage > (0)::double precision) AND (coverage <= (1)::double precision))),
     CONSTRAINT observations_kind_check CHECK ((kind = 'observation'::text))
 );
@@ -113,6 +117,8 @@ CREATE TABLE public.series (
     period interval,
     description text DEFAULT ''::text NOT NULL,
     kind text NOT NULL,
+    available_after interval NOT NULL,
+    CONSTRAINT series_available_after_check CHECK ((available_after >= '00:00:00'::interval)),
     CONSTRAINT series_kind_check CHECK ((kind = ANY (ARRAY['observation'::text, 'forecast'::text])))
 );
 
@@ -221,4 +227,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261012133234'),
     ('20261013150000'),
     ('20261013160000'),
-    ('20261013170000');
+    ('20261013170000'),
+    ('20261013180000');

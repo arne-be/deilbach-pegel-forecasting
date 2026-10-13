@@ -11,26 +11,29 @@ from pegel.core.observations import Observation, require_utc
 from pegel.core.series import SeriesValue, level_series_id
 
 # One statement for the whole batch keeps backfills of a month to one round trip.
-# Unchanged rows are skipped, so the returned count says what actually changed.
+# Unchanged rows are skipped, so the returned count says what actually changed, and an
+# unchanged value keeps its first available_at. A revised value gets the time of the revision.
 UPSERT_SQL = """
-    INSERT INTO observations (series_id, valid_at, value, coverage)
+    INSERT INTO observations (series_id, valid_at, value, coverage, available_at)
     SELECT *
-    FROM unnest(%s::text[], %s::timestamptz[], %s::double precision[], %s::double precision[])
+    FROM unnest(%s::text[], %s::timestamptz[], %s::double precision[], %s::double precision[],
+                %s::timestamptz[])
     ON CONFLICT (series_id, valid_at) DO UPDATE
-    SET value = excluded.value, coverage = excluded.coverage, ingested_at = now()
+    SET value = excluded.value, coverage = excluded.coverage,
+        available_at = excluded.available_at, ingested_at = now()
     WHERE (observations.value, observations.coverage)
         IS DISTINCT FROM (excluded.value, excluded.coverage)
 """
 
 FETCH_SQL = """
-    SELECT series_id, valid_at, value, coverage, ingested_at, kind
+    SELECT series_id, valid_at, value, coverage, ingested_at, kind, available_at
     FROM observations
     WHERE series_id = %s AND valid_at >= %s AND valid_at < %s
     ORDER BY valid_at
 """
 
 NEWEST_SQL = """
-    SELECT series_id, valid_at, value, coverage, ingested_at, kind
+    SELECT series_id, valid_at, value, coverage, ingested_at, kind, available_at
     FROM observations
     WHERE series_id = %s AND valid_at <= %s
     ORDER BY valid_at DESC
@@ -50,6 +53,7 @@ def upsert_values(conn: psycopg.Connection[TupleRow], values: Sequence[SeriesVal
         [value.valid_at for value in values],
         [value.value for value in values],
         [value.coverage for value in values],
+        [value.available_at for value in values],
     )
     with conn.transaction(), conn.cursor() as cursor:
         cursor.execute(UPSERT_SQL, params)
@@ -81,19 +85,6 @@ def newest_value(
     return None if record is None else _to_value(record)
 
 
-def upsert_observations(
-    conn: psycopg.Connection[TupleRow], observations: Sequence[Observation]
-) -> int:
-    """Store gauge levels in their stations' level series, which must exist."""
-    return upsert_values(
-        conn,
-        [
-            SeriesValue(level_series_id(o.station_id), o.observed_at, o.level_cm)
-            for o in observations
-        ],
-    )
-
-
 def fetch_observations(
     conn: psycopg.Connection[TupleRow], station_id: str, start: datetime, end: datetime
 ) -> list[Observation]:
@@ -114,5 +105,9 @@ def _to_value(record: ObservationRecord) -> SeriesValue:
     # psycopg returns timestamps in the session time zone, which we don't control
     # through Neon's pooler, so convert explicitly.
     return SeriesValue(
-        record.series_id, record.valid_at.astimezone(UTC), record.value, record.coverage
+        record.series_id,
+        record.valid_at.astimezone(UTC),
+        record.value,
+        record.available_at.astimezone(UTC),
+        record.coverage,
     )

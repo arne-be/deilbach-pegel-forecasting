@@ -2,20 +2,20 @@
 
 import logging
 from collections.abc import Callable, Mapping
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import psycopg
 from psycopg.rows import TupleRow
 
 from pegel.adapters.storage.forecasts import save_forecast
-from pegel.adapters.storage.observations import newest_observation, upsert_observations
+from pegel.adapters.storage.observations import newest_observation, upsert_values
 from pegel.adapters.storage.series import ensure_series
 from pegel.config import PegelConfig, Station
 from pegel.core.forecasts import Forecast
 from pegel.core.observations import Observation
 from pegel.core.persistence import persistence_forecast
-from pegel.core.schedule import monthly_windows
-from pegel.core.series import level_series
+from pegel.core.schedule import monthly_windows, scheduled_available_at
+from pegel.core.series import SeriesValue, level_series
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +28,39 @@ class NoObservationError(Exception):
     """There is no observation to base a forecast on."""
 
 
-def ingest(fetch: FetchLevels, conn: Conn, station: Station, start: datetime, end: datetime) -> int:
-    """Fetches and stores one window. Returns the number of new or changed rows."""
+def ingest(
+    fetch: FetchLevels,
+    conn: Conn,
+    station: Station,
+    start: datetime,
+    end: datetime,
+    issue_minute: int,
+    *,
+    live: bool,
+) -> int:
+    """Fetches and stores one window. Returns the number of new or changed rows.
+
+    Live runs stamp new values with the time of the fetch. Backfills can't know when a value
+    first appeared, so they use the time the hourly run would first have used it.
+    """
     observations = fetch(station, start, end)
-    ensure_series(conn, [level_series(station)])
-    changed = upsert_observations(conn, observations)
+    fetched_at = datetime.now(UTC)
+    series = level_series(station)
+    ensure_series(conn, [series])
+    values = [
+        SeriesValue(
+            series.id,
+            observation.observed_at,
+            observation.level_cm,
+            fetched_at
+            if live
+            else scheduled_available_at(
+                observation.observed_at, series.available_after, issue_minute
+            ),
+        )
+        for observation in observations
+    ]
+    changed = upsert_values(conn, values)
     logger.info(
         "ingested window",
         extra={
@@ -55,11 +83,16 @@ def fetch_by_source(
 
 
 def backfill(
-    fetch: FetchLevels, conn: Conn, station: Station, start: datetime, end: datetime
+    fetch: FetchLevels,
+    conn: Conn,
+    station: Station,
+    start: datetime,
+    end: datetime,
+    issue_minute: int,
 ) -> int:
     """Ingests [start, end) in monthly chunks, so one failed month doesn't lose the others."""
     return sum(
-        ingest(fetch, conn, station, window_start, window_end)
+        ingest(fetch, conn, station, window_start, window_end, issue_minute, live=False)
         for window_start, window_end in monthly_windows(start, end)
     )
 
@@ -96,13 +129,14 @@ def run_hourly(
     """
     forecast_station = config.station(config.forecast.station_id)
     start = issued_at - timedelta(hours=config.forecast.ingest_lookback_hours)
-    ingest(fetch, conn, forecast_station, start, issued_at)
+    issue_minute = config.forecast.issue_minute
+    ingest(fetch, conn, forecast_station, start, issued_at, issue_minute, live=True)
     upstream_start = issued_at - timedelta(hours=config.forecast.upstream_ingest_lookback_hours)
     for station in config.stations:
         if station.id == forecast_station.id:
             continue
         try:
-            ingest(fetch, conn, station, upstream_start, issued_at)
+            ingest(fetch, conn, station, upstream_start, issued_at, issue_minute, live=True)
         except Exception:
             logger.exception(
                 "upstream ingest failed, continuing without it",

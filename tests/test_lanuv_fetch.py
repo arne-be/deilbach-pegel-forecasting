@@ -13,7 +13,11 @@ FIXTURES = Path(__file__).parent / "fixtures"
 WEEK_BODY = json.loads((FIXTURES / "lanuv_week.json").read_text(encoding="utf-8"))
 
 STATION = Station(
-    id="nierenhof", name="Felderbach Nierenhof", source="lanuv", source_label="2769649000100"
+    id="nierenhof",
+    name="Felderbach Nierenhof",
+    source="lanuv",
+    source_label="2769649000100",
+    available_after_minutes=20,
 )
 # The fixture's readings are 08:50, 08:55, 09:00 and 09:05 UTC.
 START = datetime(2026, 10, 13, 8, 55, tzinfo=UTC)

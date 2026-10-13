@@ -8,13 +8,15 @@ from psycopg.rows import TupleRow
 
 from pegel.core.series import InputForecastValue
 
-# Unchanged rows are skipped, so the returned count says what actually changed.
+# Unchanged rows are skipped, so the returned count says what actually changed, and an
+# unchanged value keeps its first available_at. A revised value gets the time of the revision.
 UPSERT_SQL = """
-    INSERT INTO input_forecasts (series_id, run_at, valid_at, value)
+    INSERT INTO input_forecasts (series_id, run_at, valid_at, value, available_at)
     SELECT *
-    FROM unnest(%s::text[], %s::timestamptz[], %s::timestamptz[], %s::double precision[])
+    FROM unnest(%s::text[], %s::timestamptz[], %s::timestamptz[], %s::double precision[],
+                %s::timestamptz[])
     ON CONFLICT (series_id, run_at, valid_at) DO UPDATE
-    SET value = excluded.value, fetched_at = now()
+    SET value = excluded.value, available_at = excluded.available_at, fetched_at = now()
     WHERE input_forecasts.value IS DISTINCT FROM excluded.value
 """
 
@@ -32,6 +34,7 @@ def upsert_input_forecasts(
         [value.run_at for value in values],
         [value.valid_at for value in values],
         [value.value for value in values],
+        [value.available_at for value in values],
     )
     with conn.transaction(), conn.cursor() as cursor:
         cursor.execute(UPSERT_SQL, params)
