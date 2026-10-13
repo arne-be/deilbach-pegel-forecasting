@@ -7,7 +7,7 @@ from pegel.core.observations import Observation
 from pegel.core.persistence import persistence_forecast
 
 OBSERVED_AT = datetime(2026, 10, 12, 12, 22, tzinfo=UTC)
-NEWEST = Observation("kupferdreh", OBSERVED_AT, 0.68)
+NEWEST = Observation("kupferdreh", OBSERVED_AT, 68.0)
 
 
 def test_forecast_has_one_point_per_hour_of_horizon() -> None:
@@ -23,19 +23,19 @@ def test_points_are_hourly_from_the_observation_time() -> None:
 
 def test_every_point_carries_the_newest_level() -> None:
     forecast = persistence_forecast(NEWEST, OBSERVED_AT, 48)
-    assert {point.level_m for point in forecast.points} == {0.68}
+    assert {point.level_cm for point in forecast.points} == {68.0}
 
 
 def test_negative_level_is_forecast_unchanged() -> None:
-    newest = Observation("kupferdreh", OBSERVED_AT, -0.25)
+    newest = Observation("kupferdreh", OBSERVED_AT, -25.0)
     forecast = persistence_forecast(newest, OBSERVED_AT, 48)
-    assert {point.level_m for point in forecast.points} == {-0.25}
+    assert {point.level_cm for point in forecast.points} == {-25.0}
 
 
 def test_forecast_across_dst_change_has_no_gaps_or_duplicates() -> None:
     # Berlin leaves summer time at 2026-10-25 01:00 UTC.
     observed_at = datetime(2026, 10, 24, 12, 0, tzinfo=UTC)
-    newest = Observation("kupferdreh", observed_at, 0.5)
+    newest = Observation("kupferdreh", observed_at, 50.0)
     forecast = persistence_forecast(newest, observed_at, 48)
     valid_times = [point.valid_at for point in forecast.points]
     steps = {later - earlier for earlier, later in pairwise(valid_times)}

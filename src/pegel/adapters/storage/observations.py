@@ -1,4 +1,4 @@
-"""Raw observations: idempotent upserts and time-window reads."""
+"""Observed values of any series, plus the level wrappers the jobs and the API use."""
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -6,89 +6,113 @@ from datetime import UTC, datetime
 import psycopg
 from psycopg.rows import TupleRow, class_row
 
-from pegel.adapters.storage.records import RawObservationRecord
+from pegel.adapters.storage.records import ObservationRecord
 from pegel.core.observations import Observation, require_utc
+from pegel.core.series import SeriesValue, level_series_id
 
 # One statement for the whole batch keeps backfills of a month to one round trip.
-# Unchanged rows are skipped, so the returned count says what actually changed.
+# Unchanged rows are skipped, so the returned count says what actually changed, and an
+# unchanged value keeps its first available_at. A revised value is stamped no earlier than the
+# issue slot that saw it, so a backfill can't date a revision back to the original value.
 UPSERT_SQL = """
-    INSERT INTO raw_observations (station_id, observed_at, level_m, source)
-    SELECT station_id, observed_at, level_m, %(source)s
-    FROM unnest(%(station_ids)s::text[], %(observed_ats)s::timestamptz[],
-                %(levels)s::double precision[]) AS batch (station_id, observed_at, level_m)
-    ON CONFLICT (station_id, observed_at) DO UPDATE
-    SET level_m = excluded.level_m, source = excluded.source, ingested_at = now()
-    WHERE (raw_observations.level_m, raw_observations.source)
-        IS DISTINCT FROM (excluded.level_m, excluded.source)
+    INSERT INTO observations (series_id, valid_at, value, coverage, available_at)
+    SELECT *
+    FROM unnest(%s::text[], %s::timestamptz[], %s::double precision[], %s::double precision[],
+                %s::timestamptz[])
+    ON CONFLICT (series_id, valid_at) DO UPDATE
+    SET value = excluded.value, coverage = excluded.coverage,
+        available_at = greatest(excluded.available_at, %s::timestamptz), ingested_at = now()
+    WHERE (observations.value, observations.coverage)
+        IS DISTINCT FROM (excluded.value, excluded.coverage)
 """
 
 FETCH_SQL = """
-    SELECT station_id, observed_at, level_m, source, ingested_at
-    FROM raw_observations
-    WHERE station_id = %s AND observed_at >= %s AND observed_at < %s
-    ORDER BY observed_at
+    SELECT series_id, valid_at, value, coverage, ingested_at, kind, available_at
+    FROM observations
+    WHERE series_id = %s AND valid_at >= %s AND valid_at < %s
+    ORDER BY valid_at
 """
 
 NEWEST_SQL = """
-    SELECT station_id, observed_at, level_m, source, ingested_at
-    FROM raw_observations
-    WHERE station_id = %s AND observed_at <= %s
-    ORDER BY observed_at DESC
+    SELECT series_id, valid_at, value, coverage, ingested_at, kind, available_at
+    FROM observations
+    WHERE series_id = %s AND valid_at <= %s
+    ORDER BY valid_at DESC
     LIMIT 1
 """
 
 
-def upsert_observations(
-    conn: psycopg.Connection[TupleRow],
-    observations: Sequence[Observation],
-    source: str,
+def upsert_values(
+    conn: psycopg.Connection[TupleRow], values: Sequence[SeriesValue], seen_at: datetime
 ) -> int:
-    """Insert or update observations; return how many rows were new or changed.
+    """Insert or update values of existing series; return how many rows were new or changed.
 
-    Rerunning with the same observations changes nothing and returns 0.
+    `seen_at` is the current issue slot; a changed value gets at least that as available_at.
+    Rerunning with the same values changes nothing and returns 0.
     """
-    if not observations:
+    if not values:
         return 0
-    params = {
-        "source": source,
-        "station_ids": [observation.station_id for observation in observations],
-        "observed_ats": [observation.observed_at for observation in observations],
-        "levels": [observation.level_m for observation in observations],
-    }
+    params = (
+        [value.series_id for value in values],
+        [value.valid_at for value in values],
+        [value.value for value in values],
+        [value.coverage for value in values],
+        [value.available_at for value in values],
+        seen_at,
+    )
     with conn.transaction(), conn.cursor() as cursor:
         cursor.execute(UPSERT_SQL, params)
         return cursor.rowcount
 
 
-def fetch_observations(
-    conn: psycopg.Connection[TupleRow],
-    station_id: str,
-    start: datetime,
-    end: datetime,
-) -> list[Observation]:
-    """Observations with start <= observed_at < end, oldest first."""
+def fetch_values(
+    conn: psycopg.Connection[TupleRow], series_id: str, start: datetime, end: datetime
+) -> list[SeriesValue]:
+    """Values with start <= valid_at < end, oldest first."""
     require_utc(start, "start")
     require_utc(end, "end")
-    with conn.cursor(row_factory=class_row(RawObservationRecord)) as cursor:
-        cursor.execute(FETCH_SQL, (station_id, start, end))
-        return [_to_observation(record) for record in cursor]
+    with conn.cursor(row_factory=class_row(ObservationRecord)) as cursor:
+        cursor.execute(FETCH_SQL, (series_id, start, end))
+        return [_to_value(record) for record in cursor]
+
+
+def newest_value(
+    conn: psycopg.Connection[TupleRow], series_id: str, at_or_before: datetime
+) -> SeriesValue | None:
+    """The newest value no later than `at_or_before`.
+
+    The bound keeps reruns for past issue times from using data that wasn't there yet.
+    """
+    require_utc(at_or_before, "at_or_before")
+    with conn.cursor(row_factory=class_row(ObservationRecord)) as cursor:
+        cursor.execute(NEWEST_SQL, (series_id, at_or_before))
+        record = cursor.fetchone()
+    return None if record is None else _to_value(record)
+
+
+def fetch_observations(
+    conn: psycopg.Connection[TupleRow], station_id: str, start: datetime, end: datetime
+) -> list[Observation]:
+    """A station's levels with start <= observed_at < end, oldest first."""
+    values = fetch_values(conn, level_series_id(station_id), start, end)
+    return [Observation(station_id, value.valid_at, value.value) for value in values]
 
 
 def newest_observation(
     conn: psycopg.Connection[TupleRow], station_id: str, at_or_before: datetime
 ) -> Observation | None:
-    """The newest observation no later than `at_or_before`.
-
-    The bound keeps reruns for past issue times from using data that wasn't there yet.
-    """
-    require_utc(at_or_before, "at_or_before")
-    with conn.cursor(row_factory=class_row(RawObservationRecord)) as cursor:
-        cursor.execute(NEWEST_SQL, (station_id, at_or_before))
-        record = cursor.fetchone()
-    return None if record is None else _to_observation(record)
+    """A station's newest level no later than `at_or_before`."""
+    value = newest_value(conn, level_series_id(station_id), at_or_before)
+    return None if value is None else Observation(station_id, value.valid_at, value.value)
 
 
-def _to_observation(record: RawObservationRecord) -> Observation:
+def _to_value(record: ObservationRecord) -> SeriesValue:
     # psycopg returns timestamps in the session time zone, which we don't control
     # through Neon's pooler, so convert explicitly.
-    return Observation(record.station_id, record.observed_at.astimezone(UTC), record.level_m)
+    return SeriesValue(
+        record.series_id,
+        record.valid_at.astimezone(UTC),
+        record.value,
+        record.available_at.astimezone(UTC),
+        record.coverage,
+    )

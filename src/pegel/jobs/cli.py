@@ -40,7 +40,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         station = config.station(config.forecast.station_id)
         with sources_from_env() as (fetch, conn):
-            changed = backfill(fetch, conn, station, start, end)
+            changed = backfill(fetch, conn, station, start, end, config.forecast.issue_minute)
         print(f"Backfill {start:%Y-%m-%d} to {end:%Y-%m-%d %H:%M} UTC: {changed} rows stored")
         return 0
     print(_describe(run_hourly_from_env(config, arguments.issued_at), config))
@@ -92,7 +92,7 @@ def _backfill_lanuv_files(
     with connect(_required_env("JOBS_DATABASE_URL")) as conn:
         conn.autocommit = True
         for station in stations:
-            changed = backfill(fetch, conn, station, start, end)
+            changed = backfill(fetch, conn, station, start, end, config.forecast.issue_minute)
             print(
                 f"Backfill {station.id} {start:%Y-%m-%d} to {end:%Y-%m-%d}: {changed} rows stored"
             )
@@ -152,7 +152,7 @@ def _describe(forecast: Forecast, config: PegelConfig) -> str:
     ]
     for summary in summarize(forecast, config.forecast.summary_horizons_hours, config.categories):
         lines.append(
-            f"  next {summary.horizon_hours:>2} h: max {summary.max_level_m:.2f} m "
+            f"  next {summary.horizon_hours:>2} h: max {summary.max_level_cm:.1f} cm "
             f"at {local(summary.valid_at_of_max)} -> category {summary.category.number} "
             f"({summary.category.name})"
         )

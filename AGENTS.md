@@ -20,6 +20,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - LANUV stations and value parser: `config/pegel.json`, `src/pegel/adapters/sources/lanuv.py`
 - Hourly live ingest of the upstream LANUV gauges (failures logged, never block the forecast): `src/pegel/adapters/sources/lanuv.py` (`fetch_levels`), `src/pegel/jobs/pipeline.py`
 - LANUV level history from open data CSV files (`pegel backfill --source lanuv-files`): `src/pegel/adapters/sources/lanuv_files.py`
+- Generic series tables (`series`, `observations`, `input_forecasts`): `src/pegel/core/series.py`, `src/pegel/adapters/storage/series.py`, `observations.py`, `input_forecasts.py`
 - `scripts/influx-query.sh` and the docs
 
 ## Layout

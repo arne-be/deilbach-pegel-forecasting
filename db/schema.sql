@@ -26,7 +26,7 @@ SET default_table_access_method = heap;
 CREATE TABLE public.forecast_points (
     forecast_id bigint NOT NULL,
     valid_at timestamp with time zone NOT NULL,
-    level_m double precision NOT NULL
+    level_cm double precision NOT NULL
 );
 
 
@@ -59,15 +59,38 @@ ALTER TABLE public.forecasts ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 
 --
--- Name: raw_observations; Type: TABLE; Schema: public; Owner: -
+-- Name: input_forecasts; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.raw_observations (
-    station_id text NOT NULL,
-    observed_at timestamp with time zone NOT NULL,
-    level_m double precision NOT NULL,
-    source text NOT NULL,
-    ingested_at timestamp with time zone DEFAULT now() NOT NULL
+CREATE TABLE public.input_forecasts (
+    series_id text NOT NULL,
+    run_at timestamp with time zone NOT NULL,
+    valid_at timestamp with time zone NOT NULL,
+    value double precision NOT NULL,
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL,
+    kind text DEFAULT 'forecast'::text NOT NULL,
+    available_at timestamp with time zone NOT NULL,
+    CONSTRAINT input_forecasts_check CHECK ((valid_at > run_at)),
+    CONSTRAINT input_forecasts_check1 CHECK ((available_at >= run_at)),
+    CONSTRAINT input_forecasts_kind_check CHECK ((kind = 'forecast'::text))
+);
+
+
+--
+-- Name: observations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.observations (
+    series_id text NOT NULL,
+    valid_at timestamp with time zone NOT NULL,
+    value double precision NOT NULL,
+    coverage double precision,
+    ingested_at timestamp with time zone DEFAULT now() NOT NULL,
+    kind text DEFAULT 'observation'::text NOT NULL,
+    available_at timestamp with time zone NOT NULL,
+    CONSTRAINT observations_check CHECK ((available_at >= valid_at)),
+    CONSTRAINT observations_coverage_check CHECK (((coverage > (0)::double precision) AND (coverage <= (1)::double precision))),
+    CONSTRAINT observations_kind_check CHECK ((kind = 'observation'::text))
 );
 
 
@@ -77,6 +100,24 @@ CREATE TABLE public.raw_observations (
 
 CREATE TABLE public.schema_migrations (
     version character varying NOT NULL
+);
+
+
+--
+-- Name: series; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.series (
+    id text NOT NULL,
+    variable text NOT NULL,
+    unit text NOT NULL,
+    source text NOT NULL,
+    location text NOT NULL,
+    aggregation text,
+    period interval,
+    description text DEFAULT ''::text NOT NULL,
+    kind text NOT NULL,
+    CONSTRAINT series_kind_check CHECK ((kind = ANY (ARRAY['observation'::text, 'forecast'::text])))
 );
 
 
@@ -105,11 +146,19 @@ ALTER TABLE ONLY public.forecasts
 
 
 --
--- Name: raw_observations raw_observations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: input_forecasts input_forecasts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.raw_observations
-    ADD CONSTRAINT raw_observations_pkey PRIMARY KEY (station_id, observed_at);
+ALTER TABLE ONLY public.input_forecasts
+    ADD CONSTRAINT input_forecasts_pkey PRIMARY KEY (series_id, run_at, valid_at);
+
+
+--
+-- Name: observations observations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.observations
+    ADD CONSTRAINT observations_pkey PRIMARY KEY (series_id, valid_at);
 
 
 --
@@ -121,11 +170,43 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: series series_id_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.series
+    ADD CONSTRAINT series_id_kind_key UNIQUE (id, kind);
+
+
+--
+-- Name: series series_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.series
+    ADD CONSTRAINT series_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: forecast_points forecast_points_forecast_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.forecast_points
     ADD CONSTRAINT forecast_points_forecast_id_fkey FOREIGN KEY (forecast_id) REFERENCES public.forecasts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: input_forecasts input_forecasts_series_id_kind_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.input_forecasts
+    ADD CONSTRAINT input_forecasts_series_id_kind_fkey FOREIGN KEY (series_id, kind) REFERENCES public.series(id, kind);
+
+
+--
+-- Name: observations observations_series_id_kind_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.observations
+    ADD CONSTRAINT observations_series_id_kind_fkey FOREIGN KEY (series_id, kind) REFERENCES public.series(id, kind);
 
 
 --
@@ -141,4 +222,8 @@ ALTER TABLE ONLY public.forecast_points
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('20261012133232'),
-    ('20261012133234');
+    ('20261012133234'),
+    ('20261013150000'),
+    ('20261013160000'),
+    ('20261013170000'),
+    ('20261013180000');

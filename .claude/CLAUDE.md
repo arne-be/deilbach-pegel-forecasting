@@ -30,7 +30,7 @@ After every change, run in this order:
 - **Negative levels are real.** The level is relative to the staff gauge zero, so values below 0 are valid. Don't clip or drop them.
 - **Never present stale data as current.** Every forecast carries its issue time and the time of the newest observation it used.
 - **Time:** store and compute in UTC; display in Europe/Berlin.
-- **Units:** metres relative to the local zero point. German formatting (`0,68 m`) only in the UI.
+- **Units:** levels in centimetres relative to the local zero point. German formatting (`68,5 cm`) only in the UI.
 - **Language:** website in German; code, comments, docs and commits in English.
 - Category thresholds, horizons and station IDs live in one config place, never hard-coded in several files.
 

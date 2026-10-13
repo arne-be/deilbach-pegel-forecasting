@@ -19,6 +19,11 @@ def migrate_up_section(migration: str) -> str:
     return up_and_down.split("-- migrate:down", 1)[0]
 
 
+def migrate_down_section(migration: str) -> str:
+    """The SQL after `-- migrate:down`, as dbmate runs it on rollback."""
+    return migration.split("-- migrate:down", 1)[1]
+
+
 def apply_migrations(conn: psycopg.Connection[TupleRow]) -> None:
     # dbmate runs each file in its own transaction, in file name order.
     for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
@@ -43,4 +48,6 @@ def conn(database_url: str) -> Iterator[psycopg.Connection[TupleRow]]:
     with psycopg.connect(database_url, autocommit=True) as connection:
         yield connection
         connection.execute("RESET ROLE")
-        connection.execute("TRUNCATE raw_observations, forecasts, forecast_points")
+        connection.execute(
+            "TRUNCATE series, observations, input_forecasts, forecasts, forecast_points"
+        )

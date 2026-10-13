@@ -34,7 +34,7 @@ def forecast(observed_at: datetime, levels: list[float], model: str = "persisten
 
 def test_returns_the_newest_forecast(client: TestClient, conn: Conn) -> None:
     save_forecast(conn, forecast(OBSERVED_AT - timedelta(hours=1), [0.5, 0.5]))
-    save_forecast(conn, forecast(OBSERVED_AT, [-0.2, -0.1]))
+    save_forecast(conn, forecast(OBSERVED_AT, [-20.0, -10.0]))
     response = client.get("/api/forecast")
     assert response.status_code == 200
     assert response.json() == {
@@ -43,16 +43,16 @@ def test_returns_the_newest_forecast(client: TestClient, conn: Conn) -> None:
         "issued_at": "2026-10-12T15:30:00Z",
         "newest_observation_at": "2026-10-12T15:22:00Z",
         "points": [
-            {"valid_at": "2026-10-12T16:22:00Z", "level_m": -0.2},
-            {"valid_at": "2026-10-12T17:22:00Z", "level_m": -0.1},
+            {"valid_at": "2026-10-12T16:22:00Z", "level_cm": -20.0},
+            {"valid_at": "2026-10-12T17:22:00Z", "level_cm": -10.0},
         ],
     }
 
 
 def test_ignores_forecasts_of_other_models(client: TestClient, conn: Conn) -> None:
-    save_forecast(conn, forecast(OBSERVED_AT, [0.1], model="persistence"))
+    save_forecast(conn, forecast(OBSERVED_AT, [10.0], model="persistence"))
     save_forecast(conn, forecast(OBSERVED_AT + timedelta(hours=1), [0.9], model="experiment"))
-    assert client.get("/api/forecast").json()["points"][0]["level_m"] == 0.1
+    assert client.get("/api/forecast").json()["points"][0]["level_cm"] == 10.0
 
 
 def test_no_forecast_is_404(client: TestClient) -> None:

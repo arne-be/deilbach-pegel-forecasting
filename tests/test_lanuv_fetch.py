@@ -13,7 +13,11 @@ FIXTURES = Path(__file__).parent / "fixtures"
 WEEK_BODY = json.loads((FIXTURES / "lanuv_week.json").read_text(encoding="utf-8"))
 
 STATION = Station(
-    id="nierenhof", name="Felderbach Nierenhof", source="lanuv", source_label="2769649000100"
+    id="nierenhof",
+    name="Felderbach Nierenhof",
+    source="lanuv",
+    source_label="2769649000100",
+    available_after_minutes=20,
 )
 # The fixture's readings are 08:50, 08:55, 09:00 and 09:05 UTC.
 START = datetime(2026, 10, 13, 8, 55, tzinfo=UTC)
@@ -49,13 +53,13 @@ def ok() -> httpx.Response:
     return httpx.Response(200, json=WEEK_BODY)
 
 
-def test_readings_are_parsed_to_metres_and_utc() -> None:
+def test_readings_are_parsed_to_centimetres_and_utc() -> None:
     first = parse_week(WEEK_BODY, STATION)[0]
     assert (first.station_id, first.observed_at) == (
         "nierenhof",
         datetime(2026, 10, 13, 8, 50, tzinfo=UTC),
     )
-    assert first.level_m == pytest.approx(0.14)
+    assert first.level_cm == 14.0
 
 
 def test_gaps_are_skipped() -> None:

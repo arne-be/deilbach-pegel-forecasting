@@ -83,7 +83,7 @@ def _parse_timeout(raw: str) -> float:
 
 
 def parse_levels(response_json: Any, station_id: str) -> list[Observation]:
-    """Turns an InfluxDB /query answer with epoch=ms into observations in metres.
+    """Turns an InfluxDB /query answer with epoch=ms into observations in centimetres.
 
     Rows with a null level are skipped and counted in a warning: a missing reading is a gap,
     and gaps are handled downstream, not filled here.
@@ -125,7 +125,7 @@ def parse_levels(response_json: Any, station_id: str) -> list[Observation]:
                 Observation(
                     station_id=station_id,
                     observed_at=_parse_epoch_ms(row[time_index]),
-                    level_m=_millimetres_to_metres(level_mm),
+                    level_cm=_millimetres_to_centimetres(level_mm),
                 )
             )
     if null_count:
@@ -142,10 +142,12 @@ def _parse_epoch_ms(value: Any) -> datetime:
     return _EPOCH + timedelta(milliseconds=value)
 
 
-def _millimetres_to_metres(value: Any) -> float:
+def _millimetres_to_centimetres(value: Any) -> float:
     if not isinstance(value, int | float) or isinstance(value, bool):
         raise InfluxError(f"level is not a number: {value!r}")
-    return value / 1000
+    # Whole millimetres divide cleanly, but a fractional one doesn't (-399.9 / 10 gives
+    # -39.989999999999995). 0.001 cm is finer than any reading, so rounding changes none.
+    return round(value / 10, 3)
 
 
 def fetch_levels(

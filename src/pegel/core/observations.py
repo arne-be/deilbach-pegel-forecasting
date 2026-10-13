@@ -11,11 +11,11 @@ def require_utc(value: datetime, field_name: str) -> None:
 
 @dataclass(frozen=True)
 class Observation:
-    """One level reading in metres relative to the local zero point. Negative values are real."""
+    """One level reading in cm relative to the local zero point. Negative values are real."""
 
     station_id: str
     observed_at: datetime
-    level_m: float
+    level_cm: float
 
     def __post_init__(self) -> None:
         require_utc(self.observed_at, "observed_at")

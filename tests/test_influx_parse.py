@@ -24,9 +24,14 @@ def load_fixture(name: str) -> Any:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
-def test_levels_are_converted_from_millimetres_to_metres() -> None:
+def test_levels_are_converted_from_millimetres_to_centimetres() -> None:
     observations = parse_levels(load_fixture("influx_levels.json"), "kupferdreh")
-    assert [observation.level_m for observation in observations] == [-0.237, -0.25, 0.6845]
+    assert [observation.level_cm for observation in observations] == [-23.7, -25.0, 68.45]
+
+
+def test_fractional_millimetres_leave_no_float_noise() -> None:
+    response = {"results": [{"series": [{"columns": ["time", "level"], "values": [[0, -399.9]]}]}]}
+    assert parse_levels(response, "kupferdreh")[0].level_cm == -39.99
 
 
 def test_timestamps_are_parsed_as_utc() -> None:

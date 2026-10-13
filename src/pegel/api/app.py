@@ -67,7 +67,7 @@ def forecast(
         issued_at=newest.issued_at,
         newest_observation_at=newest.newest_observation_at,
         points=[
-            ForecastPointResponse(valid_at=point.valid_at, level_m=point.level_m)
+            ForecastPointResponse(valid_at=point.valid_at, level_cm=point.level_cm)
             for point in newest.points
         ],
     )
@@ -111,7 +111,7 @@ def history(
         first_day=first_day,
         last_day=last_day,
         observations=[
-            HistoryPoint(observed_at=observation.observed_at, level_m=observation.level_m)
+            HistoryPoint(observed_at=observation.observed_at, level_cm=observation.level_cm)
             for observation in observations
         ],
     )

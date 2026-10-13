@@ -27,15 +27,15 @@ Hourly water level forecast for the **Deilbach at Kupferdreh** (Essen), 48 hours
 
 ## Flood categories
 
-Levels are relative to the local zero point: the concrete ledge of the sewer outlet. The water can be up to 25 cm below it.
+Levels are relative to the local zero point: the concrete ledge of the sewer outlet. The water can be up to 25 cm below it. All levels are in centimetres.
 
 | Category | Level | What happens |
 |---|---|---|
-| 1 · unkritisch | up to 1.00 m | No action needed. |
-| 2 · kritisch | 1.00–1.20 m | From 1.20 m: close the backflow valve and connect the pump. The Deilbach overflows at the Kupferdreh car park. |
-| 3 · sehr kritisch | 1.20–1.40 m | From 1.40 m water goes over the wall. Set up mobile flood barriers. |
-| 4 · extrem kritisch | 1.40–1.80 m | Barriers and raised wall keep water out of the yard. Lay sandbags in the yard. |
-| 5 · Chaos | above 1.80 m | Water flows into the yard. Clear the ground floor flat, switch off power. |
+| 1 · unkritisch | up to 100 cm | No action needed. |
+| 2 · kritisch | 100–120 cm | From 120 cm: close the backflow valve and connect the pump. The Deilbach overflows at the Kupferdreh car park. |
+| 3 · sehr kritisch | 120–140 cm | From 140 cm water goes over the wall. Set up mobile flood barriers. |
+| 4 · extrem kritisch | 140–180 cm | Barriers and raised wall keep water out of the yard. Lay sandbags in the yard. |
+| 5 · Chaos | above 180 cm | Water flows into the yard. Clear the ground floor flat, switch off power. |
 
 ## Plan (first version, one week)
 
@@ -79,7 +79,7 @@ On AWS, credentials and the client key come from AWS Secrets Manager, not from e
 
 ## Known limitations
 
-- **Few floods in the data.** Records start in March 2023. The highest level so far was 1.20 m on 19.11.2024; there are no examples of category 3 or higher. The model will be reliable in normal conditions and much less certain in the situations that matter most.
+- **Few floods in the data.** Records start in March 2023. The highest level so far was 120 cm on 19.11.2024; there are no examples of category 3 or higher. The model will be reliable in normal conditions and much less certain in the situations that matter most.
 - **Short lead time from gauges.** Langenberg leads Kupferdreh by about one hour. Beyond a few hours the forecast depends almost entirely on the rain forecast, which is often off for a small catchment.
 - **Data access.** Still to confirm: automatic access to the public gauge data, how far back it goes, and whether we may show it on the website.
 - **Historical rain forecasts** may be hard to find, which limits how well the model can learn from them.

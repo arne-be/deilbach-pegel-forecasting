@@ -19,9 +19,9 @@ UPSERT_FORECAST_SQL = """
 DELETE_POINTS_SQL = "DELETE FROM forecast_points WHERE forecast_id = %s"
 
 INSERT_POINTS_SQL = """
-    INSERT INTO forecast_points (forecast_id, valid_at, level_m)
-    SELECT %s, valid_at, level_m
-    FROM unnest(%s::timestamptz[], %s::double precision[]) AS batch (valid_at, level_m)
+    INSERT INTO forecast_points (forecast_id, valid_at, level_cm)
+    SELECT %s, valid_at, level_cm
+    FROM unnest(%s::timestamptz[], %s::double precision[]) AS batch (valid_at, level_cm)
 """
 
 NEWEST_FORECAST_SQL = """
@@ -33,7 +33,7 @@ NEWEST_FORECAST_SQL = """
 """
 
 POINTS_SQL = """
-    SELECT forecast_id, valid_at, level_m
+    SELECT forecast_id, valid_at, level_cm
     FROM forecast_points
     WHERE forecast_id = %s
     ORDER BY valid_at
@@ -64,7 +64,7 @@ def save_forecast(conn: psycopg.Connection[TupleRow], forecast: Forecast) -> Non
             (
                 forecast_id,
                 [point.valid_at for point in forecast.points],
-                [point.level_m for point in forecast.points],
+                [point.level_cm for point in forecast.points],
             ),
         )
 
@@ -81,7 +81,7 @@ def newest_forecast(
     with conn.cursor(row_factory=class_row(ForecastPointRecord)) as cursor:
         cursor.execute(POINTS_SQL, (forecast_record.id,))
         points = tuple(
-            ForecastPoint(record.valid_at.astimezone(UTC), record.level_m) for record in cursor
+            ForecastPoint(record.valid_at.astimezone(UTC), record.level_cm) for record in cursor
         )
     # Timestamps come back in the session time zone; the core types require UTC.
     return Forecast(

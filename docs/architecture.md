@@ -50,6 +50,28 @@ If training ever takes longer than Lambda's 15 minutes, the jobs image runs as a
 
 **Neon Postgres (free plan, Frankfurt)** holds observations (raw and cleaned), forecasts and model metadata. That's about 100 MB per year; the free plan allows 1 GB.
 
+Measured and forecast inputs live in three generic tables, so a new input needs a new row, not a new table or migration:
+- `series`: what a series is (variable, unit, source, location, area aggregation, period), with a readable id such as `kupferdreh:level` or `radolan_rw:zone:neviges`. Each series has a `kind`, `observation` or `forecast`, and the database rejects a value written to a series of the other kind; `ensure_series` refuses to change the kind, variable or unit of a stored series, since that would relabel its values without converting them; such a change needs a migration. Each job ensures its own series rows before it writes values.
+- `observations`: measured values per series and time, e.g. gauge levels (in cm relative to the local zero point), radar rain, soil moisture.
+- `input_forecasts`: forecasts made by others per series, model run and valid time, e.g. ICON-D2 rain.
+
+Our own level forecasts stay in `forecasts` and `forecast_points`.
+
+**Availability for training.** A model may only learn from inputs that were there at the issue time. `ingested_at` doesn't say that: it moves when a value changes, and for backfilled rows it's the backfill date. So every value in `observations` and `input_forecasts` has `available_at`, and training uses a value only if `available_at <= issue time`.
+- **Live runs** stamp new values with the issue slot of the run that fetched them (the :30 at or before the fetch), so that run may use them. The exact fetch time stays in `ingested_at` and `fetched_at`.
+- **Backfills** can't know when a value first appeared, so they imitate the live system: live data only ever enters through the hourly run at :30. A value gets the first run at or after `valid_at + available_after` (observations) or `run_at + available_after` (forecast runs), where `available_after` is the source's typical delay until its values are reliably there (`scheduled_available_at` in `core/schedule.py`). The migration that added `available_at` filled all older rows the same way, because we can't tell which were live.
+- An unchanged value keeps its first `available_at` on every rerun. A revised value, e.g. LANUV replacing a raw reading with a checked one, gets the slot in which we first saw the revision, even when a backfill brings it in. Otherwise a backfill would date the checked value back to the raw one.
+
+`available_after` is measured per source, with a margin, and lives in `config/pegel.json` (`available_after_minutes`, on each station). Jobs read it from there; the database keeps only the result, `available_at`, so training needs no delay of its own. Measured on 2026-10-13:
+
+| Source | Measured | `available_after` |
+|---|---|---|
+| Influx (Kupferdreh) | the :22 reading is queryable within a minute | 5 min |
+| LANUV Nierenhof, Neviges | 5-minute values, the portal file is rewritten every 5 minutes; newest value 1 to 12 minutes old | 15 min |
+| LANUV Langenberg | sends once an hour: the batch for hh:10 to hh+1:05 appeared at 13:06–13:11 and 14:15 UTC, so its oldest value was 56 to 65 minutes old | 75 min |
+
+A delay only matters up to the next :30 run, so a generous margin rarely costs a run.
+
 Neon suspends the database when it's idle and wakes it on the next connection. The free plan includes 100 compute hours per month. If they run out, the database stays off until the next month. That's why normal page visits never touch the database (see below).
 
 Neon is set up by hand once, following [setup-neon.md](setup-neon.md). The schema and grants come from migrations. Three roles: one for migrations, one for the jobs (read and write) and one for the API (read only).
