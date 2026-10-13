@@ -39,7 +39,7 @@ Radar cells are the 1 km RADOLAN cells whose centre lies in the zone. Model poin
 
 ## Forecast ring
 
-`ring_10km` is the catchment widened by 10 km (872 km², 280 ICON-D2 points). Weather models often place a shower 10 to 30 km from where it falls. The ring catches storms the model puts just outside the catchment.
+`ring_10km` is the catchment widened by 10 km (872 km², 281 ICON-D2 points, 70 of them used). Weather models often place a shower 10 to 30 km from where it falls. The ring catches storms the model puts just outside the catchment.
 
 ## Rain data we collect
 
@@ -62,19 +62,22 @@ The mean over the whole catchment is the area-weighted mean of the zones, so it 
 
 DWD's 2.2 km weather model. A new run starts every 3 hours and reaches 48 hours ahead. Open-Meteo serves it as JSON (`models=icon_d2`, `hourly=precipitation`) and keeps past forecasts. The free tier is for non-commercial use only, which fits this project as long as it stays non-commercial.
 
-We fetch the 280 ring points once per new run, so about 8 times a day, and store the run's start time with each forecast. Training then only sees forecasts as they were issued.
+We fetch every second ICON-D2 grid point (0.04°, about 4.4 km apart): 70 points in the ring, 9 of them in the catchment. We fetch once per new run, so about 8 times a day, and store the run's start time with each forecast. Training then only sees forecasts as they were issued.
 
 Per run, for each lead time from +1 h to +48 h:
 
 | Series | Value | Points |
 |---|---|---|
-| `catchment:mean` | Mean over the catchment | 36 |
-| `ring:p90` | 90th percentile over the ring | 280 |
-| `zone:neviges` … `zone:lower` | Mean per zone | 3 to 12 each |
+| `catchment:mean` | Mean over the catchment | 9 |
+| `ring:p90` | 90th percentile over the ring | 70 |
 
-That's 7 × 48 = 336 values per run. The zone means are kept to test whether they help. We expect the catchment mean and the ring value to carry most of the signal, because the model's position errors are larger than the zones.
+That's 2 × 48 = 96 values per run, about 70 Open-Meteo calls per run and 560 a day. The free tier allows 10,000 a day.
 
-For training before we started collecting, Open-Meteo's Previous Runs API has ICON-D2 from February 2024. It gives, for each hour, the forecast from the newest run and from the run about a day earlier, not every lead time.
+Why every second point: on three rainy days in 2024 and 2026, the mean of 9 points matched the mean of all 36 catchment points within 3% of the 48-hour total. One centre point was off by up to 25%, three points by up to 22%. The ring value is rougher with 70 points (one peak came out at 3.1 instead of 4.6 mm/h). It only has to say whether a storm is near.
+
+Forecasts per zone are left out for now. Single zones would get only 1 to 3 points. Open-Meteo keeps its archive, so we can fetch all points later and test whether zones help.
+
+For training before we started collecting, Open-Meteo's Previous Runs API has ICON-D2 from February 2024. It gives, for each hour, the forecast from the newest run and from the run about a day earlier, not every lead time. These rows are stored under their own source, `open_meteo_previous_runs`, with an approximate run time.
 
 ### Later
 
