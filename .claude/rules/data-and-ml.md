@@ -11,6 +11,7 @@ description: Standards for data pipelines, jobs and forecasting models
 - Check schemas, units, value ranges and timestamps when data enters the system.
 - External calls use timeouts and retries with backoff. After retries fail, fail visibly instead of producing partial output.
 - Schema changes go through versioned migrations, never by hand.
+- **Optional inputs in the hourly job can't cost the forecast.** Before adding one, add up its worst case (timeout × tries × requests) against the Lambda limit; the level forecast is saved last. Fetch the newest data first and catch up older data within a time budget, so a slow source delays history, not the live forecast.
 
 ## Models
 - Build and beat a simple baseline (e.g. persistence) first; report every model against it.
