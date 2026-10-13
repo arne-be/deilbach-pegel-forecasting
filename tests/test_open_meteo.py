@@ -133,24 +133,52 @@ def test_rejects_gaps_in_hours() -> None:
         parse_points(body, POINTS, ["precipitation"])
 
 
-def test_retries_server_errors_then_succeeds() -> None:
+def fetch_archive_days(client: httpx.Client) -> dict[str, Any]:
+    first, last = date(2024, 11, 18), date(2024, 11, 19)
+    return fetch_archive(client, POINTS, VARIABLES, first, last, sleep=no_sleep)
+
+
+def test_archive_retries_server_errors_then_succeeds() -> None:
     client, requests = client_answering(
-        httpx.Response(503), httpx.Response(200, json=fixture("meta.json"))
+        httpx.Response(503), httpx.Response(200, json=fixture("archive_2024-11-18_19.json"))
     )
-    assert latest_run(client, sleep=no_sleep) == RUN_AT
+    assert set(fetch_archive_days(client)) == set(VARIABLES)
     assert len(requests) == 2
 
 
-def test_gives_up_after_repeated_server_errors() -> None:
+def test_archive_gives_up_after_repeated_server_errors() -> None:
     client, requests = client_answering(*[httpx.Response(500)] * open_meteo.MAX_ATTEMPTS)
     with pytest.raises(OpenMeteoError):
-        latest_run(client, sleep=no_sleep)
+        fetch_archive_days(client)
     assert len(requests) == open_meteo.MAX_ATTEMPTS
+
+
+def test_live_requests_are_not_retried() -> None:
+    client, requests = client_answering(httpx.Response(503), httpx.Response(503))
+    with pytest.raises(OpenMeteoError):
+        latest_run(client)
+    with pytest.raises(OpenMeteoError):
+        fetch_forecast(client, POINTS, RUN_AT, RUN_AT + timedelta(hours=49))
+    assert len(requests) == 2
+
+
+def test_slowly_trickling_body_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = iter(range(0, 1000, 10))
+    monkeypatch.setattr("pegel.adapters.sources.open_meteo.time.monotonic", lambda: next(clock))
+    chunks = [b"{", b'"last_run_initialisation_time"', b": 1791882000}"]
+
+    class Trickle(httpx.SyncByteStream):
+        def __iter__(self) -> Any:
+            yield from chunks
+
+    client, _ = client_answering(httpx.Response(200, stream=Trickle()))
+    with pytest.raises(OpenMeteoError, match="ReadTimeout"):
+        latest_run(client)
 
 
 def test_rate_limit_raises_at_once() -> None:
     answer = httpx.Response(429, json={"error": True, "reason": "Minutely API request limit"})
     client, requests = client_answering(answer)
     with pytest.raises(RateLimitedError, match="Minutely"):
-        fetch_forecast(client, POINTS, RUN_AT, RUN_AT + timedelta(hours=49), sleep=no_sleep)
+        fetch_forecast(client, POINTS, RUN_AT, RUN_AT + timedelta(hours=49))
     assert len(requests) == 1

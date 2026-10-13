@@ -77,6 +77,24 @@ def test_check_run_rejects_data_from_another_run(point_values: list[float | None
         check_run(series, RUN_AT, 3)
 
 
+def test_check_run_rejects_a_shortened_answer() -> None:
+    series = PointSeries(hours_after_run(5)[1:], [[0.0, 0.0, None, None]] * 3)
+    with pytest.raises(RunMismatchError):
+        check_run(series, RUN_AT, 3)
+
+
+def test_check_run_rejects_a_gap_in_hours() -> None:
+    times = [*hours_after_run(1), *hours_after_run(5)[2:]]
+    with pytest.raises(RunMismatchError):
+        check_run(PointSeries(times, [[0.0, 0.0, 0.0, None]] * 3), RUN_AT, 3)
+
+
+def test_check_run_rejects_a_point_starting_late() -> None:
+    series = PointSeries(hours_after_run(4), [[0.0, 0.0, 0.0, None], [None, 0.0, 0.0, None]])
+    with pytest.raises(RunMismatchError, match="starts"):
+        check_run(series, RUN_AT, 3)
+
+
 def test_check_run_needs_the_hour_after_the_horizon() -> None:
     with pytest.raises(ValueError):
         check_run(PointSeries(hours_after_run(3), [[0.0] * 3] * 3), RUN_AT, 3)

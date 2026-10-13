@@ -35,7 +35,8 @@ ARCHIVE_CHUNK_DAYS = 14
 # One 70-point chunk weighs 70 calls. A request a minute stays far below Open-Meteo's 600 calls
 # a minute and, with the hourly job, below its 5,000 an hour.
 ARCHIVE_SECONDS_BETWEEN_REQUESTS = 60.0
-# Stop well before the 10,000 calls a day, leaving room for the hourly job.
+# Per invocation; stop well before the 10,000 calls a day, leaving room for the hourly job.
+# Reaching it, or a 429, stops the backfill cleanly with the date to resume from.
 ARCHIVE_MAX_CALLS = 9000
 # Day 0 values of the last hours aren't final until their run is out (about 85 min after it
 # starts); before that the archive serves longer lead times under the same variable.
@@ -53,14 +54,13 @@ def ingest_newest_run(
     conn: Conn,
     settings: RainForecastSettings,
     points: Sequence[GridPoint],
-    *,
-    sleep: Callable[[float], None] = time.sleep,
 ) -> int:
     """Stores the newest ICON-D2 run if it isn't stored yet. Returns the changed row count.
 
-    Without a new run it only reads the small metadata file, no forecast request.
+    Without a new run it only reads the small metadata file, no forecast request. Requests get
+    one short try each, so a slow Open-Meteo can't hold up the level forecast.
     """
-    run_at = open_meteo.latest_run(client, sleep=sleep)
+    run_at = open_meteo.latest_run(client)
     stored = newest_run_at(conn, catchment_series_id(settings.source))
     context = {"job": "rain_forecast", "run_at": run_at.isoformat()}
     if stored is not None and stored >= run_at:
@@ -73,7 +73,6 @@ def ingest_newest_run(
             points,
             run_at + timedelta(hours=1),
             run_at + timedelta(hours=settings.horizon_hours + 1),
-            sleep=sleep,
         )
     except open_meteo.RateLimitedError as error:
         logger.warning(
@@ -81,8 +80,9 @@ def ingest_newest_run(
         )
         return 0
     check_run(series, run_at, settings.horizon_hours)
-    # A run published during the fetch could have mixed into the answer.
-    if open_meteo.latest_run(client, sleep=sleep) != run_at:
+    # check_run catches a whole answer from another run. This catches the next run finishing
+    # while the answer was being built, which could mix both runs within one point's hours.
+    if open_meteo.latest_run(client) != run_at:
         logger.warning("new run published during the fetch, next run catches up", extra=context)
         return 0
     values = run_values(

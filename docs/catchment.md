@@ -85,14 +85,14 @@ The forecast answer doesn't say which run it comes from. Open-Meteo's model meta
 
 The hourly step reads the metadata first. If the newest stored run of the live catchment series is that run or later, it stops: no forecast request. Otherwise it asks for the hours from run + 1 h to run + 49 h and checks:
 
-- Each point has data up to exactly run + 48 h and none after. A run's data ends at its horizon, so data still from the previous run ends 3 hours early and data from the next run 3 hours late. Either way nothing is stored.
+- The hours run from run + 1 h without a gap, and each point has data from run + 1 h to exactly run + 48 h and none after. A run's data ends at its horizon, so data still from the previous run ends 3 hours early and data from the next run 3 hours late. Either way nothing is stored.
 - The metadata still names the same run after the fetch.
 
 Hours before the run in Open-Meteo's answer come from older runs, so only run < valid_at ≤ run + 48 h is stored. `precipitation` is the sum of the preceding hour (Open-Meteo docs), so the time Open-Meteo gives is already `valid_at`.
 
 The request uses `cell_selection=nearest`. Without it Open-Meteo may pick a neighbouring cell with a better-matching elevation; one of our 70 points came back 0.02° off.
 
-On HTTP 429 the step logs and skips; the next hourly run fetches the run it missed, if it's still the newest.
+Each request gets one try of at most 15 seconds, so a slow Open-Meteo can't hold up the level forecast in the same Lambda run. On an error or HTTP 429 the step logs and skips; the next hourly run fetches the run it missed, if it's still the newest.
 
 #### Archive: Previous Runs API
 

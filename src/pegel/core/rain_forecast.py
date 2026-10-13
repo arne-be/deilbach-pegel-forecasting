@@ -45,7 +45,6 @@ def ring_series_id(source: str, percentile: int) -> str:
 
 def forecast_series(source: str, percentile: int, note: str) -> list[Series]:
     """The two stored rain forecast series of one source. `note` says where runs come from."""
-    hour = timedelta(hours=1)
     return [
         Series(
             id=catchment_series_id(source),
@@ -55,7 +54,7 @@ def forecast_series(source: str, percentile: int, note: str) -> list[Series]:
             location="catchment",
             kind="forecast",
             aggregation="mean",
-            period=hour,
+            period=HOUR,
             description=f"ICON-D2 rain, mean over the catchment points. {note}",
         ),
         Series(
@@ -66,7 +65,7 @@ def forecast_series(source: str, percentile: int, note: str) -> list[Series]:
             location="ring_10km",
             kind="forecast",
             aggregation=f"p{percentile}",
-            period=hour,
+            period=HOUR,
             description=f"ICON-D2 rain, {percentile}th percentile over the ring points. {note}",
         ),
     ]
@@ -101,22 +100,29 @@ def aggregate_hour(
 
 
 def check_run(series: PointSeries, run_at: datetime, horizon_hours: int) -> None:
-    """Checks that every point has data up to run_at + horizon and none after it.
+    """Checks that every point has data from run_at + 1 h to run_at + horizon and none after.
 
     A run's data ends exactly at its horizon, so an older run ends earlier and a newer one later.
-    This catches a server that still serves the previous run, or already the next one.
+    This catches a server that still serves the previous run, or already the next one. The
+    start check catches a shortened answer, which would otherwise be stored as a whole run.
     """
     last_hour = run_at + timedelta(hours=horizon_hours)
     if last_hour + HOUR not in series.times:
         raise ValueError("ask for at least one hour after the horizon to check the run")
+    expected_times = [run_at + HOUR * (hour + 1) for hour in range(len(series.times))]
+    if list(series.times) != expected_times:
+        raise RunMismatchError(f"hours don't run without a gap from {run_at + HOUR}")
     for point_values in series.values:
         with_data = [
             time
             for time, value in zip(series.times, point_values, strict=True)
             if value is not None
         ]
-        if not with_data or with_data[-1] != last_hour:
-            ends = with_data[-1].isoformat() if with_data else "nowhere"
+        if not with_data or with_data[0] != run_at + HOUR:
+            starts = with_data[0].isoformat() if with_data else "nowhere"
+            raise RunMismatchError(f"data starts {starts}, run {run_at.isoformat()}")
+        if with_data[-1] != last_hour:
+            ends = with_data[-1].isoformat()
             raise RunMismatchError(f"data ends {ends}, run {run_at.isoformat()} ends {last_hour}")
 
 

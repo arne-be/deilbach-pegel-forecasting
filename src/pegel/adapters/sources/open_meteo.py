@@ -23,8 +23,12 @@ ARCHIVE_URL = "https://previous-runs-api.open-meteo.com/v1/forecast"
 # The newest ICON-D2 run Open-Meteo serves. A small static file, not a forecast request.
 META_URL = "https://api.open-meteo.com/data/dwd_icon_d2/static/meta.json"
 MODEL = "icon_d2"
-TIMEOUT_SECONDS = 60.0
+# Backfill requests: 70 points over 14 days can take a while, and retries are cheap there.
+ARCHIVE_TIMEOUT_SECONDS = 60.0
 MAX_ATTEMPTS = 3
+# The hourly Lambda must still save the level forecast, so live requests get one short try;
+# the next hourly run catches up.
+LIVE_TIMEOUT_SECONDS = 15.0
 BACKOFF_BASE_SECONDS = 5.0
 # The points are ICON-D2 grid points; with nearest cell selection Open-Meteo answers with the
 # same coordinates (rounded to float32). Its default picks a neighbour with a better elevation.
@@ -50,9 +54,9 @@ def request_weight(points: int, days: int, variables: int) -> float:
     return points * max(1.0, days / 14) * max(1.0, variables / 10)
 
 
-def latest_run(client: httpx.Client, *, sleep: Callable[[float], None] = time.sleep) -> datetime:
-    """Start time of the newest ICON-D2 run Open-Meteo has finished loading."""
-    meta = _get_json(client, META_URL, {}, sleep)
+def latest_run(client: httpx.Client) -> datetime:
+    """Start time of the newest ICON-D2 run Open-Meteo has finished loading. One short try."""
+    meta = _get_json(client, META_URL, {}, attempts=1, timeout=LIVE_TIMEOUT_SECONDS)
     seconds = meta.get("last_run_initialisation_time") if isinstance(meta, dict) else None
     if not isinstance(seconds, int):
         raise OpenMeteoError("metadata has no last_run_initialisation_time")
@@ -64,12 +68,16 @@ def fetch_forecast(
     points: Sequence[GridPoint],
     first_hour: datetime,
     last_hour: datetime,
-    *,
-    sleep: Callable[[float], None] = time.sleep,
 ) -> PointSeries:
-    """Hourly precipitation at every point for the hours ending first_hour ... last_hour."""
-    params = {"start_hour": _hour_text(first_hour), "end_hour": _hour_text(last_hour)}
-    body = _get_json(client, FORECAST_URL, _params(points, "precipitation") | params, sleep)
+    """Hourly precipitation at every point for the hours ending first_hour ... last_hour.
+
+    One short try, for the hourly job.
+    """
+    params = _params(points, "precipitation") | {
+        "start_hour": _hour_text(first_hour),
+        "end_hour": _hour_text(last_hour),
+    }
+    body = _get_json(client, FORECAST_URL, params, attempts=1, timeout=LIVE_TIMEOUT_SECONDS)
     return parse_points(body, points, ["precipitation"])["precipitation"]
 
 
@@ -83,8 +91,13 @@ def fetch_archive(
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, PointSeries]:
     """Previous Runs values for the UTC days first_day ... last_day (both included)."""
-    params = {"start_date": first_day.isoformat(), "end_date": last_day.isoformat()}
-    body = _get_json(client, ARCHIVE_URL, _params(points, ",".join(variables)) | params, sleep)
+    params = _params(points, ",".join(variables)) | {
+        "start_date": first_day.isoformat(),
+        "end_date": last_day.isoformat(),
+    }
+    body = _get_json(
+        client, ARCHIVE_URL, params, MAX_ATTEMPTS, ARCHIVE_TIMEOUT_SECONDS, sleep=sleep
+    )
     return parse_points(body, points, variables)
 
 
@@ -170,27 +183,37 @@ def _hour_text(moment: datetime) -> str:
 
 
 def _get_json(
-    client: httpx.Client, url: str, params: dict[str, str], sleep: Callable[[float], None]
+    client: httpx.Client,
+    url: str,
+    params: dict[str, str],
+    attempts: int,
+    timeout: float,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> Any:
-    """GET with retries and backoff on network errors and 5xx. 429 and other 4xx raise at once."""
-    for attempt in range(1, MAX_ATTEMPTS + 1):
+    """GET with `timeout` as the whole time per attempt, including a slowly trickling body.
+
+    Network errors and 5xx are retried with backoff up to `attempts`; 429 and other 4xx raise
+    at once.
+    """
+    for attempt in range(1, attempts + 1):
         try:
-            response = client.get(url, params=params, timeout=TIMEOUT_SECONDS)
+            status, body = _get_within(client, url, params, timeout)
         except httpx.TransportError as error:
             failure = f"network error ({type(error).__name__})"
         else:
-            if response.status_code == 429:
-                raise RateLimitedError(f"rate limited: {_reason(response)}")
-            if response.status_code < 400:
+            if status == 429:
+                raise RateLimitedError(f"rate limited: {_reason(body)}")
+            if status < 400:
                 try:
-                    return response.json()
+                    return json.loads(body)
                 except ValueError:
                     raise OpenMeteoError("response body is not JSON") from None
-            if response.status_code < 500:
-                raise OpenMeteoError(f"HTTP {response.status_code}: {_reason(response)}")
-            failure = f"HTTP {response.status_code}"
-        if attempt == MAX_ATTEMPTS:
-            raise OpenMeteoError(f"unreachable after {MAX_ATTEMPTS} attempts: {failure}")
+            if status < 500:
+                raise OpenMeteoError(f"HTTP {status}: {_reason(body)}")
+            failure = f"HTTP {status}"
+        if attempt == attempts:
+            raise OpenMeteoError(f"unreachable after {attempts} attempt(s): {failure}")
         delay = BACKOFF_BASE_SECONDS * 2 ** (attempt - 1)
         logger.warning(
             "open-meteo request failed, retrying",
@@ -200,10 +223,24 @@ def _get_json(
     raise AssertionError("unreachable")
 
 
-def _reason(response: httpx.Response) -> str:
+def _get_within(
+    client: httpx.Client, url: str, params: dict[str, str], timeout: float
+) -> tuple[int, bytes]:
+    """Status and body, or ReadTimeout once `timeout` has passed. httpx times each phase alone."""
+    deadline = time.monotonic() + timeout
+    with client.stream("GET", url, params=params, timeout=timeout) as response:
+        chunks = []
+        for chunk in response.iter_bytes():
+            if time.monotonic() > deadline:
+                raise httpx.ReadTimeout(f"no complete answer within {timeout} s")
+            chunks.append(chunk)
+        return response.status_code, b"".join(chunks)
+
+
+def _reason(body: bytes) -> str:
     """Open-Meteo explains errors as {"error": true, "reason": "..."}."""
     try:
-        body = response.json()
+        parsed = json.loads(body)
     except ValueError:
         return "no reason given"
-    return str(body.get("reason")) if isinstance(body, dict) else "no reason given"
+    return str(parsed.get("reason")) if isinstance(parsed, dict) else "no reason given"
