@@ -116,13 +116,15 @@ To migrate the Neon `dev` branch (`DATABASE_URL` in `.env.local`, direct string)
 mise exec -- dbmate --env-file .env.local --no-dump-schema migrate
 ```
 
-To migrate `prod` after a merged migration, copy its direct `pegel_owner` string from the Neon console and pass it from the clipboard, so it never lands in the shell history (`docs/setup-aws.md`):
+`prod` is migrated by the deploy job (`.github/workflows/infra.yml`) on merge to `main`, after the image push and before the Lambda moves to the new image. Its connection string is in Secrets Manager (`deilbach-pegel/migrate-database-url`). Migrate `dev` first and check the code against it.
+
+For the minute or two between migrate and the end of `tofu apply`, the old code runs on the new schema. Prefer migrations it survives: a new column nullable or with a default, `NOT NULL` in a later migration. If a migration does break the old code, watch the deploy so that stretch doesn't cross :30, or accept that one hourly run fails. For a migration that deletes or rewrites data, take a Neon snapshot of prod before merging, or rely on the 6-hour restore window.
+
+Emergency only, if CI can't reach Neon: copy the direct `pegel_owner` string of `prod` from the Neon console and pass it from the clipboard, so it never lands in the shell history:
 ```
 DATABASE_URL="$(pbpaste)" mise exec -- dbmate --no-dump-schema migrate
 pbcopy </dev/null
 ```
-
-A merged migration breaks the hourly job until prod is migrated, since the new code expects the new schema. Merge it right after a :30 run, with the prod string at hand, and migrate before the next one. Take a Neon snapshot of prod first.
 
 ### Run locally
 
@@ -172,4 +174,4 @@ uv run pegel backfill-radar --from 2023-01-01 [--to 2026-10-01] [--cache-dir ~/.
 
 ### Deploy
 
-Only by merging to `main`. GitHub Actions builds the images, runs `tofu apply` and uploads the website. Never run `tofu apply` for `infra/prod/` from a laptop. The only exception is `infra/bootstrap/`, which is applied by hand once.
+Only by merging to `main`. GitHub Actions builds the images, migrates the prod database, runs `tofu apply` and uploads the website. Never run `tofu apply` for `infra/prod/` from a laptop. The only exception is `infra/bootstrap/`, which is applied by hand once.

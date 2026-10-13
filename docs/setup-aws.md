@@ -56,14 +56,14 @@ pbcopy </dev/null
 
 ## 2. Migrate prod
 
-The `prod` branch starts empty. Migrate it with the direct (not pooled) `pegel_owner` string from the console, set for this one command only. Copy it to the clipboard and pass it from there, so it never lands in the shell history:
+The `prod` branch starts empty. The next deploy migrates it, using the migration database secret from step 1. If that secret was still empty when the deploy ran, the deploy stopped at the migrate step; rerun the failed deploy job.
+
+Emergency only, if CI can't reach Neon: migrate by hand with the direct (not pooled) `pegel_owner` string from the console, set for this one command only. Copy it to the clipboard and pass it from there, so it never lands in the shell history:
 
 ```
 DATABASE_URL="$(pbpaste)" mise exec -- dbmate --no-dump-schema migrate
 pbcopy </dev/null
 ```
-
-Do the same after every merged migration.
 
 ## 3. Test run
 

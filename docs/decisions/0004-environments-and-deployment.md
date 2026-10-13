@@ -29,6 +29,10 @@ The repo stays public. Workflows from outside contributors need approval. The cl
 
 The OpenTofu state is in S3 with OpenTofu's built-in locking. The state bucket and the OIDC roles come from `infra/bootstrap/`, applied by hand once.
 
+### Migrations in CI
+
+The deploy job migrates prod with dbmate right before the Lambda switches to the new image. It connects as `pegel_owner`, with the connection string from Secrets Manager. The deploy role may read only that one secret value. Migrations go forward only; CI never rolls back, and recovery goes through Neon's restore history. `dev` is still migrated by hand, and there is no Neon branch per pull request.
+
 ### Laptop runs against prod
 
 Two things run from a laptop on purpose:
@@ -42,8 +46,11 @@ Two things run from a laptop on purpose:
 - **One CI role for everything.** A pull request from anyone could change the AWS account.
 - **A private repo.** Branch protection on a private personal repo needs GitHub Pro. A public repo also serves as portfolio.
 - **Rewriting history to remove the host.** Breaks open pull requests, and GitHub keeps old commits reachable anyway.
+- **The migration string as a GitHub secret.** Secrets for CI and deployed code live in AWS Secrets Manager (`.claude/rules/operations.md`).
+- **A GitHub Environment for the deploy job.** It changes the OIDC subject, so the deploy role's trust would have to change too.
 
 ## Consequences
 
 - Mistakes reach prod faster, so checks in CI matter.
 - The deploy role's permissions are written by hand and widened when a deploy fails on a missing permission.
+- Code merged to `main` can read the prod owner string. Only the owner can merge to `main` (branch protection), and pull requests from forks get no OIDC role.
