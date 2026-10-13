@@ -46,6 +46,30 @@ class Category(_Frozen):
     above_cm: float | None
 
 
+class CleaningSettings(_Frozen):
+    """The live Kalman outlier filter for the forecast station's level (core/cleaning.py)."""
+
+    # A reading is an outlier if it is further than this many standard deviations from the
+    # predicted level, and at least min_deviation_cm.
+    gate_sigmas: float = Field(gt=0)
+    min_deviation_cm: float = Field(gt=0)
+    measurement_noise_cm: float = Field(gt=0)
+    # How fast the trend may change, in (cm/h)^2 per hour.
+    trend_noise: float = Field(gt=0)
+    # The allowed change grows with the time since the last accepted reading only up to
+    # this, so a sensor stuck at an error value never becomes plausible.
+    cap_hours: float = Field(gt=0)
+    # Without an accepted reading for this long, the filter starts over from the next one.
+    restart_after_hours: float = Field(gt=0)
+    # A reading back within recent_tolerance_cm of a level accepted in the last recent_hours
+    # is accepted, so the true level after a spike that slipped through isn't rejected.
+    recent_hours: float = Field(gt=0)
+    recent_tolerance_cm: float = Field(gt=0)
+    # Each run replays the filter from this many hours before its window, so it needs no
+    # stored state.
+    warm_up_hours: int = Field(gt=0)
+
+
 class Freshness(_Frozen):
     observation_max_age_minutes: int = Field(gt=0)
     forecast_max_age_minutes: int = Field(gt=0)
@@ -91,6 +115,7 @@ class PegelConfig(_Frozen):
     stations: tuple[Station, ...]
     forecast: ForecastSettings
     categories: tuple[Category, ...]
+    cleaning: CleaningSettings
     freshness: Freshness
     api: ApiSettings
     rain: RainSettings

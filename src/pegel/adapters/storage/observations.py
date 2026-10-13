@@ -33,6 +33,8 @@ FETCH_SQL = """
     ORDER BY valid_at
 """
 
+DELETE_SQL = "DELETE FROM observations WHERE series_id = %s AND valid_at = ANY(%s::timestamptz[])"
+
 NEWEST_SQL = """
     SELECT series_id, valid_at, value, coverage, ingested_at, kind, available_at
     FROM observations
@@ -62,6 +64,19 @@ def upsert_values(
     )
     with conn.transaction(), conn.cursor() as cursor:
         cursor.execute(UPSERT_SQL, params)
+        return cursor.rowcount
+
+
+def delete_values(
+    conn: psycopg.Connection[TupleRow], series_id: str, valid_ats: Sequence[datetime]
+) -> int:
+    """Delete a series' values at these times; return how many rows were deleted."""
+    if not valid_ats:
+        return 0
+    for valid_at in valid_ats:
+        require_utc(valid_at, "valid_at")
+    with conn.transaction(), conn.cursor() as cursor:
+        cursor.execute(DELETE_SQL, (series_id, list(valid_ats)))
         return cursor.rowcount
 
 

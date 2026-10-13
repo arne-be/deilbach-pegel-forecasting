@@ -1,4 +1,4 @@
-"""The ingest and forecast steps. Each takes its time window, so it can rerun for any period."""
+"""The ingest, clean and forecast steps. Each takes its time window, so it can rerun."""
 
 import logging
 from collections.abc import Callable, Mapping, Sequence
@@ -8,14 +8,26 @@ import psycopg
 from psycopg.rows import TupleRow
 
 from pegel.adapters.storage.forecasts import save_forecast
-from pegel.adapters.storage.observations import newest_observation, upsert_values
+from pegel.adapters.storage.observations import (
+    delete_values,
+    fetch_values,
+    newest_value,
+    upsert_values,
+)
 from pegel.adapters.storage.series import ensure_series
 from pegel.config import PegelConfig, Station
+from pegel.core.cleaning import outlier_flags
 from pegel.core.forecasts import Forecast
 from pegel.core.observations import Observation
 from pegel.core.persistence import persistence_forecast
 from pegel.core.schedule import issue_time, monthly_windows, scheduled_available_at
-from pegel.core.series import SeriesValue, level_series
+from pegel.core.series import (
+    SeriesValue,
+    cleaned_level_series,
+    cleaned_level_series_id,
+    level_series,
+    level_series_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,12 +115,63 @@ def backfill(
     )
 
 
+def clean(conn: Conn, config: PegelConfig, station: Station, start: datetime, end: datetime) -> int:
+    """Writes the cleaned levels of [start, end). Returns rows written or deleted.
+
+    The filter replays from `warm_up_hours` before the window, so it needs no stored state.
+    A reading rejected on a rerun is deleted from the cleaned series, so reruns converge.
+    """
+    warm_up_start = start - timedelta(hours=config.cleaning.warm_up_hours)
+    raw = fetch_values(conn, level_series_id(station.id), warm_up_start, end)
+    flags = outlier_flags(raw, config.cleaning)
+    in_window = [
+        (value, flag) for value, flag in zip(raw, flags, strict=True) if value.valid_at >= start
+    ]
+    cleaned_id = cleaned_level_series_id(station.id)
+    accepted = [
+        SeriesValue(cleaned_id, value.valid_at, value.value, value.available_at)
+        for value, flag in in_window
+        if not flag
+    ]
+    rejected = [value.valid_at for value, flag in in_window if flag]
+    ensure_series(conn, [cleaned_level_series(station)])
+    seen_at = issue_time(datetime.now(UTC), config.forecast.issue_minute)
+    changed = upsert_values(conn, accepted, seen_at) + delete_values(conn, cleaned_id, rejected)
+    logger.info(
+        "cleaned window",
+        extra={
+            "job": "clean",
+            "station": station.id,
+            "window_start": start.isoformat(),
+            "window_end": end.isoformat(),
+            "accepted": len(accepted),
+            "rejected": len(rejected),
+            "changed": changed,
+        },
+    )
+    return changed
+
+
+def clean_history(
+    conn: Conn, config: PegelConfig, station: Station, start: datetime, end: datetime
+) -> int:
+    """Cleans [start, end) in monthly chunks, so one failed month doesn't lose the others."""
+    return sum(
+        clean(conn, config, station, window_start, window_end)
+        for window_start, window_end in monthly_windows(start, end)
+    )
+
+
 def forecast(conn: Conn, config: PegelConfig, issued_at: datetime) -> Forecast:
-    """Builds and stores the persistence forecast from the newest observation at issue time."""
+    """Builds and stores the persistence forecast from the newest cleaned level at issue time.
+
+    Cleaned, so a spike never becomes the forecast; its time is then the newest accepted reading.
+    """
     station_id = config.forecast.station_id
-    newest = newest_observation(conn, station_id, at_or_before=issued_at)
-    if newest is None:
+    value = newest_value(conn, cleaned_level_series_id(station_id), at_or_before=issued_at)
+    if value is None:
         raise NoObservationError(f"no observation for {station_id} at or before {issued_at}")
+    newest = Observation(station_id, value.valid_at, value.value)
     result = persistence_forecast(newest, issued_at, config.forecast.horizon_hours)
     save_forecast(conn, result)
     logger.info(
@@ -132,7 +195,8 @@ def run_hourly(
     issued_at: datetime,
     extra_steps: Sequence[tuple[str, HourlyStep]] = (),
 ) -> Forecast:
-    """Ingests the recent hours of every station and the extra inputs, then forecasts.
+    """Ingests the recent hours of every station and the extra inputs, cleans the forecast
+    station's levels, then forecasts.
 
     Only uses readings up to the issue time. A failing upstream station or extra step is logged
     and skipped, so it can't block the forecast; a failing forecast station fails the run.
@@ -141,6 +205,7 @@ def run_hourly(
     start = issued_at - timedelta(hours=config.forecast.ingest_lookback_hours)
     issue_minute = config.forecast.issue_minute
     ingest(fetch, conn, forecast_station, start, issued_at, issue_minute, live=True)
+    clean(conn, config, forecast_station, start, issued_at)
     upstream_start = issued_at - timedelta(hours=config.forecast.upstream_ingest_lookback_hours)
     for station in config.stations:
         if station.id == forecast_station.id:

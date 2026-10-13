@@ -97,6 +97,23 @@ def level_series(station: Station) -> Series:
     )
 
 
+def cleaned_level_series_id(station_id: str) -> str:
+    return f"{station_id}:cleaned_kalman"
+
+
+def cleaned_level_series(station: Station) -> Series:
+    """The level series without outliers. The history API, the forecast and training read it."""
+    return Series(
+        id=cleaned_level_series_id(station.id),
+        variable="level",
+        unit=LEVEL_UNIT,
+        source="pegel",
+        location=station.id,
+        kind="observation",
+        description=f"Water level at {station.name}, outliers removed by the live Kalman filter",
+    )
+
+
 def _require_available_after(available_at: datetime, known_at: datetime, field_name: str) -> None:
     require_utc(available_at, "available_at")
     if available_at < known_at:

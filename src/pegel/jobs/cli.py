@@ -1,4 +1,4 @@
-"""Command line entry point for local runs: `pegel backfill`, `backfill-*` and `run-hourly`."""
+"""Command line entry point for local runs: `backfill`, `backfill-*`, `clean`, `run-hourly`."""
 
 import argparse
 import os
@@ -23,7 +23,15 @@ from pegel.core.forecasts import Forecast
 from pegel.core.schedule import issue_time
 from pegel.core.summary import summarize
 from pegel.jobs import rain_forecast
-from pegel.jobs.pipeline import Conn, FetchLevels, HourlyStep, backfill, fetch_by_source, run_hourly
+from pegel.jobs.pipeline import (
+    Conn,
+    FetchLevels,
+    HourlyStep,
+    backfill,
+    clean_history,
+    fetch_by_source,
+    run_hourly,
+)
 from pegel.jobs.radar import backfill_radar, radar_step
 
 DISPLAY_TIME_ZONE = ZoneInfo("Europe/Berlin")
@@ -50,6 +58,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         with sources_from_env() as (fetch, conn):
             changed = backfill(fetch, conn, station, start, end, config.forecast.issue_minute)
         print(f"Backfill {start:%Y-%m-%d} to {end:%Y-%m-%d %H:%M} UTC: {changed} rows stored")
+        return 0
+    if arguments.command == "clean":
+        _clean_history(config, arguments.start, arguments.end)
         return 0
     print(_describe(run_hourly_from_env(config, arguments.issued_at), config))
     return 0
@@ -151,6 +162,19 @@ def _backfill_radar(config: PegelConfig, arguments: argparse.Namespace) -> None:
     print(f"Radar backfill {start:%Y-%m-%d} to {end:%Y-%m-%d %H:%M} UTC: {changed} rows stored")
 
 
+def _clean_history(config: PegelConfig, first_day: date, end_day: date | None) -> None:
+    """Rewrites the cleaned levels of the forecast station. Needs only the database."""
+    start = _utc_midnight(first_day)
+    end = _utc_midnight(end_day) if end_day else datetime.now(UTC)
+    station = config.station(config.forecast.station_id)
+    with connect(_required_env("JOBS_DATABASE_URL")) as conn:
+        conn.autocommit = True
+        changed = clean_history(conn, config, station, start, end)
+    print(
+        f"Clean {station.id} {start:%Y-%m-%d} to {end:%Y-%m-%d %H:%M} UTC: {changed} rows changed"
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pegel")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -189,6 +213,15 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path.home() / ".cache" / "deilbach-pegel" / "radolan",
         help="where downloaded DWD files are kept (default: %(default)s)",
+    )
+    clean_parser = commands.add_parser(
+        "clean", help="rewrite the cleaned levels of the forecast station in monthly chunks"
+    )
+    clean_parser.add_argument(
+        "--from", dest="start", type=date.fromisoformat, required=True, help="UTC date"
+    )
+    clean_parser.add_argument(
+        "--to", dest="end", type=date.fromisoformat, help="UTC date, exclusive (default: now)"
     )
     hourly_parser = commands.add_parser("run-hourly", help="ingest recent hours and forecast")
     hourly_parser.add_argument(

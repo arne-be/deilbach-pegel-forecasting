@@ -45,6 +45,17 @@
     { "number": 4, "name": "extrem kritisch", "above_cm": 140 },
     { "number": 5, "name": "Chaos", "above_cm": 180 }
   ],
+  "cleaning": {
+    "gate_sigmas": 4,
+    "min_deviation_cm": 15,
+    "measurement_noise_cm": 2,
+    "trend_noise": 50,
+    "cap_hours": 3,
+    "restart_after_hours": 16,
+    "recent_hours": 12,
+    "recent_tolerance_cm": 3,
+    "warm_up_hours": 48
+  },
   "freshness": {
     "observation_max_age_minutes": 90,
     "forecast_max_age_minutes": 90

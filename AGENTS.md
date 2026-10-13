@@ -21,6 +21,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - ICON-D2 rain forecast from Open-Meteo, hourly step and `backfill-forecast`: `src/pegel/adapters/sources/open_meteo.py`, `src/pegel/core/rain_forecast.py`, `src/pegel/jobs/rain_forecast.py`
 - Hourly live ingest of the upstream LANUV gauges (failures logged, never block the forecast): `src/pegel/adapters/sources/lanuv.py` (`fetch_levels`), `src/pegel/jobs/pipeline.py`
 - LANUV level history from open data CSV files (`pegel backfill --source lanuv-files`): `src/pegel/adapters/sources/lanuv_files.py`
+- Live Kalman outlier filter for the forecast station's level (`kupferdreh:cleaned_kalman`, `pegel clean`): `src/pegel/core/cleaning.py`, `src/pegel/jobs/pipeline.py`
 - Generic series tables (`series`, `observations`, `input_forecasts`): `src/pegel/core/series.py`, `src/pegel/adapters/storage/series.py`, `observations.py`, `input_forecasts.py`
 - Catchment, zones and forecast ring: `config/catchment.geojson`, `scripts/build_catchment.py`, `docs/catchment.md`
 - Rain config (`rain` in `config/pegel.json`, `config/radolan_cells.json`, `config/icon_d2_points.json`) and extra hourly steps: `src/pegel/config.py`, `src/pegel/jobs/pipeline.py`
@@ -133,7 +134,7 @@ docker build --platform linux/arm64 --target jobs .   # the Lambda jobs image
 The CLI reads `.env` and `.env.local` from the main checkout (also from a worktree); variables already set in the shell win.
 
 ```
-uv run pegel run-hourly                        # ingest the last hours, save a persistence forecast
+uv run pegel run-hourly                        # ingest and clean the last hours, save a persistence forecast
 uv run pegel run-hourly --issued-at 2026-10-12T13:30Z   # rerun a past issue time
 ```
 
@@ -143,6 +144,11 @@ Loads history in monthly chunks with the same code the hourly job uses. It's the
 
 ```
 uv run pegel backfill --source influx --from 2023-03-01
+```
+
+After loading Kupferdreh history, or after changing the `cleaning` settings, rewrite its cleaned series. It needs only the database:
+```
+uv run pegel clean --from 2023-03-01 [--to 2026-01-01]
 ```
 
 The upstream LANUV gauges load from the open data files instead: download `Ruhreinzugsgebiet-NRW-W_{decade}_EPSG25832_CSV.zip` from https://www.opengeodata.nrw.de/produkte/umwelt_klima/wasser/oberflaechengewaesser/hydro/w/, extract the `*_Wasserstand_cm.csv` files of our stations into a folder outside the repo, and pass it with `--path`. Without `--station` it loads all LANUV stations. From 2000 the data is regular (15 minutes or finer); before that Langenberg is sparse.

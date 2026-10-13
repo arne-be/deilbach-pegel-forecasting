@@ -39,3 +39,9 @@ def test_unknown_station_lookup_raises() -> None:
     config: PegelConfig = load_config()
     with pytest.raises(KeyError):
         config.station("nowhere")
+
+
+def test_non_positive_cleaning_setting_is_rejected(tmp_path: Path) -> None:
+    cleaning = load_config().cleaning.model_dump() | {"min_deviation_cm": 0}
+    with pytest.raises(ValidationError):
+        load_config(_config_with(tmp_path / "pegel.json", cleaning=cleaning))
