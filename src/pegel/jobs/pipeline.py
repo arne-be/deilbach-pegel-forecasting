@@ -56,7 +56,9 @@ def ingest(
             seen_at
             if live
             else scheduled_available_at(
-                observation.observed_at, series.available_after, issue_minute
+                observation.observed_at,
+                timedelta(minutes=station.available_after_minutes),
+                issue_minute,
             ),
         )
         for observation in observations

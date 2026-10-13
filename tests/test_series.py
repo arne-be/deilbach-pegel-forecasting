@@ -21,13 +21,6 @@ def test_level_series_of_a_station() -> None:
     assert series.kind == "observation"
 
 
-def test_level_series_is_available_after_its_station_delay() -> None:
-    station = load_config().station("kupferdreh")
-    assert level_series(station).available_after == timedelta(
-        minutes=station.available_after_minutes
-    )
-
-
 @pytest.mark.parametrize("value", [math.nan, math.inf])
 def test_value_must_be_finite(value: float) -> None:
     with pytest.raises(ValueError, match="finite"):
@@ -66,11 +59,6 @@ def test_forecast_cannot_be_available_before_its_run() -> None:
         )
 
 
-def test_available_after_must_not_be_negative() -> None:
-    with pytest.raises(ValueError, match="available_after"):
-        Series("x", "rain", "mm", "radar", "zone", "observation", timedelta(minutes=-1))
-
-
 def test_period_must_be_positive() -> None:
     with pytest.raises(ValueError, match="period"):
-        Series("x", "rain", "mm", "radar", "zone", "observation", timedelta(0), period=timedelta(0))
+        Series("x", "rain", "mm", "radar", "zone", "observation", period=timedelta(0))

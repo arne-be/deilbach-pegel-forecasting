@@ -16,7 +16,6 @@ RAIN = Series(
     "radolan_rw",
     "zone:neviges",
     "observation",
-    timedelta(minutes=35),
     "mean",
     timedelta(hours=1),
 )
@@ -24,8 +23,8 @@ RAIN = Series(
 
 def stored(conn: Conn) -> list[tuple[object, ...]]:
     return conn.execute(
-        "SELECT id, variable, unit, source, location, kind, available_after, aggregation, period,"
-        " description FROM series"
+        "SELECT id, variable, unit, source, location, kind, aggregation, period, description"
+        " FROM series"
     ).fetchall()
 
 
@@ -43,7 +42,7 @@ def test_changed_metadata_is_updated(conn: Conn) -> None:
     ensure_series(conn, [RAIN])
     changed = replace(RAIN, aggregation="p90")
     assert ensure_series(conn, [changed]) == 1
-    assert stored(conn)[0][7] == "p90"
+    assert stored(conn)[0][6] == "p90"
 
 
 def test_nothing_to_ensure(conn: Conn) -> None:
@@ -71,12 +70,6 @@ def test_kind_variable_and_unit_of_a_stored_series_cannot_change(
     with pytest.raises(SeriesDefinitionChangeError, match="radolan_rw:zone:neviges"):
         ensure_series(conn, [replace(RAIN, description="changed", **changes)])  # type: ignore[arg-type]
     assert stored(conn) == [(*astuple(RAIN),)]
-
-
-def test_available_after_is_updated(conn: Conn) -> None:
-    ensure_series(conn, [RAIN])
-    ensure_series(conn, [replace(RAIN, available_after=timedelta(minutes=50))])
-    assert stored(conn)[0][6] == timedelta(minutes=50)
 
 
 def test_other_metadata_may_change(conn: Conn) -> None:

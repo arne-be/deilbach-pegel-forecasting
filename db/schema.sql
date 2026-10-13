@@ -117,8 +117,6 @@ CREATE TABLE public.series (
     period interval,
     description text DEFAULT ''::text NOT NULL,
     kind text NOT NULL,
-    available_after interval NOT NULL,
-    CONSTRAINT series_available_after_check CHECK ((available_after >= '00:00:00'::interval)),
     CONSTRAINT series_kind_check CHECK ((kind = ANY (ARRAY['observation'::text, 'forecast'::text])))
 );
 

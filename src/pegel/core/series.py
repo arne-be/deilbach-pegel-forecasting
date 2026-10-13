@@ -26,9 +26,6 @@ class Series:
     source: str
     location: str
     kind: SeriesKind
-    # How long after valid_at (observations) or run_at (forecasts) values are reliably there.
-    # Training uses only values available at the issue time. Comes from config/pegel.json.
-    available_after: timedelta
     # How an area value combines cells or points, e.g. 'mean'. None for one gauge.
     aggregation: str | None = None
     # None for a reading at one moment; otherwise a total over the period ending at valid_at.
@@ -40,8 +37,6 @@ class Series:
             raise ValueError("series id must not be empty")
         if self.period is not None and self.period <= timedelta(0):
             raise ValueError(f"period must be positive, got {self.period!r}")
-        if self.available_after < timedelta(0):
-            raise ValueError(f"available_after must not be negative, got {self.available_after!r}")
 
 
 @dataclass(frozen=True)
@@ -98,7 +93,6 @@ def level_series(station: Station) -> Series:
         source=station.source,
         location=station.id,
         kind="observation",
-        available_after=timedelta(minutes=station.available_after_minutes),
         description=f"Water level at {station.name}",
     )
 

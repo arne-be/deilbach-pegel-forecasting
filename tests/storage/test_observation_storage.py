@@ -21,9 +21,9 @@ FAR_FUTURE = datetime(2100, 1, 1, tzinfo=UTC)
 HOUR = timedelta(hours=1)
 
 Conn = psycopg.Connection[TupleRow]
-RAIN = Series("radar:zone:test", "rain", "mm", "radar", "zone:test", "observation", HOUR, "mean")
+RAIN = Series("radar:zone:test", "rain", "mm", "radar", "zone:test", "observation", "mean")
 LEVEL = f"{STATION}:level"
-ICON = Series("icon_d2:zone:test", "rain", "mm", "icon_d2", "zone:test", "forecast", HOUR, "mean")
+ICON = Series("icon_d2:zone:test", "rain", "mm", "icon_d2", "zone:test", "forecast", "mean")
 
 
 @pytest.fixture(autouse=True)

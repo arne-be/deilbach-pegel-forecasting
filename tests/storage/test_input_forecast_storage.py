@@ -10,12 +10,8 @@ from pegel.core.series import InputForecastValue, Series
 
 Conn = psycopg.Connection[TupleRow]
 HOUR = timedelta(hours=1)
-RAIN = Series(
-    "icon_d2:catchment:mean", "rain", "mm", "icon_d2", "catchment", "forecast", HOUR, "mean"
-)
-RADAR = Series(
-    "radar:catchment:mean", "rain", "mm", "radar", "catchment", "observation", HOUR, "mean"
-)
+RAIN = Series("icon_d2:catchment:mean", "rain", "mm", "icon_d2", "catchment", "forecast", "mean")
+RADAR = Series("radar:catchment:mean", "rain", "mm", "radar", "catchment", "observation", "mean")
 RUN_AT = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
 
 

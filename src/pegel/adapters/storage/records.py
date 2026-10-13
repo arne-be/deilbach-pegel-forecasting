@@ -54,4 +54,3 @@ class SeriesRecord:
     period: timedelta | None
     description: str
     kind: str
-    available_after: timedelta

@@ -1,5 +1,6 @@
 """Migrations that move data, run up and down on their own throwaway database."""
 
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -9,7 +10,9 @@ import pytest
 from conftest import MIGRATIONS_DIR, migrate_down_section, migrate_up_section
 from psycopg.rows import TupleRow
 
+from pegel.config import load_config
 from pegel.core.schedule import scheduled_available_at
+from pegel.core.series import level_series_id
 
 Conn = psycopg.Connection[TupleRow]
 SERIES_MIGRATION = "20261013150000"
@@ -210,19 +213,34 @@ def test_kind_migration_down_restores_the_tables(before_kind: Conn) -> None:
         before_kind.execute("INSERT INTO observations VALUES ('nowhere', %s, 1.0)", (AT,))
 
 
-AVAILABLE_AFTER_MIGRATION = "20261013180000"
-# The delays the migration gives existing rows, copied from config/pegel.json at the time.
-INFLUX_MINUTES = 5
-LANUV_MINUTES = 15
-LANGENBERG_MINUTES = 75
-RADOLAN_MINUTES = 35
-OPEN_METEO_MINUTES = 120
+AVAILABLE_AT_MIGRATION = "20261013180000"
 # The issue minute in config/pegel.json when the migration was written; it's fixed in its SQL.
 MIGRATION_ISSUE_MINUTE = 30
+# Rain delays the migration was written for; config/pegel.json gets them with the rain jobs.
+RADOLAN_MINUTES = 35
+OPEN_METEO_MINUTES = 120
+
+
+def migration_delays() -> dict[str, timedelta]:
+    """The migration's delay table, by series id or source."""
+    sql = migration(AVAILABLE_AT_MIGRATION).read_text(encoding="utf-8")
+    pairs = re.findall(r"\('([^']+)', interval '(\d+) minutes'\)", sql)
+    return {key: timedelta(minutes=int(minutes)) for key, minutes in pairs}
+
+
+def test_available_at_migration_delays_match_the_config() -> None:
+    expected = {
+        level_series_id(station.id): timedelta(minutes=station.available_after_minutes)
+        for station in load_config().stations
+    }
+    expected["radolan_rw"] = timedelta(minutes=RADOLAN_MINUTES)
+    expected["open_meteo_icon_d2"] = timedelta(minutes=OPEN_METEO_MINUTES)
+    expected["open_meteo_previous_runs"] = timedelta(minutes=OPEN_METEO_MINUTES)
+    assert migration_delays() == expected
 
 
 @pytest.fixture
-def before_available_after(before_kind: Conn) -> Conn:
+def before_available_at(before_kind: Conn) -> Conn:
     """Every known source, with radar:zone renamed from the old test source to radolan_rw."""
     up(before_kind, migration(KIND_MIGRATION))
     before_kind.execute("UPDATE series SET source = 'radolan_rw' WHERE id = 'radar:zone'")
@@ -240,100 +258,88 @@ def before_available_after(before_kind: Conn) -> Conn:
     return before_kind
 
 
-def test_available_after_migration_fills_it_by_source(before_available_after: Conn) -> None:
-    up(before_available_after, migration(AVAILABLE_AFTER_MIGRATION))
-    delays = before_available_after.execute(
-        "SELECT id, available_after FROM series ORDER BY id"
-    ).fetchall()
-    assert delays == [
-        ("kupferdreh:level", timedelta(minutes=INFLUX_MINUTES)),
+def test_available_at_migration_matches_the_python_rule(before_available_at: Conn) -> None:
+    delays = migration_delays()
+    series_delays = {
+        "kupferdreh:level": delays["kupferdreh:level"],
         # Derived from the Langenberg level in the same run, so as late as that level.
-        ("langenberg:cleaned", timedelta(minutes=LANGENBERG_MINUTES)),
-        ("langenberg:level", timedelta(minutes=LANGENBERG_MINUTES)),
-        ("nierenhof:level", timedelta(minutes=LANUV_MINUTES)),
-        ("open_meteo_icon_d2:catchment", timedelta(minutes=OPEN_METEO_MINUTES)),
-        ("open_meteo_previous_runs:catchment", timedelta(minutes=OPEN_METEO_MINUTES)),
-        ("radar:zone", timedelta(minutes=RADOLAN_MINUTES)),
-    ]
+        "langenberg:cleaned": delays["langenberg:level"],
+        "langenberg:level": delays["langenberg:level"],
+        "nierenhof:level": delays["nierenhof:level"],
+        "open_meteo_icon_d2:catchment": delays["open_meteo_icon_d2"],
+        "open_meteo_previous_runs:catchment": delays["open_meteo_previous_runs"],
+        "radar:zone": delays["radolan_rw"],
+    }
+    with before_available_at.cursor() as cursor:
+        for series_id, delay in series_delays.items():
+            # Exactly on a run, just after it and just before it: a delay off by any amount
+            # moves one of them to another run.
+            on_the_run = AT.replace(minute=30) - delay
+            for known_at in (
+                on_the_run,
+                on_the_run + timedelta(microseconds=1),
+                on_the_run - timedelta(seconds=1),
+                AT.replace(hour=23, minute=59),
+            ):
+                if series_id.startswith("open_meteo"):
+                    cursor.execute(
+                        "INSERT INTO input_forecasts (series_id, run_at, valid_at, value)"
+                        " VALUES (%s, %s, %s, 0.4)",
+                        (series_id, known_at, known_at + timedelta(hours=1)),
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO observations (series_id, valid_at, value)"
+                        " VALUES (%s, %s, 1) ON CONFLICT DO NOTHING",
+                        (series_id, known_at),
+                    )
+    up(before_available_at, migration(AVAILABLE_AT_MIGRATION))
+    rows = before_available_at.execute(
+        "SELECT series_id, valid_at, available_at FROM observations"
+        " UNION ALL SELECT series_id, run_at, available_at FROM input_forecasts"
+    ).fetchall()
+    assert len(rows) >= 4 * len(series_delays)
+    for series_id, known_at, available_at in rows:
+        expected = scheduled_available_at(
+            known_at, series_delays[series_id], MIGRATION_ISSUE_MINUTE
+        )
+        assert available_at == expected, (series_id, known_at)
 
 
-def test_available_after_migration_stops_on_a_derived_series_without_its_level(
-    before_available_after: Conn,
+def test_available_at_migration_stops_on_a_derived_series_without_its_level(
+    before_available_at: Conn,
 ) -> None:
-    before_available_after.execute(
+    before_available_at.execute(
         "UPDATE series SET location = 'nowhere' WHERE id = 'langenberg:cleaned'"
     )
     with pytest.raises(psycopg.errors.RaiseException, match="langenberg:cleaned"):
-        up(before_available_after, migration(AVAILABLE_AFTER_MIGRATION))
+        up(before_available_at, migration(AVAILABLE_AT_MIGRATION))
 
 
-def test_available_after_migration_stops_on_an_unknown_source(
-    before_available_after: Conn,
-) -> None:
-    before_available_after.execute("UPDATE series SET source = 'radar' WHERE id = 'radar:zone'")
+def test_available_at_migration_stops_on_an_unknown_source(before_available_at: Conn) -> None:
+    before_available_at.execute("UPDATE series SET source = 'radar' WHERE id = 'radar:zone'")
     with pytest.raises(psycopg.errors.RaiseException, match=r"radar:zone \(radar\)"):
-        up(before_available_after, migration(AVAILABLE_AFTER_MIGRATION))
+        up(before_available_at, migration(AVAILABLE_AT_MIGRATION))
 
 
-def test_available_after_migration_rejects_a_negative_delay(
-    before_available_after: Conn,
-) -> None:
-    up(before_available_after, migration(AVAILABLE_AFTER_MIGRATION))
-    with pytest.raises(psycopg.errors.CheckViolation):
-        before_available_after.execute(
-            "UPDATE series SET available_after = interval '-1 minute' WHERE id = 'radar:zone'"
-        )
+def test_available_at_migration_down_drops_the_columns(before_available_at: Conn) -> None:
+    def tables() -> list[list[tuple[object, ...]]]:
+        return [
+            before_available_at.execute(f"SELECT * FROM {table} ORDER BY 1, 2, 3").fetchall()
+            for table in ("series", "observations", "input_forecasts")
+        ]
 
-
-def test_available_after_migration_down_drops_the_column(before_available_after: Conn) -> None:
-    def series_rows() -> list[tuple[object, ...]]:
-        return before_available_after.execute("SELECT * FROM series ORDER BY id").fetchall()
-
-    before = series_rows()
-    up(before_available_after, migration(AVAILABLE_AFTER_MIGRATION))
-    down(before_available_after, migration(AVAILABLE_AFTER_MIGRATION))
-    assert series_rows() == before
-
-
-def test_available_at_migration_matches_the_python_rule(before_available_after: Conn) -> None:
-    delay = timedelta(minutes=INFLUX_MINUTES)
-    on_the_run = AT.replace(minute=30) - delay
-    valid_times = [
-        on_the_run,
-        on_the_run + timedelta(microseconds=1),
-        on_the_run - timedelta(seconds=1),
-        AT.replace(hour=23, minute=59),
-    ]
-    with before_available_after.cursor() as cursor:
-        cursor.executemany(
-            "INSERT INTO observations (series_id, valid_at, value)"
-            " VALUES ('kupferdreh:level', %s, 1)",
-            [(valid_at,) for valid_at in valid_times],
-        )
-    before_available_after.execute(
-        "INSERT INTO input_forecasts (series_id, run_at, valid_at, value)"
-        " VALUES ('open_meteo_icon_d2:catchment', %s, %s, 0.4)",
-        (AT, AT.replace(hour=12)),
-    )
-    up(before_available_after, migration(AVAILABLE_AFTER_MIGRATION))
-    rows = before_available_after.execute(
-        "SELECT o.valid_at, s.available_after, o.available_at FROM observations o"
-        " JOIN series s ON s.id = o.series_id"
-        " UNION ALL"
-        " SELECT f.run_at, s.available_after, f.available_at FROM input_forecasts f"
-        " JOIN series s ON s.id = f.series_id"
-    ).fetchall()
-    assert len(rows) == len(RAW_ROWS) + 1 + len(valid_times) + 1
-    for known_at, available_after, available_at in rows:
-        expected = scheduled_available_at(known_at, available_after, MIGRATION_ISSUE_MINUTE)
-        assert available_at == expected, known_at
+    before = tables()
+    up(before_available_at, migration(AVAILABLE_AT_MIGRATION))
+    down(before_available_at, migration(AVAILABLE_AT_MIGRATION))
+    assert tables() == before
 
 
 def test_available_at_migration_rejects_values_available_before_their_time(
-    before_available_after: Conn,
+    before_available_at: Conn,
 ) -> None:
-    up(before_available_after, migration(AVAILABLE_AFTER_MIGRATION))
+    up(before_available_at, migration(AVAILABLE_AT_MIGRATION))
     with pytest.raises(psycopg.errors.CheckViolation):
-        before_available_after.execute(
+        before_available_at.execute(
             "UPDATE observations SET available_at = valid_at - interval '1 second'"
         )

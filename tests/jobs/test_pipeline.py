@@ -9,7 +9,6 @@ from pegel.adapters.storage.observations import fetch_observations
 from pegel.config import Station, load_config
 from pegel.core.observations import Observation
 from pegel.core.schedule import issue_time, scheduled_available_at
-from pegel.core.series import level_series
 from pegel.jobs.pipeline import (
     NoObservationError,
     backfill,
@@ -167,7 +166,7 @@ def test_hourly_run_keeps_the_stamp_of_an_unchanged_value(conn: Conn) -> None:
 def test_backfill_stamps_the_first_scheduled_run_after_the_delay(conn: Conn) -> None:
     readings = readings_before(ISSUED_AT, [10.0, 20.0])
     backfill(FakeSource(readings), conn, STATION, LONG_AGO, ISSUED_AT, MINUTE)
-    delay = level_series(STATION).available_after
+    delay = timedelta(minutes=STATION.available_after_minutes)
     assert available_at(conn) == [
         scheduled_available_at(valid_at, delay, MINUTE) for valid_at in sorted(readings)
     ]
