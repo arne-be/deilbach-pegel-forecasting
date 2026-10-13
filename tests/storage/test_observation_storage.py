@@ -190,7 +190,9 @@ def test_observed_value_for_a_forecast_series_is_rejected(conn: Conn) -> None:
 
 
 def test_delete_values_removes_only_the_given_times(conn: Conn) -> None:
-    values = [SeriesValue(RAIN.id, START + hour * HOUR, 1.0, START + hour * HOUR) for hour in range(3)]
+    values = [
+        SeriesValue(RAIN.id, START + hour * HOUR, 1.0, START + hour * HOUR) for hour in range(3)
+    ]
     upsert_values(conn, values, START)
     deleted = delete_values(conn, RAIN.id, [START + HOUR, START + 5 * HOUR])
     assert (deleted, fetch_values(conn, RAIN.id, START, FAR_FUTURE)) == (1, values[::2])
