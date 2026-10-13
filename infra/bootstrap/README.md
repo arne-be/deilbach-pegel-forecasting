@@ -40,4 +40,6 @@ aws s3 cp terraform.tfstate "s3://$(tofu output -raw tf_state_bucket)/bootstrap/
 
 When a deploy fails on a missing permission, widen the deploy role in `roles.tf`, open a PR, and after the merge run `tofu apply` here again by hand. The deploy role cannot change the CI roles itself.
 
+The state is local and gitignored, so it lives only in the main checkout (and the S3 copy). To apply from a worktree, copy `infra/bootstrap/terraform.tfstate` from the main checkout first and back afterwards. Without it, tofu starts from an empty state and tries to create everything again.
+
 The state bucket has `prevent_destroy`, so `tofu destroy` stops before deleting it.
