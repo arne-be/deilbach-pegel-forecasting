@@ -10,7 +10,9 @@ Sign up at grafana.com on the free plan and create a stack in an EU region. Note
 
 ## 2. Service account for OpenTofu
 
-In Grafana, under Administration → Users and access → Service accounts, create a service account `tofu` with the role **Editor** and add a token without expiry. Copy the token.
+In Grafana, under Administration → Users and access → Service accounts, create a service account `tofu` with the role **Admin** and add a token without expiry. Copy the token.
+
+Editor isn't enough: in Grafana 13 an Editor service account only reaches the folders it's given, and asking for a folder that doesn't exist yet returns 403 instead of 404, so OpenTofu can't create the folder. The stack holds only this project, so Admin costs little.
 
 ## 3. Database role
 
@@ -38,7 +40,7 @@ In Grafana, under Connections → Data sources, add a **PostgreSQL** data source
 - **TLS/SSL mode:** `require`
 - **Max open connections:** `2`, **max idle:** `0`, **max lifetime:** `60` seconds, so no idle connection keeps Neon awake
 
-Save & test. The password lives only in Grafana. The dashboards find the data source by type, so there should be only one PostgreSQL data source.
+Save & test. The password lives only in Grafana. The dashboards find the data source by type, so delete any other PostgreSQL data source: the dashboards might pick that one instead.
 
 ## 6. Stack URL for CI
 
