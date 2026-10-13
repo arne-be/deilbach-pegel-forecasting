@@ -1,8 +1,8 @@
-"""Compare three outlier filters on the raw Kupferdreh levels.
+"""Compare three live outlier filters on the raw Kupferdreh levels.
 
 Exploration only: reads the CSV from export.py, writes plots and a stats table
-into this folder. Each method returns a boolean mask (True = outlier) and uses
-nothing but the level series itself.
+into this folder. The filters are in methods.py and use nothing but the level
+series itself.
 """
 
 import sys
@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from methods import LIVE_FILTERS, excursion, run_live
 
 HERE = Path(__file__).parent
 SENSOR_CEILING_M = 2.95  # the gauge reports 2.98 m when it fails; no real level gets close
@@ -28,96 +29,50 @@ REAL_EVENT_DAYS = [
     "2026-06-02",
 ]
 
-# Method parameters, picked with the sweep in README.md
-HAMPEL_WINDOW = "9h"  # centred, so spikes up to 4 h long are still a minority
-HAMPEL_K = 3.0
-HAMPEL_MIN_DEVIATION_M = 0.15  # MAD is ~0 at low water, so set a floor
-RATE_MAX_STEP_M_PER_H = 0.35
-RATE_REANCHOR_AFTER = 8  # consecutive rejections before we trust the new level
-EXCURSION_JUMP_M = 0.25
-EXCURSION_MAX_HOURS = 14  # longest stuck run seen is 13 h
-EXCURSION_RETURN_FRACTION = 0.25  # back within a quarter of the excursion height
+WARM_UP = pd.Timedelta("48h")  # how much history a fresh filter gets in the replay check
 
 
-def hampel(levels: pd.Series) -> pd.Series:
-    """Outlier if it is far from the centred rolling median, in units of MAD."""
-    rolling = levels.rolling(HAMPEL_WINDOW, center=True, min_periods=3)
-    median = rolling.median()
-    mad = (levels - median).abs().rolling(HAMPEL_WINDOW, center=True, min_periods=3).median()
-    limit = np.maximum(HAMPEL_K * 1.4826 * mad, HAMPEL_MIN_DEVIATION_M)
-    return (levels - median).abs() > limit
-
-
-def rate_limit(levels: pd.Series) -> pd.Series:
-    """Causal: outlier if it moved faster than the max rate from the last accepted value.
-
-    After RATE_REANCHOR_AFTER rejections in a row the new level is accepted, so a
-    real fast rise is only lost for its first few hours instead of forever.
-    """
-    flags = np.zeros(len(levels), dtype=bool)
-    hours = (levels.index - levels.index[0]).total_seconds().to_numpy() / 3600
-    values = levels.to_numpy()
-    last_value, last_hour, rejected = values[0], hours[0], 0
-    for i in range(1, len(values)):
-        allowed = RATE_MAX_STEP_M_PER_H * max(hours[i] - last_hour, 1.0)
-        if abs(values[i] - last_value) <= allowed or rejected >= RATE_REANCHOR_AFTER:
-            last_value, last_hour, rejected = values[i], hours[i], 0
-            continue
-        flags[i] = True
-        rejected += 1
-    return pd.Series(flags, index=levels.index)
-
-
-def excursion(levels: pd.Series) -> pd.Series:
-    """Outlier if a jump of more than EXCURSION_JUMP_M is undone by a jump back
-    within EXCURSION_MAX_HOURS.
-
-    "Back" means a step in the opposite direction that lands close to the level
-    before the excursion. Real floods fall at most ~0.2 m/h here, so a sharp
-    step back only happens when the jump up was fake.
-    """
-    flags = np.zeros(len(levels), dtype=bool)
-    values = levels.to_numpy()
-    times = levels.index
-    i = 1
-    while i < len(values):
-        before = values[i - 1]
-        direction = np.sign(values[i] - before)
-        if abs(values[i] - before) <= EXCURSION_JUMP_M:
-            i += 1
-            continue
-        end = times[i - 1] + pd.Timedelta(hours=EXCURSION_MAX_HOURS + 1)
-        height = abs(values[i] - before)
-        j = i + 1
-        while j < len(values) and times[j] <= end:
-            step_back = (values[j - 1] - values[j]) * direction
-            if step_back > EXCURSION_JUMP_M and (
-                abs(values[j] - before) < EXCURSION_RETURN_FRACTION * height
-            ):
-                flags[i:j] = True
-                break
-            height = max(height, abs(values[j] - before))
-            j += 1
-        # Continue after the return point, so it becomes the next anchor and the
-        # drop back from one spike can't start an "excursion" to the next spike
-        i = j + 1 if flags[i] else i + 1
-    return pd.Series(flags, index=levels.index)
-
-
-METHODS = {"Hampel": hampel, "Rate limit": rate_limit, "Excursion": excursion}
+def flags_for(levels: pd.Series) -> dict[str, pd.Series]:
+    return {name: run_live(filter_class, levels) for name, filter_class in LIVE_FILTERS.items()}
 
 
 def self_check() -> None:
     index = pd.date_range("2024-01-01", periods=30, freq="h", tz="UTC")
-    flat = np.full(30, 0.2)
-    spiky = flat.copy()
+    spiky = np.full(30, 0.2)
     spiky[[10, 15]] = 2.98  # two spikes: the good values between must stay
     spiky[20:22] = 1.5
     flood = np.concatenate([np.full(10, 0.2), np.linspace(0.2, 1.6, 6), np.full(14, 1.6)])
-    for name, method in METHODS.items():
-        found = method(pd.Series(spiky, index=index))
-        assert list(np.flatnonzero(found)) == [10, 15, 20, 21], (name, np.flatnonzero(found))
-        assert not method(pd.Series(flood, index=index)).any(), name
+    for name, flags in flags_for(pd.Series(spiky, index=index)).items():
+        assert list(np.flatnonzero(flags)) == [10, 15, 20, 21], (name, np.flatnonzero(flags))
+    for name, flags in flags_for(pd.Series(flood, index=index)).items():
+        assert not flags.any(), (name, np.flatnonzero(flags))
+    # A small spike may pass, but the true level after it must not be rejected
+    small = np.full(30, 0.2)
+    small[10] = 0.5
+    for name, flags in flags_for(pd.Series(small, index=index)).items():
+        assert not flags.iloc[11:].any(), (name, np.flatnonzero(flags))
+
+
+def check_live(levels: pd.Series, flags: dict[str, pd.Series]) -> None:
+    """Flags must not change when later readings are added: cut the series at
+    a few points and compare with the full run."""
+    for cut in np.linspace(len(levels) // 10, len(levels) - 1, 7).astype(int):
+        for name, prefix_flags in flags_for(levels.iloc[:cut]).items():
+            assert prefix_flags.equals(flags[name].iloc[:cut]), (name, cut)
+
+
+def replay_mismatches(levels: pd.Series, flags: dict[str, pd.Series]) -> dict[str, int]:
+    """Readings judged differently when each month starts from a fresh filter
+    with only WARM_UP of history, as a stateless hourly job would."""
+    mismatches = dict.fromkeys(flags, 0)
+    for month_start in pd.date_range(levels.index[0].normalize(), levels.index[-1], freq="MS"):
+        month = levels[month_start : month_start + pd.offsets.MonthBegin(1)].index
+        if month.empty:
+            continue
+        replayed = flags_for(levels[month_start - WARM_UP : month[-1]])
+        for name in flags:
+            mismatches[name] += int((replayed[name][month] != flags[name][month]).sum())
+    return mismatches
 
 
 def load(path: Path) -> pd.Series:
@@ -200,8 +155,12 @@ def plot_diffs(levels: pd.Series, flags: dict[str, pd.Series], path: Path) -> No
 def main(csv_path: Path) -> None:
     self_check()
     levels = load(csv_path)
-    flags = {name: method(levels) for name, method in METHODS.items()}
-    print(stats(levels, flags).to_markdown())
+    flags = flags_for(levels)
+    check_live(levels, flags)
+    table = stats(levels, {**flags, "Excursion (offline reference)": excursion(levels)})
+    print(table.to_markdown())
+    print()
+    print("replay mismatches:", replay_mismatches(levels, flags))
     print()
     print(agreement(flags).to_markdown())
     plots = HERE / "plots"
