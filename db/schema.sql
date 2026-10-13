@@ -68,7 +68,9 @@ CREATE TABLE public.input_forecasts (
     valid_at timestamp with time zone NOT NULL,
     value double precision NOT NULL,
     fetched_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT input_forecasts_check CHECK ((valid_at > run_at))
+    kind text DEFAULT 'forecast'::text NOT NULL,
+    CONSTRAINT input_forecasts_check CHECK ((valid_at > run_at)),
+    CONSTRAINT input_forecasts_kind_check CHECK ((kind = 'forecast'::text))
 );
 
 
@@ -82,7 +84,9 @@ CREATE TABLE public.observations (
     value double precision NOT NULL,
     coverage double precision,
     ingested_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT observations_coverage_check CHECK (((coverage > (0)::double precision) AND (coverage <= (1)::double precision)))
+    kind text DEFAULT 'observation'::text NOT NULL,
+    CONSTRAINT observations_coverage_check CHECK (((coverage > (0)::double precision) AND (coverage <= (1)::double precision))),
+    CONSTRAINT observations_kind_check CHECK ((kind = 'observation'::text))
 );
 
 
@@ -107,7 +111,9 @@ CREATE TABLE public.series (
     location text NOT NULL,
     aggregation text,
     period interval,
-    description text DEFAULT ''::text NOT NULL
+    description text DEFAULT ''::text NOT NULL,
+    kind text NOT NULL,
+    CONSTRAINT series_kind_check CHECK ((kind = ANY (ARRAY['observation'::text, 'forecast'::text])))
 );
 
 
@@ -160,6 +166,14 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: series series_id_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.series
+    ADD CONSTRAINT series_id_kind_key UNIQUE (id, kind);
+
+
+--
 -- Name: series series_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -176,19 +190,19 @@ ALTER TABLE ONLY public.forecast_points
 
 
 --
--- Name: input_forecasts input_forecasts_series_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: input_forecasts input_forecasts_series_id_kind_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.input_forecasts
-    ADD CONSTRAINT input_forecasts_series_id_fkey FOREIGN KEY (series_id) REFERENCES public.series(id);
+    ADD CONSTRAINT input_forecasts_series_id_kind_fkey FOREIGN KEY (series_id, kind) REFERENCES public.series(id, kind);
 
 
 --
--- Name: observations observations_series_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: observations observations_series_id_kind_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.observations
-    ADD CONSTRAINT observations_series_id_fkey FOREIGN KEY (series_id) REFERENCES public.series(id);
+    ADD CONSTRAINT observations_series_id_kind_fkey FOREIGN KEY (series_id, kind) REFERENCES public.series(id, kind);
 
 
 --
@@ -206,4 +220,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261012133232'),
     ('20261012133234'),
     ('20261013150000'),
-    ('20261013160000');
+    ('20261013160000'),
+    ('20261013170000');

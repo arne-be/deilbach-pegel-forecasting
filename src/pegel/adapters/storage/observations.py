@@ -23,14 +23,14 @@ UPSERT_SQL = """
 """
 
 FETCH_SQL = """
-    SELECT series_id, valid_at, value, coverage, ingested_at
+    SELECT series_id, valid_at, value, coverage, ingested_at, kind
     FROM observations
     WHERE series_id = %s AND valid_at >= %s AND valid_at < %s
     ORDER BY valid_at
 """
 
 NEWEST_SQL = """
-    SELECT series_id, valid_at, value, coverage, ingested_at
+    SELECT series_id, valid_at, value, coverage, ingested_at, kind
     FROM observations
     WHERE series_id = %s AND valid_at <= %s
     ORDER BY valid_at DESC

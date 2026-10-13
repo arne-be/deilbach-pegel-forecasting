@@ -51,7 +51,7 @@ If training ever takes longer than Lambda's 15 minutes, the jobs image runs as a
 **Neon Postgres (free plan, Frankfurt)** holds observations (raw and cleaned), forecasts and model metadata. That's about 100 MB per year; the free plan allows 1 GB.
 
 Measured and forecast inputs live in three generic tables, so a new input needs a new row, not a new table or migration:
-- `series`: what a series is (variable, unit, source, location, area aggregation, period), with a readable id such as `kupferdreh:level` or `radolan_rw:zone:neviges`. Each job ensures its own series rows before it writes values.
+- `series`: what a series is (variable, unit, source, location, area aggregation, period), with a readable id such as `kupferdreh:level` or `radolan_rw:zone:neviges`. Each series has a `kind`, `observation` or `forecast`, and the database rejects a value written to a series of the other kind; `ensure_series` refuses to change the kind of an existing series. Each job ensures its own series rows before it writes values.
 - `observations`: measured values per series and time, e.g. gauge levels (in cm relative to the local zero point), radar rain, soil moisture.
 - `input_forecasts`: forecasts made by others per series, model run and valid time, e.g. ICON-D2 rain.
 

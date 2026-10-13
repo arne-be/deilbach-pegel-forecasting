@@ -18,6 +18,7 @@ def test_level_series_of_a_station() -> None:
         "langenberg",
         None,
     )
+    assert series.kind == "observation"
 
 
 @pytest.mark.parametrize("value", [math.nan, math.inf])
@@ -48,4 +49,4 @@ def test_forecast_value_must_be_after_its_run() -> None:
 
 def test_period_must_be_positive() -> None:
     with pytest.raises(ValueError, match="period"):
-        Series("x", "rain", "mm", "radar", "zone", period=timedelta(0))
+        Series("x", "rain", "mm", "radar", "zone", "observation", period=timedelta(0))

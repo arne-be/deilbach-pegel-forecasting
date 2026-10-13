@@ -3,11 +3,16 @@
 import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Literal
 
 from pegel.config import Station
 from pegel.core.observations import require_utc
 
 LEVEL_UNIT = "cm"
+
+# Observations go to the observations table, forecasts by others to input_forecasts.
+# The database rejects a value written to a series of the other kind.
+SeriesKind = Literal["observation", "forecast"]
 
 
 @dataclass(frozen=True)
@@ -20,6 +25,7 @@ class Series:
     unit: str
     source: str
     location: str
+    kind: SeriesKind
     # How an area value combines cells or points, e.g. 'mean'. None for one gauge.
     aggregation: str | None = None
     # None for a reading at one moment; otherwise a total over the period ending at valid_at.
@@ -79,6 +85,7 @@ def level_series(station: Station) -> Series:
         unit=LEVEL_UNIT,
         source=station.source,
         location=station.id,
+        kind="observation",
         description=f"Water level at {station.name}",
     )
 

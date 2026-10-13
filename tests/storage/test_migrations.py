@@ -137,3 +137,72 @@ def test_centimetres_migration_down_restores_metres(before_centimetres: Conn) ->
     down(before_centimetres, migration(CENTIMETRES_MIGRATION))
     points = before_centimetres.execute("SELECT level_m FROM forecast_points").fetchall()
     assert (values(before_centimetres), points) == (before, [(0.229,)])
+
+
+KIND_MIGRATION = "20261013170000"
+
+
+@pytest.fixture
+def before_kind(before_centimetres: Conn) -> Conn:
+    up(before_centimetres, migration(CENTIMETRES_MIGRATION))
+    return before_centimetres
+
+
+def add_forecast_series(conn: Conn, series_id: str) -> None:
+    conn.execute(
+        "INSERT INTO series (id, variable, unit, source, location)"
+        " VALUES (%s, 'rain', 'mm', 'icon_d2', 'catchment')",
+        (series_id,),
+    )
+    conn.execute(
+        "INSERT INTO input_forecasts (series_id, run_at, valid_at, value) VALUES (%s, %s, %s, 0.4)",
+        (series_id, AT, AT.replace(hour=10)),
+    )
+
+
+def test_kind_migration_sets_the_kind_from_the_data(before_kind: Conn) -> None:
+    add_forecast_series(before_kind, "icon_d2:catchment")
+    up(before_kind, migration(KIND_MIGRATION))
+    kinds = before_kind.execute("SELECT id, kind FROM series ORDER BY id").fetchall()
+    assert kinds == [
+        ("icon_d2:catchment", "forecast"),
+        ("kupferdreh:level", "observation"),
+        ("langenberg:level", "observation"),
+        ("radar:zone", "observation"),
+    ]
+
+
+def test_kind_migration_stops_on_a_series_in_both_tables(before_kind: Conn) -> None:
+    before_kind.execute(
+        "INSERT INTO input_forecasts (series_id, run_at, valid_at, value)"
+        " VALUES ('radar:zone', %s, %s, 0.4)",
+        (AT, AT.replace(hour=10)),
+    )
+    with pytest.raises(psycopg.errors.RaiseException, match="radar:zone"):
+        up(before_kind, migration(KIND_MIGRATION))
+
+
+def test_kind_migration_rejects_forecasts_of_observation_series(before_kind: Conn) -> None:
+    up(before_kind, migration(KIND_MIGRATION))
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        before_kind.execute(
+            "INSERT INTO input_forecasts (series_id, run_at, valid_at, value)"
+            " VALUES ('radar:zone', %s, %s, 1.0)",
+            (AT, AT.replace(hour=10)),
+        )
+
+
+def test_kind_migration_down_restores_the_tables(before_kind: Conn) -> None:
+    def columns() -> list[tuple[object, ...]]:
+        return before_kind.execute(
+            "SELECT table_name, column_name FROM information_schema.columns"
+            " WHERE table_schema = 'public' ORDER BY table_name, ordinal_position"
+        ).fetchall()
+
+    add_forecast_series(before_kind, "icon_d2:catchment")
+    before = (columns(), values(before_kind))
+    up(before_kind, migration(KIND_MIGRATION))
+    down(before_kind, migration(KIND_MIGRATION))
+    assert (columns(), values(before_kind)) == before
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        before_kind.execute("INSERT INTO observations VALUES ('nowhere', %s, 1.0)", (AT,))

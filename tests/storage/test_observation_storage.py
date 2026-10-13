@@ -22,12 +22,13 @@ FAR_FUTURE = datetime(2100, 1, 1, tzinfo=UTC)
 HOUR = timedelta(hours=1)
 
 Conn = psycopg.Connection[TupleRow]
-RAIN = Series("radar:zone:test", "rain", "mm", "radar", "zone:test", "mean")
+RAIN = Series("radar:zone:test", "rain", "mm", "radar", "zone:test", "observation", "mean")
+ICON = Series("icon_d2:zone:test", "rain", "mm", "icon_d2", "zone:test", "forecast", "mean")
 
 
 @pytest.fixture(autouse=True)
 def series(conn: Conn) -> None:
-    ensure_series(conn, [level_series(load_config().station(STATION)), RAIN])
+    ensure_series(conn, [level_series(load_config().station(STATION)), RAIN, ICON])
 
 
 def hourly(levels: list[float]) -> list[Observation]:
@@ -143,3 +144,8 @@ def test_series_are_kept_apart(conn: Conn) -> None:
     upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5)])
     upsert_observations(conn, hourly([40.0]))
     assert [o.level_cm for o in fetch_observations(conn, STATION, START, FAR_FUTURE)] == [40.0]
+
+
+def test_observed_value_for_a_forecast_series_is_rejected(conn: Conn) -> None:
+    with pytest.raises(psycopg.errors.ForeignKeyViolation, match="observation"):
+        upsert_values(conn, [SeriesValue(ICON.id, START, 1.5)])

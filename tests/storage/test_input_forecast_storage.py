@@ -9,14 +9,15 @@ from pegel.adapters.storage.series import ensure_series
 from pegel.core.series import InputForecastValue, Series
 
 Conn = psycopg.Connection[TupleRow]
-RAIN = Series("icon_d2:catchment:mean", "rain", "mm", "icon_d2", "catchment", "mean")
+RAIN = Series("icon_d2:catchment:mean", "rain", "mm", "icon_d2", "catchment", "forecast", "mean")
+RADAR = Series("radar:catchment:mean", "rain", "mm", "radar", "catchment", "observation", "mean")
 RUN_AT = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
 HOUR = timedelta(hours=1)
 
 
 @pytest.fixture(autouse=True)
 def series(conn: Conn) -> None:
-    ensure_series(conn, [RAIN])
+    ensure_series(conn, [RAIN, RADAR])
 
 
 def run(run_at: datetime, values: list[float]) -> list[InputForecastValue]:
@@ -70,3 +71,9 @@ def test_api_role_cannot_insert(conn: Conn) -> None:
     conn.execute("SET ROLE pegel_api")
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         upsert_input_forecasts(conn, run(RUN_AT, [0.1]))
+
+
+def test_forecast_value_for_an_observation_series_is_rejected(conn: Conn) -> None:
+    value = InputForecastValue(RADAR.id, RUN_AT, RUN_AT + HOUR, 0.1)
+    with pytest.raises(psycopg.errors.ForeignKeyViolation, match="forecast"):
+        upsert_input_forecasts(conn, [value])
