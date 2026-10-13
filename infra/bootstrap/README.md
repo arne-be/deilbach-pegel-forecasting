@@ -4,8 +4,9 @@ Creates what `infra/prod` and CI need before they can run:
 
 - the S3 bucket for the `infra/prod` state (`deilbach-pegel-tofu-state-<account id>`, key `prod/terraform.tfstate`, OpenTofu's S3 locking),
 - the GitHub OIDC provider,
-- the role `deilbach-pegel-github-plan` for `tofu plan` in pull requests (read only, no secret values),
-- the role `deilbach-pegel-github-deploy` for deploys from `main` (only resources named `deilbach-pegel*`).
+- the role `deilbach-pegel-github-plan` for `tofu plan` in pull requests (read only, no secret values except the Grafana token),
+- the role `deilbach-pegel-github-deploy` for deploys from `main` (only resources named `deilbach-pegel*`),
+- the empty secret `deilbach-pegel/grafana-token`, which both roles can read ([docs/setup-grafana.md](../docs/setup-grafana.md)).
 
 You apply it by hand once, with admin credentials. CI never touches it. The state of this folder stays local, because it creates the bucket a remote backend would need.
 
@@ -38,5 +39,7 @@ aws s3 cp terraform.tfstate "s3://$(tofu output -raw tf_state_bucket)/bootstrap/
 ## Changing it
 
 When a deploy fails on a missing permission, widen the deploy role in `roles.tf`, open a PR, and after the merge run `tofu apply` here again by hand. The deploy role cannot change the CI roles itself.
+
+The state is local and gitignored, so it lives only in the main checkout (and the S3 copy). To apply from a worktree, copy `infra/bootstrap/terraform.tfstate` from the main checkout first and back afterwards. Without it, tofu starts from an empty state and tries to create everything again.
 
 The state bucket has `prevent_destroy`, so `tofu destroy` stops before deleting it.

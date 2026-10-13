@@ -80,7 +80,7 @@ A delay only matters up to the next :30 run, so a generous margin rarely costs a
 
 Neon suspends the database when it's idle and wakes it on the next connection. The free plan includes 100 compute hours per month. If they run out, the database stays off until the next month. That's why normal page visits never touch the database (see below).
 
-Neon is set up by hand once, following [setup-neon.md](setup-neon.md). The schema and grants come from migrations. Three roles: one for migrations, one for the jobs (read and write) and one for the API (read only).
+Neon is set up by hand once, following [setup-neon.md](setup-neon.md). The schema and grants come from migrations. Four roles: one for migrations, one for the jobs (read and write), one for the API and one for Grafana (both read only).
 
 **S3** holds what doesn't belong in a database. The bucket is private; only our Lambdas read and write it.
 - raw files as received

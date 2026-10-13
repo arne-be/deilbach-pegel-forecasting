@@ -23,13 +23,14 @@ The free plan gives 100 CU-hours a month. A fixed small size makes them last as 
 
 ## 3. Roles
 
-We need three roles:
+We need four roles:
 
 | Role | Used by | Can |
 |---|---|---|
 | `pegel_owner` (exists already) | migrations in CI | change the schema |
 | `pegel_jobs` | ingest, clean, forecast, train, backup | read and write data |
 | `pegel_api` | the FastAPI app | read only |
+| `pegel_grafana` | Grafana Cloud ([setup-grafana.md](setup-grafana.md)) | read only |
 
 Neon names the owner role after the database, so with `pegel` it is `pegel_owner`.
 
@@ -40,6 +41,13 @@ Generate two strong passwords in your password manager, then run:
 ```sql
 CREATE ROLE pegel_jobs LOGIN PASSWORD '<password from password manager>';
 CREATE ROLE pegel_api LOGIN PASSWORD '<password from password manager>';
+```
+
+`pegel_grafana` came later, after the `dev` branch existed, so create it on `dev` too, with its own password. The limits keep a dashboard from tying up the small compute:
+
+```sql
+CREATE ROLE pegel_grafana LOGIN PASSWORD '<password from password manager>' CONNECTION LIMIT 3;
+ALTER ROLE pegel_grafana SET statement_timeout = '15s';
 ```
 
 The grants (`USAGE`, `SELECT`, `INSERT`, …) come from the migrations, not from here.

@@ -108,3 +108,13 @@ resource "aws_iam_openid_connect_provider" "github" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
 }
+
+# --- Grafana token ---
+
+# Service account token for Grafana Cloud, read by tofu plan and apply in infra/prod.
+# Here and not in infra/prod, because the grafana provider needs the value before
+# infra/prod can plan at all. The value is put in by hand (infra/bootstrap/README.md).
+resource "aws_secretsmanager_secret" "grafana_token" {
+  name        = "deilbach-pegel/grafana-token"
+  description = "Grafana Cloud service account token (Editor), used by OpenTofu"
+}
