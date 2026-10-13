@@ -14,7 +14,7 @@ from pegel.config import PegelConfig, Station
 from pegel.core.forecasts import Forecast
 from pegel.core.observations import Observation
 from pegel.core.persistence import persistence_forecast
-from pegel.core.schedule import monthly_windows, scheduled_available_at
+from pegel.core.schedule import issue_time, monthly_windows, scheduled_available_at
 from pegel.core.series import SeriesValue, level_series
 
 logger = logging.getLogger(__name__)
@@ -40,11 +40,12 @@ def ingest(
 ) -> int:
     """Fetches and stores one window. Returns the number of new or changed rows.
 
-    Live runs stamp new values with the time of the fetch. Backfills can't know when a value
-    first appeared, so they use the time the hourly run would first have used it.
+    Live runs stamp new values with the issue slot of the fetch, so the run that fetched them
+    may use them. Backfills can't know when a value first appeared, so they use the slot the
+    hourly run would first have used it in.
     """
     observations = fetch(station, start, end)
-    fetched_at = datetime.now(UTC)
+    seen_at = issue_time(datetime.now(UTC), issue_minute)
     series = level_series(station)
     ensure_series(conn, [series])
     values = [
@@ -52,7 +53,7 @@ def ingest(
             series.id,
             observation.observed_at,
             observation.level_cm,
-            fetched_at
+            seen_at
             if live
             else scheduled_available_at(
                 observation.observed_at, series.available_after, issue_minute
@@ -60,7 +61,7 @@ def ingest(
         )
         for observation in observations
     ]
-    changed = upsert_values(conn, values)
+    changed = upsert_values(conn, values, seen_at)
     logger.info(
         "ingested window",
         extra={

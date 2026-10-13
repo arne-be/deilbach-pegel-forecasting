@@ -58,9 +58,9 @@ Measured and forecast inputs live in three generic tables, so a new input needs 
 Our own level forecasts stay in `forecasts` and `forecast_points`.
 
 **Availability for training.** A model may only learn from inputs that were there at the issue time. `ingested_at` doesn't say that: it moves when a value changes, and for backfilled rows it's the backfill date. So every value in `observations` and `input_forecasts` has `available_at`, and training uses a value only if `available_at <= issue time`.
-- **Live runs** stamp new values with the time the run fetched them.
+- **Live runs** stamp new values with the issue slot of the run that fetched them (the :30 at or before the fetch), so that run may use them. The exact fetch time stays in `ingested_at` and `fetched_at`.
 - **Backfills** can't know when a value first appeared, so they imitate the live system: live data only ever enters through the hourly run at :30. A value gets the first run at or after `valid_at + available_after` (observations) or `run_at + available_after` (forecast runs), where `available_after` is the series' typical delay until its values are reliably at the source (`scheduled_available_at` in `core/schedule.py`). The migration that added the column filled all older rows the same way, because we can't tell which were live.
-- An unchanged value keeps its first `available_at` on every rerun. A revised value, e.g. LANUV replacing a raw reading with a checked one, gets the time of the revision.
+- An unchanged value keeps its first `available_at` on every rerun. A revised value, e.g. LANUV replacing a raw reading with a checked one, gets the slot in which we first saw the revision, even when a backfill brings it in. Otherwise a backfill would date the checked value back to the raw one.
 
 `available_after` is measured per source, with a margin, and lives in `config/pegel.json` (`available_after_minutes`, on each station). `ensure_series` copies it into `series`, so the database describes itself and training code never holds a delay of its own. Measured on 2026-10-13:
 

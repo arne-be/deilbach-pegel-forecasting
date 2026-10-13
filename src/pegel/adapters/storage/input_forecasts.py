@@ -9,14 +9,16 @@ from psycopg.rows import TupleRow
 from pegel.core.series import InputForecastValue
 
 # Unchanged rows are skipped, so the returned count says what actually changed, and an
-# unchanged value keeps its first available_at. A revised value gets the time of the revision.
+# unchanged value keeps its first available_at. A revised value is stamped no earlier than the
+# issue slot that saw it, so a backfill can't date a revision back to the original value.
 UPSERT_SQL = """
     INSERT INTO input_forecasts (series_id, run_at, valid_at, value, available_at)
     SELECT *
     FROM unnest(%s::text[], %s::timestamptz[], %s::timestamptz[], %s::double precision[],
                 %s::timestamptz[])
     ON CONFLICT (series_id, run_at, valid_at) DO UPDATE
-    SET value = excluded.value, available_at = excluded.available_at, fetched_at = now()
+    SET value = excluded.value, available_at = greatest(excluded.available_at, %s::timestamptz),
+        fetched_at = now()
     WHERE input_forecasts.value IS DISTINCT FROM excluded.value
 """
 
@@ -24,9 +26,12 @@ NEWEST_RUN_SQL = "SELECT max(run_at) FROM input_forecasts WHERE series_id = %s"
 
 
 def upsert_input_forecasts(
-    conn: psycopg.Connection[TupleRow], values: Sequence[InputForecastValue]
+    conn: psycopg.Connection[TupleRow], values: Sequence[InputForecastValue], seen_at: datetime
 ) -> int:
-    """Insert or update forecast values; return how many rows were new or changed."""
+    """Insert or update forecast values; return how many rows were new or changed.
+
+    `seen_at` is the current issue slot; a changed value gets at least that as available_at.
+    """
     if not values:
         return 0
     params = (
@@ -35,6 +40,7 @@ def upsert_input_forecasts(
         [value.valid_at for value in values],
         [value.value for value in values],
         [value.available_at for value in values],
+        seen_at,
     )
     with conn.transaction(), conn.cursor() as cursor:
         cursor.execute(UPSERT_SQL, params)

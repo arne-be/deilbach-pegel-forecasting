@@ -12,7 +12,8 @@ from pegel.core.series import SeriesValue, level_series_id
 
 # One statement for the whole batch keeps backfills of a month to one round trip.
 # Unchanged rows are skipped, so the returned count says what actually changed, and an
-# unchanged value keeps its first available_at. A revised value gets the time of the revision.
+# unchanged value keeps its first available_at. A revised value is stamped no earlier than the
+# issue slot that saw it, so a backfill can't date a revision back to the original value.
 UPSERT_SQL = """
     INSERT INTO observations (series_id, valid_at, value, coverage, available_at)
     SELECT *
@@ -20,7 +21,7 @@ UPSERT_SQL = """
                 %s::timestamptz[])
     ON CONFLICT (series_id, valid_at) DO UPDATE
     SET value = excluded.value, coverage = excluded.coverage,
-        available_at = excluded.available_at, ingested_at = now()
+        available_at = greatest(excluded.available_at, %s::timestamptz), ingested_at = now()
     WHERE (observations.value, observations.coverage)
         IS DISTINCT FROM (excluded.value, excluded.coverage)
 """
@@ -41,9 +42,12 @@ NEWEST_SQL = """
 """
 
 
-def upsert_values(conn: psycopg.Connection[TupleRow], values: Sequence[SeriesValue]) -> int:
+def upsert_values(
+    conn: psycopg.Connection[TupleRow], values: Sequence[SeriesValue], seen_at: datetime
+) -> int:
     """Insert or update values of existing series; return how many rows were new or changed.
 
+    `seen_at` is the current issue slot; a changed value gets at least that as available_at.
     Rerunning with the same values changes nothing and returns 0.
     """
     if not values:
@@ -54,6 +58,7 @@ def upsert_values(conn: psycopg.Connection[TupleRow], values: Sequence[SeriesVal
         [value.value for value in values],
         [value.coverage for value in values],
         [value.available_at for value in values],
+        seen_at,
     )
     with conn.transaction(), conn.cursor() as cursor:
         cursor.execute(UPSERT_SQL, params)

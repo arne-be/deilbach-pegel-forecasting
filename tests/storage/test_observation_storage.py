@@ -22,6 +22,7 @@ HOUR = timedelta(hours=1)
 
 Conn = psycopg.Connection[TupleRow]
 RAIN = Series("radar:zone:test", "rain", "mm", "radar", "zone:test", "observation", HOUR, "mean")
+LEVEL = f"{STATION}:level"
 ICON = Series("icon_d2:zone:test", "rain", "mm", "icon_d2", "zone:test", "forecast", HOUR, "mean")
 
 
@@ -44,7 +45,7 @@ def upsert_observations(
         SeriesValue(f"{o.station_id}:level", o.observed_at, o.level_cm, available_at)
         for o in observations
     ]
-    return upsert_values(conn, values)
+    return upsert_values(conn, values, START)
 
 
 def stored_available_at(conn: Conn) -> list[datetime]:
@@ -81,6 +82,13 @@ def test_changed_value_takes_the_new_available_at(conn: Conn) -> None:
     upsert_observations(conn, hourly([40.0]), available_at=START + HOUR)
     upsert_observations(conn, hourly([41.0]), available_at=START + 2 * HOUR)
     assert stored_available_at(conn) == [START + 2 * HOUR]
+
+
+def test_backfilled_revision_is_not_dated_back(conn: Conn) -> None:
+    upsert_observations(conn, hourly([40.0]), available_at=START + HOUR)
+    upsert_values(conn, [SeriesValue(LEVEL, START, 41.0, START + HOUR)], START + 5 * HOUR)
+    upsert_values(conn, [SeriesValue(LEVEL, START, 41.0, START + HOUR)], START + 9 * HOUR)
+    assert stored_available_at(conn) == [START + 5 * HOUR]
 
 
 def test_changed_value_is_updated(conn: Conn) -> None:
@@ -151,7 +159,7 @@ def test_newest_observation_ignores_readings_after_the_bound(conn: Conn) -> None
 
 def test_values_of_an_unknown_series_are_rejected(conn: Conn) -> None:
     with pytest.raises(psycopg.errors.ForeignKeyViolation):
-        upsert_values(conn, [SeriesValue("nowhere:level", START, 10.0, START)])
+        upsert_values(conn, [SeriesValue("nowhere:level", START, 10.0, START)], START)
 
 
 def test_values_round_trip_with_coverage(conn: Conn) -> None:
@@ -159,22 +167,22 @@ def test_values_round_trip_with_coverage(conn: Conn) -> None:
         SeriesValue(RAIN.id, START, 1.5, START + HOUR, 0.75),
         SeriesValue(RAIN.id, START + HOUR, 0.0, START + 2 * HOUR),
     ]
-    upsert_values(conn, values)
+    upsert_values(conn, values, START)
     assert fetch_values(conn, RAIN.id, START, FAR_FUTURE) == values
 
 
 def test_changed_coverage_counts_as_a_change(conn: Conn) -> None:
-    upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, START, 0.75)])
-    assert upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, START, 0.75)]) == 0
-    assert upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, START, 1.0)]) == 1
+    upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, START, 0.75)], START)
+    assert upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, START, 0.75)], START) == 0
+    assert upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, START, 1.0)], START) == 1
 
 
 def test_series_are_kept_apart(conn: Conn) -> None:
-    upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, START)])
+    upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, START)], START)
     upsert_observations(conn, hourly([40.0]))
     assert [o.level_cm for o in fetch_observations(conn, STATION, START, FAR_FUTURE)] == [40.0]
 
 
 def test_observed_value_for_a_forecast_series_is_rejected(conn: Conn) -> None:
     with pytest.raises(psycopg.errors.ForeignKeyViolation, match="observation"):
-        upsert_values(conn, [SeriesValue(ICON.id, START, 1.5, START)])
+        upsert_values(conn, [SeriesValue(ICON.id, START, 1.5, START)], START)

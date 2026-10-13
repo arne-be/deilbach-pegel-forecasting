@@ -8,7 +8,7 @@ from pegel.adapters.storage.forecasts import newest_forecast
 from pegel.adapters.storage.observations import fetch_observations
 from pegel.config import Station, load_config
 from pegel.core.observations import Observation
-from pegel.core.schedule import scheduled_available_at
+from pegel.core.schedule import issue_time, scheduled_available_at
 from pegel.core.series import level_series
 from pegel.jobs.pipeline import (
     NoObservationError,
@@ -148,11 +148,12 @@ def available_at(conn: Conn) -> list[datetime]:
     return [row[0] for row in rows]
 
 
-def test_hourly_run_stamps_new_values_with_the_fetch_time(conn: Conn) -> None:
-    before = datetime.now(UTC)
+def test_hourly_run_stamps_new_values_with_the_slot_of_the_fetch(conn: Conn) -> None:
+    # A past issue time as with --issued-at: the stamp is still the slot of the fetch.
+    before = issue_time(datetime.now(UTC), MINUTE)
     run_hourly(FakeSource(readings_before(ISSUED_AT, [10.0])), conn, CONFIG, ISSUED_AT)
     [stamp] = available_at(conn)
-    assert before <= stamp <= datetime.now(UTC)
+    assert stamp in {before, issue_time(datetime.now(UTC), MINUTE)}
 
 
 def test_hourly_run_keeps_the_stamp_of_an_unchanged_value(conn: Conn) -> None:

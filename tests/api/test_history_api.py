@@ -41,6 +41,7 @@ def test_returns_readings_of_whole_berlin_days(client: TestClient, conn: Conn) -
             observation(datetime(2026, 10, 10, 21, 22, tzinfo=UTC), 30.0),  # Oct 10, 23:22 Berlin
             observation(datetime(2026, 10, 10, 22, 0, tzinfo=UTC), 40.0),  # Oct 11, 00:00 Berlin
         ],
+        datetime(2026, 10, 10, 22, 30, tzinfo=UTC),
     )
     response = client.get("/api/history", params={"from": "2026-10-10", "to": "2026-10-10"})
     assert response.status_code == 200

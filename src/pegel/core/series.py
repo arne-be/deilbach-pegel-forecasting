@@ -51,8 +51,8 @@ class SeriesValue:
     series_id: str
     valid_at: datetime
     value: float
-    # When the value was first there for us: the fetch time in live runs, the scheduled rule
-    # for backfills (core.schedule.scheduled_available_at). Training uses it, not ingested_at.
+    # The first issue time that may use the value: the slot of the fetch in live runs, the
+    # scheduled rule for backfills (core.schedule.scheduled_available_at). Training uses it.
     available_at: datetime
     # Share of the cells or points behind an area value that had data. None for one gauge.
     coverage: float | None = None
