@@ -58,7 +58,8 @@
     "radar": {
       "source": "radolan_rw",
       "cells_file": "radolan_cells.json",
-      "ingest_lookback_hours": 6
+      "ingest_lookback_hours": 6,
+      "available_after_minutes": 35
     },
     "forecast": {
       "source": "open_meteo_icon_d2",

@@ -62,13 +62,14 @@ Our own level forecasts stay in `forecasts` and `forecast_points`.
 - **Backfills** can't know when a value first appeared, so they imitate the live system: live data only ever enters through the hourly run at :30. A value gets the first run at or after `valid_at + available_after` (observations) or `run_at + available_after` (forecast runs), where `available_after` is the source's typical delay until its values are reliably there (`scheduled_available_at` in `core/schedule.py`). The migration that added `available_at` filled all older rows the same way, because we can't tell which were live.
 - An unchanged value keeps its first `available_at` on every rerun. A revised value, e.g. LANUV replacing a raw reading with a checked one, gets the slot in which we first saw the revision, even when a backfill brings it in. Otherwise a backfill would date the checked value back to the raw one.
 
-`available_after` is measured per source, with a margin, and lives in `config/pegel.json` (`available_after_minutes`, on each station and in `rain.forecast`). Jobs read it from there; the database keeps only the result, `available_at`, so training needs no delay of its own. Measured on 2026-10-13:
+`available_after` is measured per source, with a margin, and lives in `config/pegel.json` (`available_after_minutes`, on each station, in `rain.radar` and in `rain.forecast`). Jobs read it from there; the database keeps only the result, `available_at`, so training needs no delay of its own. Measured on 2026-10-13:
 
 | Source | Measured | `available_after` |
 |---|---|---|
 | Influx (Kupferdreh) | the :22 reading is queryable within a minute | 5 min |
 | LANUV Nierenhof, Neviges | 5-minute values, the portal file is rewritten every 5 minutes; newest value 1 to 12 minutes old | 15 min |
 | LANUV Langenberg | sends once an hour: the batch for hh:10 to hh+1:05 appeared at 13:06–13:11 and 14:15 UTC, so its oldest value was 56 to 65 minutes old | 75 min |
+| DWD RADOLAN RW | the hh:50 file is in the live folder about 26 minutes later ([catchment.md](catchment.md)) | 35 min |
 | Open-Meteo ICON-D2 (live and archive) | a run is served about 85 minutes after it starts ([catchment.md](catchment.md)) | 120 min |
 
 A delay only matters up to the next :30 run, so a generous margin rarely costs a run.

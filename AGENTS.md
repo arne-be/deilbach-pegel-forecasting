@@ -24,6 +24,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Generic series tables (`series`, `observations`, `input_forecasts`): `src/pegel/core/series.py`, `src/pegel/adapters/storage/series.py`, `observations.py`, `input_forecasts.py`
 - Catchment, zones and forecast ring: `config/catchment.geojson`, `scripts/build_catchment.py`, `docs/catchment.md`
 - Rain config (`rain` in `config/pegel.json`, `config/radolan_cells.json`, `config/icon_d2_points.json`) and extra hourly steps: `src/pegel/config.py`, `src/pegel/jobs/pipeline.py`
+- Radar rain (DWD RADOLAN RW): hourly step `radar_rain` and `pegel backfill-radar`: `src/pegel/adapters/sources/radolan.py`, `src/pegel/core/radar.py`, `src/pegel/jobs/radar.py`
 - `scripts/influx-query.sh` and the docs
 
 ## Layout
@@ -151,6 +152,11 @@ uv run pegel backfill-forecast --from 2024-02-01
 ```
 ```
 uv run pegel backfill --source lanuv-files --path <folder> --from 2000-01-01 [--station langenberg]
+```
+
+Radar rain loads from DWD's archives: monthly tars (about 180 MB each) before 2025, single hourly files from 2025 on. Downloads stay in the cache folder, so reruns are quick; delete it when done.
+```
+uv run pegel backfill-radar --from 2023-01-01 [--to 2026-10-01] [--cache-dir ~/.cache/deilbach-pegel/radolan]
 ```
 
 ### Deploy

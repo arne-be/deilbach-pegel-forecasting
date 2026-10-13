@@ -58,6 +58,14 @@ Six values per hour:
 
 The mean over the whole catchment is the area-weighted mean of the zones, so it isn't stored separately.
 
+The series ids start with the source, e.g. `radolan_rw:zone:neviges`, and each value is stored at the product time (the end of its hour). The hourly run reads the live folder, which keeps about two days. History comes from DWD's archives: monthly tars up to 2024, single files from 2025 on.
+
+**For training:** the hourly RW file for product time hh:50 shows up in the live folder about 26 minutes later (48 products on 2026-10-11 to 13, from the folder listing: 25.8 to 26.5 min for the bz2 files, 30.2 min worst over all 10-minute products). Training uses a value only if its `available_at` ≤ the issue time. The hourly step stamps values with the issue slot (:30) of the run that fetched them; the exact fetch time stays in `ingested_at`. Backfilled hours get what the live system would have done: the first hourly run (:30) at or after valid_at + `available_after`, which is `rain.radar.available_after_minutes` (35). So an hh:50 product counts from the :30 run of the next hour; any delay up to 40 minutes gives the same run.
+
+Cells flagged as no data, clutter or negative are left out, and the coverage says what share of a series' cells had data. Cells filled from interpolated rain gauges (where the radar sees nothing) count as data. The bits are in DWD's [format description](https://opendata.dwd.de/climate_environment/CDC/help/RADOLAN/Unterstuetzungsdokumente/RADOLAN-RADVOR-Kompositformat_2.6.pdf), chapter 1.2. The parser rejects composites on the WGS84 grid (header `VS 5`), because the cells are built on DWD's sphere grid; RW still uses it.
+
+The grid was checked three ways: DWD's corner table matches our projection within 4 m, wradlib reads the same values in the same cell order (row 0 in the south), and on 2024-11-19 the radar's blind spot sits exactly at the Essen radar site, next to DWD station 01303. Around that station the radar gave 2.4 and 30.8 mm on 18 and 19 November 2024; the rain gauge measured 2.8 and 31.0 mm.
+
 ### Rain forecast: ICON-D2 via Open-Meteo
 
 DWD's 2.2 km weather model. A new run starts every 3 hours and reaches 48 hours ahead. Open-Meteo serves it as JSON (`models=icon_d2`, `hourly=precipitation`) and keeps past forecasts. The free tier is for non-commercial use only, which fits this project as long as it stays non-commercial.
