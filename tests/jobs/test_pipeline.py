@@ -45,13 +45,13 @@ def readings_before(issued_at: datetime, levels: list[float]) -> dict[datetime, 
 
 
 def test_hourly_run_forecasts_the_newest_level(conn: Conn) -> None:
-    source = FakeSource(readings_before(ISSUED_AT, [0.10, 0.20, -0.21]))
+    source = FakeSource(readings_before(ISSUED_AT, [10.0, 20.0, -21.0]))
     result = run_hourly(source, conn, CONFIG, ISSUED_AT)
-    assert {point.level_m for point in result.points} == {-0.21}
+    assert {point.level_cm for point in result.points} == {-21.0}
 
 
 def test_hourly_run_stores_the_forecast(conn: Conn) -> None:
-    source = FakeSource(readings_before(ISSUED_AT, [0.1]))
+    source = FakeSource(readings_before(ISSUED_AT, [10.0]))
     result = run_hourly(source, conn, CONFIG, ISSUED_AT)
     assert newest_forecast(conn, STATION.id, result.model) == result
 
@@ -63,14 +63,14 @@ def test_hourly_run_ignores_readings_after_issue_time(conn: Conn) -> None:
 
 
 def test_hourly_run_fetches_the_lookback_window(conn: Conn) -> None:
-    source = FakeSource(readings_before(ISSUED_AT, [0.1]))
+    source = FakeSource(readings_before(ISSUED_AT, [10.0]))
     run_hourly(source, conn, CONFIG, ISSUED_AT)
     lookback = timedelta(hours=CONFIG.forecast.ingest_lookback_hours)
     assert source.windows[0] == (ISSUED_AT - lookback, ISSUED_AT)
 
 
 def test_hourly_run_fetches_every_upstream_station(conn: Conn) -> None:
-    source = FakeSource(readings_before(ISSUED_AT, [0.1]))
+    source = FakeSource(readings_before(ISSUED_AT, [10.0]))
     run_hourly(source, conn, CONFIG, ISSUED_AT)
     lookback = timedelta(hours=CONFIG.forecast.upstream_ingest_lookback_hours)
     upstream_count = len(CONFIG.stations) - 1
@@ -78,7 +78,7 @@ def test_hourly_run_fetches_every_upstream_station(conn: Conn) -> None:
 
 
 def test_failing_upstream_station_does_not_stop_the_forecast(conn: Conn) -> None:
-    readings = FakeSource(readings_before(ISSUED_AT, [0.1, 0.2]))
+    readings = FakeSource(readings_before(ISSUED_AT, [10.0, 20.0]))
 
     def source(station: Station, start: datetime, end: datetime) -> list[Observation]:
         if station.id == "nierenhof":
@@ -106,14 +106,14 @@ def test_fetch_by_source_uses_the_station_source() -> None:
 
 
 def test_rerun_gives_the_same_forecast(conn: Conn) -> None:
-    source = FakeSource(readings_before(ISSUED_AT, [0.1, 0.2]))
+    source = FakeSource(readings_before(ISSUED_AT, [10.0, 20.0]))
     first = run_hourly(source, conn, CONFIG, ISSUED_AT)
     assert run_hourly(source, conn, CONFIG, ISSUED_AT) == first
 
 
 def test_stale_data_keeps_its_observation_time(conn: Conn) -> None:
     old_reading = ISSUED_AT - timedelta(hours=3, minutes=8)
-    backfill(FakeSource({old_reading: 0.3}), conn, STATION, LONG_AGO, ISSUED_AT)
+    backfill(FakeSource({old_reading: 30.0}), conn, STATION, LONG_AGO, ISSUED_AT)
     assert forecast(conn, CONFIG, ISSUED_AT).newest_observation_at == old_reading
 
 
@@ -132,6 +132,6 @@ def test_backfill_stores_every_month(conn: Conn) -> None:
 
 def test_backfill_twice_adds_nothing(conn: Conn) -> None:
     start = datetime(2026, 9, 1, tzinfo=UTC)
-    source = FakeSource(readings_before(ISSUED_AT, [0.1, 0.2, 0.3]))
+    source = FakeSource(readings_before(ISSUED_AT, [10.0, 20.0, 30.0]))
     backfill(source, conn, STATION, start, ISSUED_AT)
     assert backfill(source, conn, STATION, start, ISSUED_AT) == 0

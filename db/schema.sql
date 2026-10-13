@@ -26,7 +26,7 @@ SET default_table_access_method = heap;
 CREATE TABLE public.forecast_points (
     forecast_id bigint NOT NULL,
     valid_at timestamp with time zone NOT NULL,
-    level_m double precision NOT NULL
+    level_cm double precision NOT NULL
 );
 
 
@@ -205,4 +205,5 @@ ALTER TABLE ONLY public.observations
 INSERT INTO public.schema_migrations (version) VALUES
     ('20261012133232'),
     ('20261012133234'),
-    ('20261013150000');
+    ('20261013150000'),
+    ('20261013160000');

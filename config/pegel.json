@@ -35,11 +35,11 @@
     "upstream_ingest_lookback_hours": 24
   },
   "categories": [
-    { "number": 1, "name": "unkritisch", "above_m": null },
-    { "number": 2, "name": "kritisch", "above_m": 1.0 },
-    { "number": 3, "name": "sehr kritisch", "above_m": 1.2 },
-    { "number": 4, "name": "extrem kritisch", "above_m": 1.4 },
-    { "number": 5, "name": "Chaos", "above_m": 1.8 }
+    { "number": 1, "name": "unkritisch", "above_cm": null },
+    { "number": 2, "name": "kritisch", "above_cm": 100 },
+    { "number": 3, "name": "sehr kritisch", "above_cm": 120 },
+    { "number": 4, "name": "extrem kritisch", "above_cm": 140 },
+    { "number": 5, "name": "Chaos", "above_cm": 180 }
   ],
   "freshness": {
     "observation_max_age_minutes": 90,

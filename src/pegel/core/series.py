@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pegel.config import Station
 from pegel.core.observations import require_utc
 
-LEVEL_UNIT = "m"
+LEVEL_UNIT = "cm"
 
 
 @dataclass(frozen=True)

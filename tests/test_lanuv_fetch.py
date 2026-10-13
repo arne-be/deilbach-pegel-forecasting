@@ -49,13 +49,13 @@ def ok() -> httpx.Response:
     return httpx.Response(200, json=WEEK_BODY)
 
 
-def test_readings_are_parsed_to_metres_and_utc() -> None:
+def test_readings_are_parsed_to_centimetres_and_utc() -> None:
     first = parse_week(WEEK_BODY, STATION)[0]
     assert (first.station_id, first.observed_at) == (
         "nierenhof",
         datetime(2026, 10, 13, 8, 50, tzinfo=UTC),
     )
-    assert first.level_m == pytest.approx(0.14)
+    assert first.level_cm == 14.0
 
 
 def test_gaps_are_skipped() -> None:

@@ -21,9 +21,9 @@ def _config_with(path: Path, **changes: object) -> Path:
 
 def test_descending_category_bounds_are_rejected(tmp_path: Path) -> None:
     categories = [
-        {"number": 1, "name": "a", "above_m": None},
-        {"number": 2, "name": "b", "above_m": 1.2},
-        {"number": 3, "name": "c", "above_m": 1.0},
+        {"number": 1, "name": "a", "above_cm": None},
+        {"number": 2, "name": "b", "above_cm": 120.0},
+        {"number": 3, "name": "c", "above_cm": 100.0},
     ]
     with pytest.raises(ValidationError):
         load_config(_config_with(tmp_path / "pegel.json", categories=categories))

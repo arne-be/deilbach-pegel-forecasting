@@ -30,7 +30,7 @@ class LanuvError(Exception):
 def parse_lanuv_value(
     station_id: str, timestamp_text: str, value: str | float | None
 ) -> Observation | None:
-    """One LANUV reading as an observation in metres and UTC, or None for a gap.
+    """One LANUV reading as an observation in centimetres and UTC, or None for a gap.
 
     LANUV timestamps carry a fixed +01:00 offset all year, and values are centimetres.
     """
@@ -42,7 +42,7 @@ def parse_lanuv_value(
     return Observation(
         station_id=station_id,
         observed_at=observed_at.astimezone(UTC),
-        level_m=float(value) / 100,
+        level_cm=float(value),
     )
 
 

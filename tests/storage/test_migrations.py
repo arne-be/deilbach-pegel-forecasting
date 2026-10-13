@@ -85,3 +85,55 @@ def test_series_migration_down_restores_raw_observations(before_series: Conn) ->
     up(before_series, migration(SERIES_MIGRATION))
     down(before_series, migration(SERIES_MIGRATION))
     assert raw_rows(before_series) == RAW_ROWS
+
+
+CENTIMETRES_MIGRATION = "20261013160000"
+
+
+@pytest.fixture
+def before_centimetres(before_series: Conn) -> Conn:
+    """Levels in metres in the series tables, a rain series and a forecast point."""
+    up(before_series, migration(SERIES_MIGRATION))
+    before_series.execute(
+        "INSERT INTO series (id, variable, unit, source, location)"
+        " VALUES ('radar:zone', 'rain', 'mm', 'radar', 'zone')"
+    )
+    before_series.execute("INSERT INTO observations VALUES ('radar:zone', %s, 1.5, 0.5)", (AT,))
+    before_series.execute(
+        "INSERT INTO forecasts (station_id, model, issued_at, newest_observation_at)"
+        " VALUES ('kupferdreh', 'persistence', %s, %s)",
+        (AT, AT),
+    )
+    before_series.execute(
+        "INSERT INTO forecast_points SELECT id, %s, 0.229 FROM forecasts", (AT.replace(hour=10),)
+    )
+    return before_series
+
+
+def values(conn: Conn) -> list[tuple[object, ...]]:
+    return conn.execute(
+        "SELECT o.series_id, s.unit, o.value FROM observations o"
+        " JOIN series s ON s.id = o.series_id"
+        " ORDER BY o.series_id, o.valid_at"
+    ).fetchall()
+
+
+def test_centimetres_migration_scales_levels_only(before_centimetres: Conn) -> None:
+    up(before_centimetres, migration(CENTIMETRES_MIGRATION))
+    points = before_centimetres.execute("SELECT level_cm FROM forecast_points").fetchall()
+    assert values(before_centimetres) == [
+        ("kupferdreh:level", "cm", -21.0),
+        ("kupferdreh:level", "cm", 28.0),
+        ("langenberg:level", "cm", 40.0),
+        ("radar:zone", "mm", 1.5),
+    ]
+    # 0.229 * 100 is 22.900000000000002 in floating point; the migration rounds it off.
+    assert points == [(22.9,)]
+
+
+def test_centimetres_migration_down_restores_metres(before_centimetres: Conn) -> None:
+    before = values(before_centimetres)
+    up(before_centimetres, migration(CENTIMETRES_MIGRATION))
+    down(before_centimetres, migration(CENTIMETRES_MIGRATION))
+    points = before_centimetres.execute("SELECT level_m FROM forecast_points").fetchall()
+    assert (values(before_centimetres), points) == (before, [(0.229,)])

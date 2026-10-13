@@ -88,7 +88,7 @@ def upsert_observations(
     return upsert_values(
         conn,
         [
-            SeriesValue(level_series_id(o.station_id), o.observed_at, o.level_m)
+            SeriesValue(level_series_id(o.station_id), o.observed_at, o.level_cm)
             for o in observations
         ],
     )

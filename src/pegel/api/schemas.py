@@ -7,12 +7,12 @@ from pydantic import BaseModel, Field
 
 class HistoryPoint(BaseModel):
     observed_at: datetime = Field(description="UTC")
-    level_m: float = Field(description="Metres relative to the gauge zero; can be negative")
+    level_cm: float = Field(description="Centimetres relative to the gauge zero; can be negative")
 
 
 class ForecastPointResponse(BaseModel):
     valid_at: datetime = Field(description="UTC")
-    level_m: float = Field(description="Metres relative to the gauge zero; can be negative")
+    level_cm: float = Field(description="Centimetres relative to the gauge zero; can be negative")
 
 
 class ForecastResponse(BaseModel):

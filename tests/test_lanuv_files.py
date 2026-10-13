@@ -14,7 +14,7 @@ NIERENHOF = load_config().station("nierenhof")
 HEADER = "station_name;station_no;dateTime;value[cm]\n"
 
 
-def test_levels_of_all_decades_are_read_in_metres_and_utc_without_gaps() -> None:
+def test_levels_of_all_decades_are_read_in_centimetres_and_utc_without_gaps() -> None:
     observations = read_levels(FIXTURES / "lanuv", NIERENHOF)
     assert [o.observed_at for o in observations] == [
         datetime(2019, 12, 31, 22, 50, tzinfo=UTC),
@@ -22,7 +22,7 @@ def test_levels_of_all_decades_are_read_in_metres_and_utc_without_gaps() -> None
         datetime(2020, 1, 31, 22, 30, tzinfo=UTC),
         datetime(2020, 2, 1, 0, 0, tzinfo=UTC),
     ]
-    assert [o.level_m for o in observations] == pytest.approx([0.322, 0.321, -0.035, 0.40])
+    assert [o.level_cm for o in observations] == [32.2, 32.1, -3.5, 40.0]
 
 
 def test_wrong_header_fails() -> None:
@@ -63,7 +63,7 @@ def test_duplicate_times_fail(tmp_path: Path) -> None:
 def test_source_returns_the_window_only() -> None:
     fetch = LevelFiles(FIXTURES / "lanuv")
     start, end = datetime(2020, 1, 1, tzinfo=UTC), datetime(2020, 2, 1, tzinfo=UTC)
-    assert [o.level_m for o in fetch(NIERENHOF, start, end)] == [pytest.approx(-0.035)]
+    assert [o.level_cm for o in fetch(NIERENHOF, start, end)] == [-3.5]
 
 
 def test_backfill_from_files_is_idempotent(conn: psycopg.Connection[TupleRow]) -> None:

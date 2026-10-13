@@ -152,7 +152,7 @@ def _describe(forecast: Forecast, config: PegelConfig) -> str:
     ]
     for summary in summarize(forecast, config.forecast.summary_horizons_hours, config.categories):
         lines.append(
-            f"  next {summary.horizon_hours:>2} h: max {summary.max_level_m:.2f} m "
+            f"  next {summary.horizon_hours:>2} h: max {summary.max_level_cm:.1f} cm "
             f"at {local(summary.valid_at_of_max)} -> category {summary.category.number} "
             f"({summary.category.name})"
         )

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 class ForecastPointRecord:
     forecast_id: int
     valid_at: datetime
-    level_m: float
+    level_cm: float
 
 
 @dataclass(frozen=True)

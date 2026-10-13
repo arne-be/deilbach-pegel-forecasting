@@ -12,7 +12,7 @@ from pegel.core.forecasts import Forecast
 @dataclass(frozen=True)
 class HorizonSummary:
     horizon_hours: int
-    max_level_m: float
+    max_level_cm: float
     valid_at_of_max: datetime
     category: Category
 
@@ -32,10 +32,10 @@ def _summarize_horizon(
     if not in_horizon:
         raise ValueError(f"forecast has no points within {horizon_hours} h")
     # max() keeps the first of equal levels, so ties report the earliest time.
-    highest = max(in_horizon, key=lambda point: point.level_m)
+    highest = max(in_horizon, key=lambda point: point.level_cm)
     return HorizonSummary(
         horizon_hours=horizon_hours,
-        max_level_m=highest.level_m,
+        max_level_cm=highest.level_cm,
         valid_at_of_max=highest.valid_at,
-        category=category_for(highest.level_m, categories),
+        category=category_for(highest.level_cm, categories),
     )

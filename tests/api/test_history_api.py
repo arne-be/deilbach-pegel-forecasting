@@ -28,8 +28,8 @@ def client(database_url: str) -> Iterator[TestClient]:
     app.dependency_overrides.clear()
 
 
-def observation(observed_at: datetime, level_m: float) -> Observation:
-    return Observation(STATION, observed_at, level_m)
+def observation(observed_at: datetime, level_cm: float) -> Observation:
+    return Observation(STATION, observed_at, level_cm)
 
 
 def test_returns_readings_of_whole_berlin_days(client: TestClient, conn: Conn) -> None:
@@ -37,10 +37,10 @@ def test_returns_readings_of_whole_berlin_days(client: TestClient, conn: Conn) -
     upsert_observations(
         conn,
         [
-            observation(datetime(2026, 10, 9, 21, 59, tzinfo=UTC), 0.1),  # Oct 9, 23:59 Berlin
-            observation(datetime(2026, 10, 9, 22, 22, tzinfo=UTC), -0.2),  # Oct 10, 00:22 Berlin
-            observation(datetime(2026, 10, 10, 21, 22, tzinfo=UTC), 0.3),  # Oct 10, 23:22 Berlin
-            observation(datetime(2026, 10, 10, 22, 0, tzinfo=UTC), 0.4),  # Oct 11, 00:00 Berlin
+            observation(datetime(2026, 10, 9, 21, 59, tzinfo=UTC), 10.0),  # Oct 9, 23:59 Berlin
+            observation(datetime(2026, 10, 9, 22, 22, tzinfo=UTC), -20.0),  # Oct 10, 00:22 Berlin
+            observation(datetime(2026, 10, 10, 21, 22, tzinfo=UTC), 30.0),  # Oct 10, 23:22 Berlin
+            observation(datetime(2026, 10, 10, 22, 0, tzinfo=UTC), 40.0),  # Oct 11, 00:00 Berlin
         ],
     )
     response = client.get("/api/history", params={"from": "2026-10-10", "to": "2026-10-10"})
@@ -50,8 +50,8 @@ def test_returns_readings_of_whole_berlin_days(client: TestClient, conn: Conn) -
         "from": "2026-10-10",
         "to": "2026-10-10",
         "observations": [
-            {"observed_at": "2026-10-09T22:22:00Z", "level_m": -0.2},
-            {"observed_at": "2026-10-10T21:22:00Z", "level_m": 0.3},
+            {"observed_at": "2026-10-09T22:22:00Z", "level_cm": -20.0},
+            {"observed_at": "2026-10-10T21:22:00Z", "level_cm": 30.0},
         ],
     }
 

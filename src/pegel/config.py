@@ -37,11 +37,11 @@ class ForecastSettings(_Frozen):
 
 
 class Category(_Frozen):
-    """A flood category. It applies when the level is strictly above `above_m`."""
+    """A flood category. It applies when the level is strictly above `above_cm`."""
 
     number: int
     name: str
-    above_m: float | None
+    above_cm: float | None
 
 
 class Freshness(_Frozen):
@@ -72,9 +72,9 @@ class PegelConfig(_Frozen):
         horizon = self.forecast.horizon_hours
         if any(hours > horizon for hours in self.forecast.summary_horizons_hours):
             raise ValueError("summary horizons must not exceed the forecast horizon")
-        if not self.categories or self.categories[0].above_m is not None:
-            raise ValueError("the first category must have no lower bound (above_m: null)")
-        bounds = [category.above_m for category in self.categories[1:]]
+        if not self.categories or self.categories[0].above_cm is not None:
+            raise ValueError("the first category must have no lower bound (above_cm: null)")
+        bounds = [category.above_cm for category in self.categories[1:]]
         set_bounds = [bound for bound in bounds if bound is not None]
         if len(set_bounds) != len(bounds) or set_bounds != sorted(set_bounds):
             raise ValueError("category bounds must be set and ascending after the first one")

@@ -22,7 +22,7 @@ def persistence_forecast(newest: Observation, issued_at: datetime, horizon_hours
     # Lead times count from the observation, not the issue time, so each point lands on
     # the same minute as a future reading and evaluation can match them exactly.
     points = tuple(
-        ForecastPoint(newest.observed_at + timedelta(hours=lead), newest.level_m)
+        ForecastPoint(newest.observed_at + timedelta(hours=lead), newest.level_cm)
         for lead in range(1, horizon_hours + 1)
     )
     return Forecast(

@@ -9,7 +9,7 @@ from pegel.core.observations import require_utc
 @dataclass(frozen=True)
 class ForecastPoint:
     valid_at: datetime
-    level_m: float
+    level_cm: float
 
     def __post_init__(self) -> None:
         require_utc(self.valid_at, "valid_at")
