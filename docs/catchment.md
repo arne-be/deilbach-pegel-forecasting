@@ -90,7 +90,7 @@ For training before we started collecting, Open-Meteo's Previous Runs API has IC
 
 ## Rebuilding the outlines
 
-`scripts/build_catchment.py` writes `config/catchment.geojson`. It needs the GSK3E shapefile (430 MB), which isn't in the repo:
+`scripts/build_catchment.py` writes three files to `config/`: `catchment.geojson` (outlines), `radolan_cells.json` (radar cells per zone) and `icon_d2_points.json` (forecast points). It needs the GSK3E shapefile (430 MB), which isn't in the repo:
 
 ```
 curl -O https://www.opengeodata.nrw.de/produkte/umwelt_klima/wasser/oberflaechengewaesser/gsk3e/gsk3e_EPSG25832_Shape.zip
