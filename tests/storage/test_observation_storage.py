@@ -5,6 +5,7 @@ import pytest
 from psycopg.rows import TupleRow
 
 from pegel.adapters.storage.observations import (
+    delete_values,
     fetch_observations,
     fetch_values,
     newest_observation,
@@ -186,3 +187,16 @@ def test_series_are_kept_apart(conn: Conn) -> None:
 def test_observed_value_for_a_forecast_series_is_rejected(conn: Conn) -> None:
     with pytest.raises(psycopg.errors.ForeignKeyViolation, match="observation"):
         upsert_values(conn, [SeriesValue(ICON.id, START, 1.5, START)], START)
+
+
+def test_delete_values_removes_only_the_given_times(conn: Conn) -> None:
+    values = [SeriesValue(RAIN.id, START + hour * HOUR, 1.0, START + hour * HOUR) for hour in range(3)]
+    upsert_values(conn, values, START)
+    deleted = delete_values(conn, RAIN.id, [START + HOUR, START + 5 * HOUR])
+    assert (deleted, fetch_values(conn, RAIN.id, START, FAR_FUTURE)) == (1, values[::2])
+
+
+def test_jobs_role_can_delete_values(conn: Conn) -> None:
+    upsert_values(conn, [SeriesValue(RAIN.id, START, 1.0, START)], START)
+    conn.execute("SET ROLE pegel_jobs")
+    assert delete_values(conn, RAIN.id, [START]) == 1
