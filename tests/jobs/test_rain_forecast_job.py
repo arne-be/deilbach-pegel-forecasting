@@ -10,9 +10,9 @@ from psycopg.rows import TupleRow
 
 from pegel.adapters.sources import open_meteo
 from pegel.config import load_config
-from pegel.core.rain_forecast import GridPoint, RunMismatchError
+from pegel.core.rain_forecast import GridPoint
 from pegel.core.schedule import issue_time
-from pegel.jobs.rain_forecast import backfill_archive, ingest_newest_run
+from pegel.jobs.rain_forecast import backfill_archive, ingest_new_runs
 
 Conn = psycopg.Connection[TupleRow]
 SETTINGS = load_config().rain.forecast
@@ -28,34 +28,51 @@ def fixture(name: str) -> Any:
 
 
 class FakeOpenMeteo:
-    """Answers metadata, forecast and archive requests and records the URLs it was asked for."""
+    """Answers metadata, single run and archive requests and records the runs it was asked for.
 
-    def __init__(self, metas: list[dict[str, Any]], forecast: httpx.Response) -> None:
-        self.metas = metas
-        self.forecast = forecast
-        self.urls: list[str] = []
+    Each run gets the recorded run shifted to its start, unless `answers` has (status, body) for it.
+    """
+
+    def __init__(
+        self, newest: datetime, answers: dict[datetime, tuple[int, Any]] | None = None
+    ) -> None:
+        self.newest = newest
+        self.answers = answers or {}
+        self.runs: list[datetime] = []
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url.copy_with(query=None))
-        self.urls.append(url)
         if url == open_meteo.META_URL:
-            return httpx.Response(
-                200, json=self.metas.pop(0) if len(self.metas) > 1 else self.metas[0]
-            )
+            return httpx.Response(200, json=meta(self.newest))
         if url == open_meteo.ARCHIVE_URL:
             return httpx.Response(200, json=fixture("archive_2024-11-18_19.json"))
-        return self.forecast
+        run_at = datetime.fromisoformat(request.url.params["run"]).replace(tzinfo=UTC)
+        self.runs.append(run_at)
+        status, body = self.answers.get(run_at, (200, run_answer(run_at)))
+        return httpx.Response(status, json=body)
 
     def client(self) -> httpx.Client:
         return httpx.Client(transport=httpx.MockTransport(self.handler))
+
+
+@pytest.fixture(autouse=True)
+def no_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(open_meteo, "BACKOFF_BASE_SECONDS", 0)
 
 
 def meta(run_at: datetime) -> Any:
     return fixture("meta.json") | {"last_run_initialisation_time": int(run_at.timestamp())}
 
 
-def forecast_ok() -> httpx.Response:
-    return httpx.Response(200, json=fixture("forecast_run_2026-10-13T09.json"))
+def run_answer(run_at: datetime) -> Any:
+    """The recorded run, moved to start at run_at."""
+    body = fixture("single_run_2026-10-13T09.json")
+    for location in body:
+        location["hourly"]["time"] = [
+            (datetime.fromisoformat(text) + (run_at - RUN_AT)).strftime("%Y-%m-%dT%H:%M")
+            for text in location["hourly"]["time"]
+        ]
+    return body
 
 
 def stored(conn: Conn) -> list[tuple[Any, ...]]:
@@ -65,24 +82,46 @@ def stored(conn: Conn) -> list[tuple[Any, ...]]:
     ).fetchall()
 
 
-def test_new_run_is_stored_once(conn: Conn) -> None:
-    fake = FakeOpenMeteo([meta(RUN_AT)], forecast_ok())
+def stored_runs(conn: Conn) -> list[datetime]:
+    rows = conn.execute("SELECT DISTINCT run_at FROM input_forecasts ORDER BY 1").fetchall()
+    return [row[0].astimezone(UTC) for row in rows]
+
+
+def runs_back(*hours: int) -> list[datetime]:
+    return [RUN_AT - timedelta(hours=back) for back in hours]
+
+
+def test_catch_up_fetches_missing_runs_oldest_first_four_per_hour(conn: Conn) -> None:
+    fake = FakeOpenMeteo(RUN_AT)
     with fake.client() as client:
-        assert ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE) == 96
-        assert [row[:2] for row in stored(conn)] == [
-            ("open_meteo_icon_d2:catchment:mean", 48),
-            ("open_meteo_icon_d2:ring:p90", 48),
-        ]
-        requests_before = len(fake.urls)
-        assert ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE) == 0
-    # The rerun only read the metadata.
-    assert fake.urls[requests_before:] == [open_meteo.META_URL]
+        assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 4 * 96
+        assert fake.runs == runs_back(24, 21, 18, 15)
+        ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE)
+        ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE)
+    assert fake.runs == runs_back(24, 21, 18, 15, 12, 9, 6, 3, 0)
+    assert stored_runs(conn) == fake.runs
+    assert [row[:2] for row in stored(conn)] == [
+        ("open_meteo_icon_d2:catchment:mean", 9 * 48),
+        ("open_meteo_icon_d2:ring:p90", 9 * 48),
+    ]
+
+
+def test_only_runs_after_the_newest_stored_are_fetched(conn: Conn) -> None:
+    with FakeOpenMeteo(RUN_AT).client() as client:
+        for _ in range(3):
+            ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE)
+        assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 0
+    fake = FakeOpenMeteo(RUN_AT + timedelta(hours=3))
+    with fake.client() as client:
+        assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 96
+        assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 0
+    assert fake.runs == [RUN_AT + timedelta(hours=3)]
 
 
 def test_new_run_is_available_from_the_slot_of_its_fetch(conn: Conn) -> None:
     before = issue_time(datetime.now(UTC), MINUTE)
-    with FakeOpenMeteo([meta(RUN_AT)], forecast_ok()).client() as client:
-        ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE)
+    with FakeOpenMeteo(RUN_AT).client() as client:
+        ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE)
     row = conn.execute(
         "SELECT min(available_at), max(available_at) FROM input_forecasts"
     ).fetchone()
@@ -90,31 +129,32 @@ def test_new_run_is_available_from_the_slot_of_its_fetch(conn: Conn) -> None:
     assert row[0] in {before, issue_time(datetime.now(UTC), MINUTE)}
 
 
-def test_run_published_during_fetch_is_not_stored(conn: Conn) -> None:
-    later_run = datetime(2026, 10, 13, 12, tzinfo=UTC)
-    fake = FakeOpenMeteo([meta(RUN_AT), meta(later_run)], forecast_ok())
+def test_failing_run_stops_the_catch_up_but_keeps_earlier_runs(conn: Conn) -> None:
+    fake = FakeOpenMeteo(RUN_AT, {RUN_AT - timedelta(hours=18): (503, {})})
     with fake.client() as client:
-        assert ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE) == 0
-    assert stored(conn) == []
+        assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 2 * 96
+    # The failing run was tried twice, the run after it not at all.
+    assert fake.runs == runs_back(24, 21, 18, 18)
+    assert stored_runs(conn) == runs_back(24, 21)
 
 
 def test_data_of_another_run_is_rejected(conn: Conn) -> None:
-    earlier_run = datetime(2026, 10, 13, 6, tzinfo=UTC)
-    fake = FakeOpenMeteo([meta(earlier_run)], forecast_ok())
-    with fake.client() as client, pytest.raises(RunMismatchError):
-        ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE)
+    fake = FakeOpenMeteo(RUN_AT, {RUN_AT - timedelta(hours=24): (200, run_answer(RUN_AT))})
+    with fake.client() as client:
+        assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 0
     assert stored(conn) == []
 
 
-def test_rate_limit_skips_the_run(conn: Conn) -> None:
-    fake = FakeOpenMeteo([meta(RUN_AT)], httpx.Response(429, json={"reason": "Hourly limit"}))
+def test_rate_limit_is_not_retried(conn: Conn) -> None:
+    fake = FakeOpenMeteo(RUN_AT, {RUN_AT - timedelta(hours=24): (429, {"reason": "Hourly limit"})})
     with fake.client() as client:
-        assert ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE) == 0
+        assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 0
+    assert fake.runs == runs_back(24)
     assert stored(conn) == []
 
 
 def test_archive_backfill_is_idempotent(conn: Conn) -> None:
-    fake = FakeOpenMeteo([meta(RUN_AT)], forecast_ok())
+    fake = FakeOpenMeteo(RUN_AT)
     first, end = date(2024, 11, 18), date(2024, 11, 20)
     with fake.client() as client:
         result = backfill_archive(
@@ -131,7 +171,7 @@ def test_archive_backfill_is_idempotent(conn: Conn) -> None:
 
 
 def test_archive_runs_are_available_at_the_first_hourly_run_after_the_delay(conn: Conn) -> None:
-    with FakeOpenMeteo([meta(RUN_AT)], forecast_ok()).client() as client:
+    with FakeOpenMeteo(RUN_AT).client() as client:
         first, end = date(2024, 11, 18), date(2024, 11, 20)
         backfill_archive(client, conn, SETTINGS, POINTS, first, end, 30, now=LONG_AFTER)
     delays = conn.execute(
@@ -144,7 +184,7 @@ def test_archive_runs_are_available_at_the_first_hourly_run_after_the_delay(conn
 
 def test_archive_backfill_stops_at_the_call_budget(conn: Conn, monkeypatch: Any) -> None:
     monkeypatch.setattr("pegel.jobs.rain_forecast.ARCHIVE_MAX_CALLS", 4)
-    fake = FakeOpenMeteo([meta(RUN_AT)], forecast_ok())
+    fake = FakeOpenMeteo(RUN_AT)
     sleeps: list[float] = []
     with fake.client() as client:
         result = backfill_archive(

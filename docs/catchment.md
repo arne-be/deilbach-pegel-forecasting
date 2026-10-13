@@ -89,18 +89,19 @@ Series ids carry the source: `open_meteo_icon_d2:catchment:mean` and `open_meteo
 
 #### Which run a forecast comes from
 
-The forecast answer doesn't say which run it comes from. Open-Meteo's model metadata does: `https://api.open-meteo.com/data/dwd_icon_d2/static/meta.json` has `last_run_initialisation_time` (the run's start, Unix seconds) and `last_run_availability_time` (when Open-Meteo started serving it). Runs start at 00, 03, … 21 UTC and come out about 85 minutes later (run 09:00 was served from 10:25).
+Open-Meteo's model metadata says which run is the newest: `https://api.open-meteo.com/data/dwd_icon_d2/static/meta.json` has `last_run_initialisation_time` (the run's start, Unix seconds) and `last_run_availability_time` (when Open-Meteo started serving it). Runs start at 00, 03, … 21 UTC and come out about 85 minutes later (run 09:00 was served from 10:25).
 
-The hourly step reads the metadata first. If the newest stored run of the live catchment series is that run or later, it stops: no forecast request. Otherwise it asks for the hours from run + 1 h to run + 49 h and checks:
+The hourly step reads the metadata first. It then wants every run of the last 24 hours up to the newest that starts after the newest stored run of the live catchment series. If there is none, it stops: no forecast request. Otherwise it fetches them oldest first, at most 4 per hour, so after a long outage the next hours fetch the rest. A run only 24 hours late still covers half the horizon; older ones are left to the archive.
 
-- The hours run from run + 1 h without a gap, and each point has data from run + 1 h to exactly run + 48 h and none after. A run's data ends at its horizon, so data still from the previous run ends 3 hours early and data from the next run 3 hours late. Either way nothing is stored.
-- The metadata still names the same run after the fetch.
+Each run comes from Open-Meteo's Single Runs API (`single-runs-api.open-meteo.com/v1/forecast`), which takes the forecast parameters plus `run=2026-10-13T09:00`. The live forecast API only serves the newest run, so a missed run was lost before. Single Runs keeps runs from about May 2026 on and answers HTTP 400 for older ones. It doesn't take `start_hour`, so we ask for `forecast_hours=50`: the hours from the run start to run + 49 h. For run 09:00 on 2026-10-13 it gave the same values as the live API. It served the 18:00 run before the metadata named it, so going by the metadata never asks too early.
 
-Hours before the run in Open-Meteo's answer come from older runs, so only run < valid_at ≤ run + 48 h is stored. `precipitation` is the sum of the preceding hour (Open-Meteo docs), so the time Open-Meteo gives is already `valid_at`.
+Each run is checked before it's stored: the hours run from run + 1 h without a gap, and each point has data from run + 1 h to exactly run + 48 h and none after. A shortened answer, or one from another run, ends early or late, and nothing of that run is stored.
+
+Only run < valid_at ≤ run + 48 h is stored. `precipitation` is the sum of the preceding hour (Open-Meteo docs), so the time Open-Meteo gives is already `valid_at`. Each run is available from the issue slot of its fetch: a run caught up late is stored as late.
 
 The request uses `cell_selection=nearest`. Without it Open-Meteo may pick a neighbouring cell with a better-matching elevation; one of our 70 points came back 0.02° off.
 
-Each request gets one try of at most 60 seconds, which still leaves the Lambda time for the level forecast. From Lambda, the first request for a new run once took longer than 15 seconds. On an error or HTTP 429 the step logs and skips; the next hourly run fetches the run it missed, if it's still the newest.
+Each request (metadata and runs) gets two tries of at most 60 seconds, 5 seconds apart, on a timeout, network error or 5xx. From Lambda, single requests have timed out and got HTTP 503; the first request for a new run once took longer than 15 seconds. HTTP 429 isn't retried. A failing run stops the catch-up for this hour and keeps the runs stored before it; the next hour starts again from there.
 
 #### Archive: Previous Runs API
 

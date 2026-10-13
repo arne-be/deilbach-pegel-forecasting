@@ -107,6 +107,12 @@ def aggregate_hour(
     ]
 
 
+def missing_runs(newest: datetime, stored: datetime | None, look_back: timedelta) -> list[datetime]:
+    """The runs from newest - look_back to newest that start after `stored`, oldest first."""
+    runs = [newest - RUN_INTERVAL * back for back in range(look_back // RUN_INTERVAL, -1, -1)]
+    return [run for run in runs if stored is None or run > stored]
+
+
 def check_run(series: PointSeries, run_at: datetime, horizon_hours: int) -> None:
     """Checks that every point has data from run_at + 1 h to run_at + horizon and none after.
 

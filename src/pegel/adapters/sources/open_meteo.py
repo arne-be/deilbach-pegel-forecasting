@@ -1,4 +1,4 @@
-"""Reads ICON-D2 rain forecasts from Open-Meteo: the live API, its run metadata and the archive.
+"""Reads ICON-D2 rain forecasts from Open-Meteo: single runs, the run metadata and the archive.
 
 Open-Meteo's free tier is for non-commercial use, data CC BY 4.0 (DWD via Open-Meteo).
 """
@@ -18,7 +18,8 @@ from pegel.core.rain_forecast import GridPoint, PointSeries
 
 logger = logging.getLogger(__name__)
 
-FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+# Any run of the last months by its start time, from about May 2026 on.
+SINGLE_RUNS_URL = "https://single-runs-api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://previous-runs-api.open-meteo.com/v1/forecast"
 # The newest ICON-D2 run Open-Meteo serves. A small static file, not a forecast request.
 META_URL = "https://api.open-meteo.com/data/dwd_icon_d2/static/meta.json"
@@ -26,10 +27,11 @@ MODEL = "icon_d2"
 # Backfill requests: 70 points over 14 days can take a while, and retries are cheap there.
 ARCHIVE_TIMEOUT_SECONDS = 60.0
 MAX_ATTEMPTS = 3
-# Live requests get one try; the next hourly run catches up. From Lambda the first request for a
-# new run took over 15 s (2026-10-13), and the Lambda has 900 s, so 60 s still leaves room for
-# the level forecast.
+# Live requests get a second try after a short wait: from Lambda, single requests timed out or got
+# a 503 (2026-10-13). A request for a new run once took over 15 s. The Lambda has 900 s, so even a
+# few runs at 2 x 60 s leave room for the level forecast.
 LIVE_TIMEOUT_SECONDS = 60.0
+LIVE_ATTEMPTS = 2
 BACKOFF_BASE_SECONDS = 5.0
 # The points are ICON-D2 grid points; with nearest cell selection Open-Meteo answers with the
 # same coordinates (rounded to float32). Its default picks a neighbour with a better elevation.
@@ -56,30 +58,32 @@ def request_weight(points: int, days: int, variables: int) -> float:
 
 
 def latest_run(client: httpx.Client) -> datetime:
-    """Start time of the newest ICON-D2 run Open-Meteo has finished loading. One short try."""
-    meta = _get_json(client, META_URL, {}, attempts=1, timeout=LIVE_TIMEOUT_SECONDS)
+    """Start time of the newest ICON-D2 run Open-Meteo has finished loading."""
+    meta = _get_json(client, META_URL, {}, LIVE_ATTEMPTS, LIVE_TIMEOUT_SECONDS)
     seconds = meta.get("last_run_initialisation_time") if isinstance(meta, dict) else None
     if not isinstance(seconds, int):
         raise OpenMeteoError("metadata has no last_run_initialisation_time")
     return datetime.fromtimestamp(seconds, UTC)
 
 
-def fetch_forecast(
+def fetch_run(
     client: httpx.Client,
     points: Sequence[GridPoint],
-    first_hour: datetime,
-    last_hour: datetime,
+    run_at: datetime,
+    hours: int,
 ) -> PointSeries:
-    """Hourly precipitation at every point for the hours ending first_hour ... last_hour.
-
-    One short try, for the hourly job.
+    """Hourly precipitation of the run starting at run_at, for the hours ending run_at + 1 h ...
+    run_at + hours, at every point. For the hourly job.
     """
+    # Single Runs refuses start_hour; its answer starts at run_at.
     params = _params(points, "precipitation") | {
-        "start_hour": _hour_text(first_hour),
-        "end_hour": _hour_text(last_hour),
+        "run": _hour_text(run_at),
+        "forecast_hours": str(hours + 1),
     }
-    body = _get_json(client, FORECAST_URL, params, attempts=1, timeout=LIVE_TIMEOUT_SECONDS)
-    return parse_points(body, points, ["precipitation"])["precipitation"]
+    body = _get_json(client, SINGLE_RUNS_URL, params, LIVE_ATTEMPTS, LIVE_TIMEOUT_SECONDS)
+    series = parse_points(body, points, ["precipitation"])["precipitation"]
+    # The hour ending at run_at has no rain sum in this run.
+    return PointSeries(series.times[1:], [values[1:] for values in series.values])
 
 
 def fetch_archive(
