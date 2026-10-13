@@ -1,0 +1,298 @@
+{
+  "uid": "deilbach-all-series",
+  "title": "All series",
+  "description": "Every time series in the prod database. Managed in git (grafana/dashboards/); edits in the UI are overwritten on the next deploy.",
+  "tags": [
+    "deilbach-pegel"
+  ],
+  "timezone": "Europe/Berlin",
+  "refresh": "",
+  "time": {
+    "from": "now-7d",
+    "to": "now+2d"
+  },
+  "editable": true,
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Forecast station: observed and newest forecast",
+      "description": "Raw and cleaned level at every station we forecast, and the newest forecast of each model.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "lengthcm",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroupAlias(o.valid_at, $__interval), o.series_id AS metric, avg(o.value) AS value\nFROM observations o\nJOIN series s ON s.id = o.series_id\nWHERE s.variable = 'level' AND s.location IN (SELECT DISTINCT station_id FROM forecasts)\n  AND $__timeFilter(o.valid_at)\nGROUP BY 1, 2\nORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT p.valid_at AS time, 'forecast:' || f.model AS metric, p.level_cm AS value\nFROM forecast_points p\nJOIN (\n  SELECT DISTINCT ON (station_id, model) id, model\n  FROM forecasts\n  ORDER BY station_id, model, issued_at DESC\n) f ON f.id = p.forecast_id\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "All gauge levels",
+      "description": "Every observed level series, averaged per pixel.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "lengthcm",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroupAlias(o.valid_at, $__interval), o.series_id AS metric, avg(o.value) AS value\nFROM observations o\nJOIN series s ON s.id = o.series_id\nWHERE s.variable = 'level' AND $__timeFilter(o.valid_at)\nGROUP BY 1, 2\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Observed rain",
+      "description": "Every observed rain series in mm per hour, averaged per pixel.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "lengthmm",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroupAlias(o.valid_at, $__interval), o.series_id AS metric, avg(o.value) AS value\nFROM observations o\nJOIN series s ON s.id = o.series_id\nWHERE s.variable = 'rain' AND $__timeFilter(o.valid_at)\nGROUP BY 1, 2\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Input forecasts, newest run per hour",
+      "description": "Forecasts from others that the model uses, e.g. ICON-D2 rain. For each hour the value from the newest run.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT DISTINCT ON (valid_at, series_id) valid_at AS time, series_id AS metric, value\nFROM input_forecasts\nWHERE $__timeFilter(valid_at)\nORDER BY valid_at, series_id, run_at DESC"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Freshness",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${datasource}"
+      },
+      "description": "Newest value of every series and of our own forecasts. Ignores the time picker.",
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Age"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT s.id AS \"Series\", coalesce(o.at, f.at) AS \"Newest\",\n  extract(epoch FROM now() - coalesce(o.at, f.at)) AS \"Age\"\nFROM series s\nLEFT JOIN LATERAL (\n  SELECT valid_at AS at FROM observations WHERE series_id = s.id ORDER BY valid_at DESC LIMIT 1\n) o ON true\nLEFT JOIN LATERAL (\n  SELECT run_at AS at FROM input_forecasts WHERE series_id = s.id ORDER BY run_at DESC LIMIT 1\n) f ON true\nUNION ALL\nSELECT 'forecast:' || station_id || ':' || model, max(issued_at), extract(epoch FROM now() - max(issued_at))\nFROM forecasts\nGROUP BY station_id, model\nORDER BY 3 DESC"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Data source",
+        "type": "datasource",
+        "query": "grafana-postgresql-datasource",
+        "hide": 2,
+        "current": {}
+      }
+    ]
+  }
+}

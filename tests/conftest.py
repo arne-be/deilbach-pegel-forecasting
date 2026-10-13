@@ -39,6 +39,7 @@ def database_url() -> Iterator[str]:
             # In Neon these roles are created by hand (docs/setup-neon.md).
             conn.execute("CREATE ROLE pegel_jobs NOLOGIN")
             conn.execute("CREATE ROLE pegel_api NOLOGIN")
+            conn.execute("CREATE ROLE pegel_grafana NOLOGIN")
             apply_migrations(conn)
         yield url
 
