@@ -13,13 +13,14 @@ import httpx
 
 from pegel.adapters.env_files import load_env_files, main_checkout
 from pegel.adapters.logging import configure_logging
+from pegel.adapters.sources import lanuv
 from pegel.adapters.sources.influx import fetch_levels, influx_settings_from_env, ssl_context
 from pegel.adapters.storage.connection import connect
 from pegel.config import PegelConfig, load_config
 from pegel.core.forecasts import Forecast
 from pegel.core.schedule import issue_time
 from pegel.core.summary import summarize
-from pegel.jobs.pipeline import Conn, FetchLevels, backfill, run_hourly
+from pegel.jobs.pipeline import Conn, FetchLevels, backfill, fetch_by_source, run_hourly
 
 DISPLAY_TIME_ZONE = ZoneInfo("Europe/Berlin")
 
@@ -50,16 +51,21 @@ def run_hourly_from_env(config: PegelConfig, issued_at: datetime | None = None) 
 
 @contextmanager
 def sources_from_env() -> Iterator[tuple[FetchLevels, Conn]]:
-    """The Influx source and the jobs database, set up from environment variables."""
+    """All sources, each picked by `station.source`, and the jobs database, set up from env."""
     database_url = _required_env("JOBS_DATABASE_URL")
     influx_settings = influx_settings_from_env(os.environ)
     with (
         httpx.Client(verify=ssl_context(influx_settings)) as client,
+        httpx.Client() as lanuv_client,
         connect(database_url) as conn,
     ):
         # Each storage call commits on its own, so a failed backfill month keeps the others.
         conn.autocommit = True
-        yield partial(fetch_levels, influx_settings, client=client), conn
+        fetchers: dict[str, FetchLevels] = {
+            "influx": partial(fetch_levels, influx_settings, client=client),
+            "lanuv": partial(lanuv.fetch_levels, client=lanuv_client),
+        }
+        yield partial(fetch_by_source, fetchers), conn
 
 
 def _parser() -> argparse.ArgumentParser:

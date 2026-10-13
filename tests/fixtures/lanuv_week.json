@@ -1,0 +1,41 @@
+[
+  {
+    "station_name": "Nierenhof",
+    "station_no": "2769649000100",
+    "site_no": "100",
+    "stationparameter_name": "Wasserstand",
+    "ts_name": "Wasserstand.Internet.5",
+    "ts_shortname": "5m.Cmd.Internet",
+    "ts_unitsymbol": "cm",
+    "ts_precision": "Deci,2,0,0",
+    "BODY_RESPONSIBLE": "Standort Duisburg",
+    "station_elevation": "",
+    "CATCHMENT_SIZE": "22.00 km²",
+    "WTO_OBJECT": "Felderbach",
+    "web_stationstyp": "",
+    "ObjectDescription": "",
+    "LANUV_PARA_PUBLIC": "LVN-Web-App",
+    "AdminStatus": "",
+    "AdminBemerkung": "",
+    "rows": "4",
+    "columns": "Timestamp,Value",
+    "data": [
+      [
+        "2026-10-13T09:50:00.000+01:00",
+        14.0
+      ],
+      [
+        "2026-10-13T09:55:00.000+01:00",
+        14.0
+      ],
+      [
+        "2026-10-13T10:00:00.000+01:00",
+        14.0
+      ],
+      [
+        "2026-10-13T10:05:00.000+01:00",
+        14.0
+      ]
+    ]
+  }
+]
