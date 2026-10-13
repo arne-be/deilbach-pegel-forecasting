@@ -167,7 +167,7 @@ def test_live_requests_are_not_retried() -> None:
 
 
 def test_slowly_trickling_body_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
-    clock = iter(range(0, 1000, 10))
+    clock = iter(range(0, 10_000, 30))  # each chunk arrives 30 s after the last
     monkeypatch.setattr("pegel.adapters.sources.open_meteo.time.monotonic", lambda: next(clock))
     chunks = [b"{", b'"last_run_initialisation_time"', b": 1791882000}"]
 

@@ -100,7 +100,7 @@ Hours before the run in Open-Meteo's answer come from older runs, so only run < 
 
 The request uses `cell_selection=nearest`. Without it Open-Meteo may pick a neighbouring cell with a better-matching elevation; one of our 70 points came back 0.02° off.
 
-Each request gets one try of at most 15 seconds, so a slow Open-Meteo can't hold up the level forecast in the same Lambda run. On an error or HTTP 429 the step logs and skips; the next hourly run fetches the run it missed, if it's still the newest.
+Each request gets one try of at most 60 seconds, which still leaves the Lambda time for the level forecast. From Lambda, the first request for a new run once took longer than 15 seconds. On an error or HTTP 429 the step logs and skips; the next hourly run fetches the run it missed, if it's still the newest.
 
 #### Archive: Previous Runs API
 

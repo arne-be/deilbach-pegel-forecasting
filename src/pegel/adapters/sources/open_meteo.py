@@ -26,9 +26,10 @@ MODEL = "icon_d2"
 # Backfill requests: 70 points over 14 days can take a while, and retries are cheap there.
 ARCHIVE_TIMEOUT_SECONDS = 60.0
 MAX_ATTEMPTS = 3
-# The hourly Lambda must still save the level forecast, so live requests get one short try;
-# the next hourly run catches up.
-LIVE_TIMEOUT_SECONDS = 15.0
+# Live requests get one try; the next hourly run catches up. From Lambda the first request for a
+# new run took over 15 s (2026-10-13), and the Lambda has 300 s, so 60 s still leaves room for
+# the level forecast.
+LIVE_TIMEOUT_SECONDS = 60.0
 BACKOFF_BASE_SECONDS = 5.0
 # The points are ICON-D2 grid points; with nearest cell selection Open-Meteo answers with the
 # same coordinates (rounded to float32). Its default picks a neighbour with a better elevation.
