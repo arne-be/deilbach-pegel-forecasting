@@ -112,8 +112,9 @@ def _backfill_forecast(config: PegelConfig, start: date, end: date) -> int:
     points = open_meteo.load_points(config_file(settings.points_file))
     with httpx.Client() as client, connect(_required_env("JOBS_DATABASE_URL")) as conn:
         conn.autocommit = True
+        issue_minute = config.forecast.issue_minute
         result = rain_forecast.backfill_archive(
-            client, conn, settings, points, start, end, now=datetime.now(UTC)
+            client, conn, settings, points, start, end, issue_minute, now=datetime.now(UTC)
         )
     loaded_until = result.resume_from or end
     print(

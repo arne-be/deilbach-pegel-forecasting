@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,7 @@ from pegel.jobs.rain_forecast import backfill_archive, ingest_newest_run
 
 Conn = psycopg.Connection[TupleRow]
 SETTINGS = load_config().rain.forecast
+MINUTE = load_config().forecast.issue_minute
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "open_meteo"
 POINTS = [GridPoint(51.3, 7.1, True), GridPoint(51.3, 7.14, True), GridPoint(51.22, 7.02, False)]
 RUN_AT = datetime(2026, 10, 13, 9, tzinfo=UTC)
@@ -77,6 +78,16 @@ def test_new_run_is_stored_once(conn: Conn) -> None:
     assert fake.urls[requests_before:] == [open_meteo.META_URL]
 
 
+def test_new_run_is_available_from_its_fetch(conn: Conn) -> None:
+    before = datetime.now(UTC)
+    with FakeOpenMeteo([meta(RUN_AT)], forecast_ok()).client() as client:
+        ingest_newest_run(client, conn, SETTINGS, POINTS)
+    row = conn.execute(
+        "SELECT min(available_at), max(available_at) FROM input_forecasts"
+    ).fetchone()
+    assert row is not None and before <= row[0] == row[1] <= datetime.now(UTC)
+
+
 def test_run_published_during_fetch_is_not_stored(conn: Conn) -> None:
     later_run = datetime(2026, 10, 13, 12, tzinfo=UTC)
     fake = FakeOpenMeteo([meta(RUN_AT), meta(later_run)], forecast_ok())
@@ -104,8 +115,10 @@ def test_archive_backfill_is_idempotent(conn: Conn) -> None:
     fake = FakeOpenMeteo([meta(RUN_AT)], forecast_ok())
     first, end = date(2024, 11, 18), date(2024, 11, 20)
     with fake.client() as client:
-        result = backfill_archive(client, conn, SETTINGS, POINTS, first, end, now=LONG_AFTER)
-        rerun = backfill_archive(client, conn, SETTINGS, POINTS, first, end, now=LONG_AFTER)
+        result = backfill_archive(
+            client, conn, SETTINGS, POINTS, first, end, MINUTE, now=LONG_AFTER
+        )
+        rerun = backfill_archive(client, conn, SETTINGS, POINTS, first, end, MINUTE, now=LONG_AFTER)
     # 48 hours, two variables, two series.
     assert (result.changed, result.calls, result.resume_from) == (192, 3, None)
     assert rerun.changed == 0
@@ -113,6 +126,18 @@ def test_archive_backfill_is_idempotent(conn: Conn) -> None:
     count, shortest, longest = rows["open_meteo_previous_runs:catchment:mean"]
     assert count == 96
     assert (shortest.total_seconds(), longest.total_seconds()) == (3600, 27 * 3600)
+
+
+def test_archive_runs_are_available_at_the_first_hourly_run_after_the_delay(conn: Conn) -> None:
+    with FakeOpenMeteo([meta(RUN_AT)], forecast_ok()).client() as client:
+        first, end = date(2024, 11, 18), date(2024, 11, 20)
+        backfill_archive(client, conn, SETTINGS, POINTS, first, end, 30, now=LONG_AFTER)
+    delays = conn.execute(
+        "SELECT DISTINCT available_at - run_at FROM input_forecasts ORDER BY 1"
+    ).fetchall()
+    # Runs start on the hour, so with 120 minutes the :30 run after next takes them.
+    assert SETTINGS.available_after_minutes == 120
+    assert delays == [(timedelta(minutes=150),)]
 
 
 def test_archive_backfill_stops_at_the_call_budget(conn: Conn, monkeypatch: Any) -> None:
@@ -127,6 +152,7 @@ def test_archive_backfill_stops_at_the_call_budget(conn: Conn, monkeypatch: Any)
             POINTS,
             date(2024, 11, 1),
             date(2024, 12, 1),
+            MINUTE,
             now=LONG_AFTER,
             sleep=sleeps.append,
         )

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from pegel.core.observations import require_utc
+from pegel.core.schedule import scheduled_available_at
 from pegel.core.series import InputForecastValue, Series
 
 # ICON-D2 starts a run every 3 hours, at 00, 03, ... 21 UTC.
@@ -43,7 +44,9 @@ def ring_series_id(source: str, percentile: int) -> str:
     return f"{source}:ring:p{percentile}"
 
 
-def forecast_series(source: str, percentile: int, note: str) -> list[Series]:
+def forecast_series(
+    source: str, percentile: int, note: str, available_after: timedelta
+) -> list[Series]:
     """The two stored rain forecast series of one source. `note` says where runs come from."""
     return [
         Series(
@@ -53,6 +56,7 @@ def forecast_series(source: str, percentile: int, note: str) -> list[Series]:
             source=source,
             location="catchment",
             kind="forecast",
+            available_after=available_after,
             aggregation="mean",
             period=HOUR,
             description=f"ICON-D2 rain, mean over the catchment points. {note}",
@@ -64,6 +68,7 @@ def forecast_series(source: str, percentile: int, note: str) -> list[Series]:
             source=source,
             location="ring_10km",
             kind="forecast",
+            available_after=available_after,
             aggregation=f"p{percentile}",
             period=HOUR,
             description=f"ICON-D2 rain, {percentile}th percentile over the ring points. {note}",
@@ -78,6 +83,7 @@ def aggregate_hour(
     values: Sequence[float],
     points: Sequence[GridPoint],
     percentile: int,
+    available_at: datetime,
 ) -> list[InputForecastValue]:
     """The catchment mean and the ring percentile for one forecast hour."""
     if len(values) != len(points):
@@ -93,9 +99,15 @@ def aggregate_hour(
     )
     return [
         InputForecastValue(
-            catchment_series_id(source), run_at, valid_at, statistics.fmean(catchment)
+            catchment_series_id(source),
+            run_at,
+            valid_at,
+            statistics.fmean(catchment),
+            available_at,
         ),
-        InputForecastValue(ring_series_id(source, percentile), run_at, valid_at, ring),
+        InputForecastValue(
+            ring_series_id(source, percentile), run_at, valid_at, ring, available_at
+        ),
     ]
 
 
@@ -133,8 +145,12 @@ def run_values(
     run_at: datetime,
     horizon_hours: int,
     percentile: int,
+    available_at: datetime,
 ) -> list[InputForecastValue]:
-    """The series for each hour with run_at < valid_at <= run_at + horizon, all points required."""
+    """The series for each hour with run_at < valid_at <= run_at + horizon, all points required.
+
+    `available_at` is when we fetched the run.
+    """
     last_hour = run_at + timedelta(hours=horizon_hours)
     result = []
     for hour, valid_at in enumerate(series.times):
@@ -143,8 +159,9 @@ def run_values(
         values = [point_values[hour] for point_values in series.values]
         if any(value is None for value in values):
             raise RunMismatchError(f"missing values at {valid_at.isoformat()}")
+        complete = [v for v in values if v is not None]
         result += aggregate_hour(
-            source, run_at, valid_at, [v for v in values if v is not None], points, percentile
+            source, run_at, valid_at, complete, points, percentile, available_at
         )
     return result
 
@@ -167,8 +184,14 @@ def archive_values(
     points: Sequence[GridPoint],
     days_before: int,
     percentile: int,
+    available_after: timedelta,
+    issue_minute: int,
 ) -> list[InputForecastValue]:
-    """The series for every hour of one Previous Runs variable. Hours with a gap are skipped."""
+    """The series for every hour of one Previous Runs variable. Hours with a gap are skipped.
+
+    Each run counts as available at the first hourly run after run_at + available_after, as
+    the live system would have used it.
+    """
     result = []
     for hour, valid_at in enumerate(series.times):
         values = [point_values[hour] for point_values in series.values]
@@ -176,5 +199,8 @@ def archive_values(
         if len(complete) < len(values):
             continue
         run_at = archive_run_at(valid_at, days_before)
-        result += aggregate_hour(source, run_at, valid_at, complete, points, percentile)
+        available_at = scheduled_available_at(run_at, available_after, issue_minute)
+        result += aggregate_hour(
+            source, run_at, valid_at, complete, points, percentile, available_at
+        )
     return result

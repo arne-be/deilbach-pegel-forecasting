@@ -79,6 +79,7 @@ def ingest_newest_run(
             "open-meteo rate limit, next run catches up", extra=context | {"error": str(error)}
         )
         return 0
+    fetched_at = datetime.now(UTC)
     check_run(series, run_at, settings.horizon_hours)
     # check_run catches a whole answer from another run. This catches the next run finishing
     # while the answer was being built, which could mix both runs within one point's hours.
@@ -86,9 +87,23 @@ def ingest_newest_run(
         logger.warning("new run published during the fetch, next run catches up", extra=context)
         return 0
     values = run_values(
-        settings.source, series, points, run_at, settings.horizon_hours, settings.ring_percentile
+        settings.source,
+        series,
+        points,
+        run_at,
+        settings.horizon_hours,
+        settings.ring_percentile,
+        fetched_at,
     )
-    ensure_series(conn, forecast_series(settings.source, settings.ring_percentile, LIVE_NOTE))
+    ensure_series(
+        conn,
+        forecast_series(
+            settings.source,
+            settings.ring_percentile,
+            LIVE_NOTE,
+            timedelta(minutes=settings.available_after_minutes),
+        ),
+    )
     changed = upsert_input_forecasts(conn, values)
     logger.info(
         "stored rain forecast run", extra=context | {"values": len(values), "changed": changed}
@@ -111,13 +126,19 @@ def backfill_archive(
     points: Sequence[GridPoint],
     first_day: date,
     end_day: date,
+    issue_minute: int,
     *,
     now: datetime,
     sleep: Callable[[float], None] = time.sleep,
 ) -> ArchiveResult:
-    """Loads Previous Runs values for the UTC days [first_day, end_day) in 14-day chunks."""
+    """Loads Previous Runs values for the UTC days [first_day, end_day) in 14-day chunks.
+
+    Each run gets the available_at the live system would have given it: the first hourly run
+    (at `issue_minute`) after run_at + available_after.
+    """
     source, percentile = settings.archive_source, settings.ring_percentile
-    ensure_series(conn, forecast_series(source, percentile, ARCHIVE_NOTE))
+    available_after = timedelta(minutes=settings.available_after_minutes)
+    ensure_series(conn, forecast_series(source, percentile, ARCHIVE_NOTE, available_after))
     settled_until = now.astimezone(UTC) - ARCHIVE_SETTLE_TIME
     changed, calls = 0, 0.0
     chunk_start = first_day
@@ -146,7 +167,13 @@ def backfill_archive(
             value
             for variable, days_before in ARCHIVE_VARIABLES.items()
             for value in archive_values(
-                source, by_variable[variable], points, days_before, percentile
+                source,
+                by_variable[variable],
+                points,
+                days_before,
+                percentile,
+                available_after,
+                issue_minute,
             )
             if value.valid_at <= settled_until
         ]

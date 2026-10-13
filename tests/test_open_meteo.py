@@ -77,7 +77,9 @@ def test_recorded_run_passes_the_run_check_and_gives_48_hours() -> None:
     hours = timedelta(hours=1), timedelta(hours=49)
     series = fetch_forecast(client, POINTS, RUN_AT + hours[0], RUN_AT + hours[1])
     check_run(series, RUN_AT, HORIZON)
-    values = run_values("open_meteo_icon_d2", series, POINTS, RUN_AT, HORIZON, 90)
+    values = run_values(
+        "open_meteo_icon_d2", series, POINTS, RUN_AT, HORIZON, 90, RUN_AT + timedelta(hours=2)
+    )
     assert len(values) == 2 * HORIZON
     assert max(value.valid_at for value in values) == RUN_AT + timedelta(hours=HORIZON)
     params = requests[0].url.params
@@ -97,7 +99,9 @@ def test_recorded_archive_gives_both_days() -> None:
     )
     series = fetch_archive(client, POINTS, VARIABLES, date(2024, 11, 18), date(2024, 11, 19))
     assert requests[0].url.params["start_date"] == "2024-11-18"
-    day0 = archive_values("open_meteo_previous_runs", series["precipitation"], POINTS, 0, 90)
+    day0 = archive_values(
+        "open_meteo_previous_runs", series["precipitation"], POINTS, 0, 90, timedelta(0), 30
+    )
     catchment = [value.value for value in day0 if value.series_id.endswith(":catchment:mean")]
     assert len(catchment) == 48
     assert sum(catchment) == pytest.approx((43.2 + 44.3) / 2)

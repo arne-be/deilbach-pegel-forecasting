@@ -109,7 +109,7 @@ We checked this against Open-Meteo's Single Runs API, which serves whole runs by
 
 These rows go under their own source, `open_meteo_previous_runs`, with run_at set by that rule (`archive_run_at`). Both variables go into the same two series. Their lead times differ, so they never share a key. Hours where any point is missing are skipped. The last 3 hours before the fetch are left out, because their day-0 values may still come from a longer lead time.
 
-**For training:** a run is only out about 85 minutes after run_at. A forecast is usable at issue time t only if run_at + 1.5 h ≤ t. That applies to live and archive rows alike. Most day-0 values (lead 1 to 3 h) weren't available until after their hour had started, so treat them as close to an observation, not a forecast.
+**For training:** a run is only out about 85 minutes after run_at (measured 84.8 and 85.8 min for the 09 and 12 UTC runs on 2026-10-13, as `last_run_availability_time − last_run_initialisation_time`). Training uses a value only if its `available_at` ≤ the issue time. The live step stamps a run with the time it fetched it. Archive rows get what the live system would have done: the first hourly run (:30) at or after run_at + `available_after`, which is `rain.forecast.available_after_minutes` (120) for both sources and stored on each series. Any delay between 91 and 150 minutes gives the same :30 run, so 120 keeps a wide margin at no cost. Most day-0 values (lead 1 to 3 h) weren't available until after their hour had started, so treat them as close to an observation, not a forecast.
 
 Backfill:
 

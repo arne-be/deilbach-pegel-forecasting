@@ -65,7 +65,8 @@
       "archive_source": "open_meteo_previous_runs",
       "points_file": "icon_d2_points.json",
       "horizon_hours": 48,
-      "ring_percentile": 90
+      "ring_percentile": 90,
+      "available_after_minutes": 120
     }
   }
 }
