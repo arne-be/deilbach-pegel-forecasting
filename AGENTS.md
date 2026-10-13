@@ -19,6 +19,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - API `GET /api/history` and `GET /api/forecast` (FastAPI): `src/pegel/api/`, `src/pegel/core/history.py`
 - LANUV stations and value parser: `config/pegel.json`, `src/pegel/adapters/sources/lanuv.py`
 - Hourly live ingest of the upstream LANUV gauges (failures logged, never block the forecast): `src/pegel/adapters/sources/lanuv.py` (`fetch_levels`), `src/pegel/jobs/pipeline.py`
+- LANUV level history from open data CSV files (`pegel backfill --source lanuv-files`): `src/pegel/adapters/sources/lanuv_files.py`
 - `scripts/influx-query.sh` and the docs
 
 ## Layout
@@ -136,6 +137,11 @@ Loads history in monthly chunks with the same code the hourly job uses. It's the
 
 ```
 uv run pegel backfill --source influx --from 2023-03-01
+```
+
+The upstream LANUV gauges load from the open data files instead: download `Ruhreinzugsgebiet-NRW-W_{decade}_EPSG25832_CSV.zip` from https://www.opengeodata.nrw.de/produkte/umwelt_klima/wasser/oberflaechengewaesser/hydro/w/, extract the `*_Wasserstand_cm.csv` files of our stations into a folder outside the repo, and pass it with `--path`. Without `--station` it loads all LANUV stations. From 2000 the data is regular (15 minutes or finer); before that Langenberg is sparse.
+```
+uv run pegel backfill --source lanuv-files --path <folder> --from 2000-01-01 [--station langenberg]
 ```
 
 ### Deploy
