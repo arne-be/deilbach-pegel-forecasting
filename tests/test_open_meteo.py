@@ -11,7 +11,7 @@ from pegel.adapters.sources.open_meteo import (
     OpenMeteoError,
     RateLimitedError,
     fetch_archive,
-    fetch_forecast,
+    fetch_run,
     latest_run,
     load_points,
     parse_points,
@@ -72,10 +72,9 @@ def test_latest_run_reads_initialisation_time() -> None:
 
 def test_recorded_run_passes_the_run_check_and_gives_48_hours() -> None:
     client, requests = client_answering(
-        httpx.Response(200, json=fixture("forecast_run_2026-10-13T09.json"))
+        httpx.Response(200, json=fixture("single_run_2026-10-13T09.json"))
     )
-    hours = timedelta(hours=1), timedelta(hours=49)
-    series = fetch_forecast(client, POINTS, RUN_AT + hours[0], RUN_AT + hours[1])
+    series = fetch_run(client, POINTS, RUN_AT, HORIZON + 1)
     check_run(series, RUN_AT, HORIZON)
     values = run_values(
         "open_meteo_icon_d2", series, POINTS, RUN_AT, HORIZON, 90, RUN_AT + timedelta(hours=2)
@@ -83,14 +82,16 @@ def test_recorded_run_passes_the_run_check_and_gives_48_hours() -> None:
     assert len(values) == 2 * HORIZON
     assert max(value.valid_at for value in values) == RUN_AT + timedelta(hours=HORIZON)
     params = requests[0].url.params
+    assert (params["run"], params["forecast_hours"]) == ("2026-10-13T09:00", "50")
     assert params["cell_selection"] == "nearest"
     assert params["latitude"] == "51.3,51.3,51.22"
 
 
 def test_recorded_run_is_rejected_for_an_earlier_run() -> None:
-    series = parse_points(fixture("forecast_run_2026-10-13T09.json"), POINTS, ["precipitation"])
+    client, _ = client_answering(httpx.Response(200, json=fixture("single_run_2026-10-13T09.json")))
+    series = fetch_run(client, POINTS, RUN_AT, HORIZON + 1)
     with pytest.raises(RunMismatchError):
-        check_run(series["precipitation"], RUN_AT - timedelta(hours=3), HORIZON)
+        check_run(series, RUN_AT - timedelta(hours=3), HORIZON)
 
 
 def test_recorded_archive_gives_both_days() -> None:
@@ -108,13 +109,13 @@ def test_recorded_archive_gives_both_days() -> None:
 
 
 def test_rejects_wrong_number_of_locations() -> None:
-    body = fixture("forecast_run_2026-10-13T09.json")[:2]
+    body = fixture("single_run_2026-10-13T09.json")[:2]
     with pytest.raises(OpenMeteoError):
         parse_points(body, POINTS, ["precipitation"])
 
 
 def test_rejects_a_location_off_the_requested_point() -> None:
-    body = fixture("forecast_run_2026-10-13T09.json")
+    body = fixture("single_run_2026-10-13T09.json")
     body[2]["longitude"] = 7.04
     with pytest.raises(OpenMeteoError):
         parse_points(body, POINTS, ["precipitation"])
@@ -122,14 +123,14 @@ def test_rejects_a_location_off_the_requested_point() -> None:
 
 @pytest.mark.parametrize("value", [-0.1, "1.0", True])
 def test_rejects_bad_values(value: Any) -> None:
-    body = fixture("forecast_run_2026-10-13T09.json")
+    body = fixture("single_run_2026-10-13T09.json")
     body[0]["hourly"]["precipitation"][0] = value
     with pytest.raises(OpenMeteoError):
         parse_points(body, POINTS, ["precipitation"])
 
 
 def test_rejects_gaps_in_hours() -> None:
-    body = fixture("forecast_run_2026-10-13T09.json")
+    body = fixture("single_run_2026-10-13T09.json")
     for location in body:
         del location["hourly"]["time"][5]
         del location["hourly"]["precipitation"][5]
@@ -157,16 +158,20 @@ def test_archive_gives_up_after_repeated_server_errors() -> None:
     assert len(requests) == open_meteo.MAX_ATTEMPTS
 
 
-def test_live_requests_are_not_retried() -> None:
-    client, requests = client_answering(httpx.Response(503), httpx.Response(503))
+def test_live_requests_retry_a_server_error_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(open_meteo, "BACKOFF_BASE_SECONDS", 0)
+    client, requests = client_answering(
+        httpx.Response(503), httpx.Response(200, json=fixture("meta.json"))
+    )
+    assert latest_run(client) == RUN_AT
+    client, requests = client_answering(*[httpx.Response(503)] * 3)
     with pytest.raises(OpenMeteoError):
-        latest_run(client)
-    with pytest.raises(OpenMeteoError):
-        fetch_forecast(client, POINTS, RUN_AT, RUN_AT + timedelta(hours=49))
-    assert len(requests) == 2
+        fetch_run(client, POINTS, RUN_AT, HORIZON + 1)
+    assert len(requests) == open_meteo.LIVE_ATTEMPTS
 
 
 def test_slowly_trickling_body_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(open_meteo, "BACKOFF_BASE_SECONDS", 0)
     clock = iter(range(0, 10_000, 30))  # each chunk arrives 30 s after the last
     monkeypatch.setattr("pegel.adapters.sources.open_meteo.time.monotonic", lambda: next(clock))
     chunks = [b"{", b'"last_run_initialisation_time"', b": 1791882000}"]
@@ -175,7 +180,7 @@ def test_slowly_trickling_body_times_out(monkeypatch: pytest.MonkeyPatch) -> Non
         def __iter__(self) -> Any:
             yield from chunks
 
-    client, _ = client_answering(httpx.Response(200, stream=Trickle()))
+    client, _ = client_answering(*[httpx.Response(200, stream=Trickle()) for _ in range(2)])
     with pytest.raises(OpenMeteoError, match="ReadTimeout"):
         latest_run(client)
 
@@ -184,5 +189,5 @@ def test_rate_limit_raises_at_once() -> None:
     answer = httpx.Response(429, json={"error": True, "reason": "Minutely API request limit"})
     client, requests = client_answering(answer)
     with pytest.raises(RateLimitedError, match="Minutely"):
-        fetch_forecast(client, POINTS, RUN_AT, RUN_AT + timedelta(hours=49))
+        fetch_run(client, POINTS, RUN_AT, HORIZON + 1)
     assert len(requests) == 1

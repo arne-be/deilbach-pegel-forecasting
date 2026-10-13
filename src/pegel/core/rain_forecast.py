@@ -1,7 +1,7 @@
 """Turns weather model point values into the stored rain forecast series. Pure, no I/O."""
 
 import statistics
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -107,6 +107,14 @@ def aggregate_hour(
     ]
 
 
+def missing_runs(
+    newest: datetime, stored: Collection[datetime], look_back: timedelta
+) -> list[datetime]:
+    """The runs from newest back to newest - look_back that aren't stored, newest first."""
+    runs = [newest - RUN_INTERVAL * back for back in range(look_back // RUN_INTERVAL + 1)]
+    return [run for run in runs if run not in stored]
+
+
 def check_run(series: PointSeries, run_at: datetime, horizon_hours: int) -> None:
     """Checks that every point has data from run_at + 1 h to run_at + horizon and none after.
 
@@ -116,7 +124,7 @@ def check_run(series: PointSeries, run_at: datetime, horizon_hours: int) -> None
     """
     last_hour = run_at + timedelta(hours=horizon_hours)
     if last_hour + HOUR not in series.times:
-        raise ValueError("ask for at least one hour after the horizon to check the run")
+        raise RunMismatchError(f"no data for the hour after the horizon, run {run_at.isoformat()}")
     expected_times = [run_at + HOUR * (hour + 1) for hour in range(len(series.times))]
     if list(series.times) != expected_times:
         raise RunMismatchError(f"hours don't run without a gap from {run_at + HOUR}")

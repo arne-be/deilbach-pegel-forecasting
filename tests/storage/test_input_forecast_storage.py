@@ -4,7 +4,7 @@ import psycopg
 import pytest
 from psycopg.rows import TupleRow
 
-from pegel.adapters.storage.input_forecasts import newest_run_at, upsert_input_forecasts
+from pegel.adapters.storage.input_forecasts import stored_runs_since, upsert_input_forecasts
 from pegel.adapters.storage.series import ensure_series
 from pegel.core.series import InputForecastValue, Series
 
@@ -78,15 +78,16 @@ def test_runs_are_kept_side_by_side(conn: Conn) -> None:
     assert stored_values(conn) == [0.1, 0.5]
 
 
-def test_newest_run_at(conn: Conn) -> None:
-    upsert_input_forecasts(conn, run(RUN_AT + 3 * HOUR, [0.5]), RUN_AT)
+def test_stored_runs_since(conn: Conn) -> None:
+    upsert_input_forecasts(conn, run(RUN_AT + 3 * HOUR, [0.5, 0.6]), RUN_AT)
     upsert_input_forecasts(conn, run(RUN_AT, [0.1]), RUN_AT)
     conn.execute("SET TIME ZONE 'Europe/Berlin'")
-    assert newest_run_at(conn, RAIN.id) == RUN_AT + 3 * HOUR
+    assert stored_runs_since(conn, RAIN.id, RUN_AT) == {RUN_AT, RUN_AT + 3 * HOUR}
+    assert stored_runs_since(conn, RAIN.id, RUN_AT + HOUR) == {RUN_AT + 3 * HOUR}
 
 
-def test_newest_run_at_of_empty_series_is_none(conn: Conn) -> None:
-    assert newest_run_at(conn, RAIN.id) is None
+def test_stored_runs_since_of_empty_series_is_empty(conn: Conn) -> None:
+    assert stored_runs_since(conn, RAIN.id, RUN_AT) == set()
 
 
 def test_unknown_series_is_rejected(conn: Conn) -> None:
