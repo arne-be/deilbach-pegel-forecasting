@@ -53,5 +53,19 @@
     "history_first_day": "2023-03-06",
     "history_default_days": 7,
     "history_max_days": 31
+  },
+  "rain": {
+    "radar": {
+      "source": "radolan_rw",
+      "cells_file": "radolan_cells.json",
+      "ingest_lookback_hours": 6
+    },
+    "forecast": {
+      "source": "open_meteo_icon_d2",
+      "archive_source": "open_meteo_previous_runs",
+      "points_file": "icon_d2_points.json",
+      "horizon_hours": 48,
+      "ring_percentile": 90
+    }
   }
 }

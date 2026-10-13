@@ -1,7 +1,7 @@
 """The ingest and forecast steps. Each takes its time window, so it can rerun for any period."""
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 
 import psycopg
@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 Conn = psycopg.Connection[TupleRow]
 # Fetches a station's readings in [start, end). The source adapter, passed in for testing.
 FetchLevels = Callable[[Station, datetime, datetime], list[Observation]]
+# An extra input for the hourly run, e.g. radar rain. Gets the connection and the issue time,
+# stores what it fetched and returns the number of new or changed rows.
+HourlyStep = Callable[[Conn, datetime], int]
 
 
 class NoObservationError(Exception):
@@ -123,12 +126,16 @@ def forecast(conn: Conn, config: PegelConfig, issued_at: datetime) -> Forecast:
 
 
 def run_hourly(
-    fetch: FetchLevels, conn: Conn, config: PegelConfig, issued_at: datetime
+    fetch: FetchLevels,
+    conn: Conn,
+    config: PegelConfig,
+    issued_at: datetime,
+    extra_steps: Sequence[tuple[str, HourlyStep]] = (),
 ) -> Forecast:
-    """Ingests the recent hours of every station, then forecasts.
+    """Ingests the recent hours of every station and the extra inputs, then forecasts.
 
-    Only uses readings up to the issue time. A failing upstream station is logged and skipped,
-    so it can't block the forecast; a failing forecast station fails the run.
+    Only uses readings up to the issue time. A failing upstream station or extra step is logged
+    and skipped, so it can't block the forecast; a failing forecast station fails the run.
     """
     forecast_station = config.station(config.forecast.station_id)
     start = issued_at - timedelta(hours=config.forecast.ingest_lookback_hours)
@@ -149,5 +156,13 @@ def run_hourly(
                     "window_start": upstream_start.isoformat(),
                     "window_end": issued_at.isoformat(),
                 },
+            )
+    for name, step in extra_steps:
+        try:
+            step(conn, issued_at)
+        except Exception:
+            logger.exception(
+                "hourly step failed, continuing without it",
+                extra={"job": name, "issued_at": issued_at.isoformat()},
             )
     return forecast(conn, config, issued_at)
