@@ -36,7 +36,7 @@
             "drawStyle": "line",
             "lineWidth": 1,
             "fillOpacity": 0,
-            "spanNulls": false,
+            "spanNulls": 10800000,
             "showPoints": "never"
           }
         },
@@ -99,7 +99,7 @@
             "drawStyle": "line",
             "lineWidth": 1,
             "fillOpacity": 0,
-            "spanNulls": false,
+            "spanNulls": 10800000,
             "showPoints": "never"
           }
         },
@@ -198,12 +198,12 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "lengthmm",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
             "fillOpacity": 0,
-            "spanNulls": false,
+            "spanNulls": 10800000,
             "showPoints": "never"
           }
         },
@@ -229,7 +229,7 @@
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
-          "rawSql": "SELECT DISTINCT ON (valid_at, series_id) valid_at AS time, series_id AS metric, value\nFROM input_forecasts\nWHERE $__timeFilter(valid_at)\nORDER BY valid_at, series_id, run_at DESC"
+          "rawSql": "SELECT $__timeGroupAlias(valid_at, $__interval), series_id AS metric, avg(value) AS value\nFROM (\n  SELECT DISTINCT ON (series_id, valid_at) series_id, valid_at, value\n  FROM input_forecasts\n  WHERE $__timeFilter(valid_at)\n  ORDER BY series_id, valid_at, run_at DESC\n) newest\nGROUP BY 1, 2\nORDER BY 1"
         }
       ]
     },
