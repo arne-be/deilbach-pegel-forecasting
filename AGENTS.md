@@ -113,10 +113,13 @@ To migrate the Neon `dev` branch (`DATABASE_URL` in `.env.local`, direct string)
 mise exec -- dbmate --env-file .env.local --no-dump-schema migrate
 ```
 
-To migrate `prod` after a merged migration, pass its direct `pegel_owner` string for that one command only (`docs/setup-aws.md`):
+To migrate `prod` after a merged migration, copy its direct `pegel_owner` string from the Neon console and pass it from the clipboard, so it never lands in the shell history (`docs/setup-aws.md`):
 ```
-DATABASE_URL='<direct prod pegel_owner string>' mise exec -- dbmate --no-dump-schema migrate
+DATABASE_URL="$(pbpaste)" mise exec -- dbmate --no-dump-schema migrate
+pbcopy </dev/null
 ```
+
+A merged migration breaks the hourly job until prod is migrated, since the new code expects the new schema. Merge it right after a :30 run, with the prod string at hand, and migrate before the next one. Take a Neon snapshot of prod first.
 
 ### Run locally
 
@@ -138,7 +141,7 @@ uv run pegel run-hourly --issued-at 2026-10-12T13:30Z   # rerun a past issue tim
 
 ### Backfill
 
-Loads history in monthly chunks with the same code the hourly job uses. It's the one case where a laptop writes to prod. Pass the prod jobs connection string as a temporary environment variable for that run only, never in `.env.local`.
+Loads history in monthly chunks with the same code the hourly job uses. It's the one case where a laptop writes to prod. Pass the prod jobs connection string from the clipboard for that run only (`JOBS_DATABASE_URL="$(pbpaste)" uv run pegel backfill …`, then `pbcopy </dev/null`), never in `.env.local`.
 
 ```
 uv run pegel backfill --source influx --from 2023-03-01

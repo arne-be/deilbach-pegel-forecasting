@@ -49,10 +49,11 @@ rm "$tmp"
 
 ## 2. Migrate prod
 
-The `prod` branch starts empty. Migrate it with the direct (not pooled) `pegel_owner` string from the console, set for this one command only:
+The `prod` branch starts empty. Migrate it with the direct (not pooled) `pegel_owner` string from the console, set for this one command only. Copy it to the clipboard and pass it from there, so it never lands in the shell history:
 
 ```
-DATABASE_URL='<direct prod pegel_owner string>' mise exec -- dbmate --no-dump-schema migrate
+DATABASE_URL="$(pbpaste)" mise exec -- dbmate --no-dump-schema migrate
+pbcopy </dev/null
 ```
 
 Do the same after every merged migration.

@@ -54,3 +54,10 @@ git switch main && git pull
 - Use `-D` because squash merges leave the branch looking unmerged to git.
 - Only clean up after confirming the PR is merged (`gh pr view <number> --json state`). Never remove a worktree with uncommitted changes.
 - Run `git worktree prune` to drop entries for worktrees deleted by hand.
+
+## Retrospective after merge
+After the cleanup, look back over the work on the PR before moving on:
+
+- What went wrong or took a detour: a correction from the user, a failed command, a check that missed something, a rework after review.
+- For each one that could happen again, write it down where it will be found next time: a rule in `.claude/rules/` or `CLAUDE.md` for anything that applies to everyone working on this repo, the agent's memory for personal or machine-specific things. Update an existing rule rather than adding a near duplicate.
+- If nothing went wrong, say so and add nothing. Put rule changes in their own small `docs` PR, not in the merged one.
