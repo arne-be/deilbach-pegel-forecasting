@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 import httpx
 
 from pegel.adapters.sources import open_meteo
-from pegel.adapters.storage.input_forecasts import newest_run_at, upsert_input_forecasts
+from pegel.adapters.storage.input_forecasts import stored_runs_since, upsert_input_forecasts
 from pegel.adapters.storage.series import ensure_series
 from pegel.config import RainForecastSettings, config_file
 from pegel.core.rain_forecast import (
@@ -66,15 +66,15 @@ def ingest_new_runs(
     points: Sequence[GridPoint],
     issue_minute: int,
 ) -> int:
-    """Stores the runs of the last CATCH_UP not stored yet, oldest first. Returns the changed
-    row count.
+    """Stores the runs of the last CATCH_UP not stored yet, newest first: the level forecast
+    needs the newest, older runs only matter for training. Returns the changed row count.
 
     A run is available from the issue slot of its fetch, so the run that fetched it may use it, and
     a run caught up late is honestly late. Without a new run it only reads the small metadata file.
     A failing run stops the catch-up for this hour; the next hour tries again from there.
     """
     newest = open_meteo.latest_run(client)
-    stored = newest_run_at(conn, catchment_series_id(settings.source))
+    stored = stored_runs_since(conn, catchment_series_id(settings.source), newest - CATCH_UP)
     runs = missing_runs(newest, stored, CATCH_UP)[:MAX_RUNS_PER_HOUR]
     if not runs:
         logger.info(

@@ -91,15 +91,15 @@ def runs_back(*hours: int) -> list[datetime]:
     return [RUN_AT - timedelta(hours=back) for back in hours]
 
 
-def test_catch_up_fetches_missing_runs_oldest_first_four_per_hour(conn: Conn) -> None:
+def test_catch_up_fetches_missing_runs_newest_first_four_per_hour(conn: Conn) -> None:
     fake = FakeOpenMeteo(RUN_AT)
     with fake.client() as client:
         assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 4 * 96
-        assert fake.runs == runs_back(24, 21, 18, 15)
+        assert fake.runs == runs_back(0, 3, 6, 9)
         ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE)
         ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE)
-    assert fake.runs == runs_back(24, 21, 18, 15, 12, 9, 6, 3, 0)
-    assert stored_runs(conn) == fake.runs
+    assert fake.runs == runs_back(0, 3, 6, 9, 12, 15, 18, 21, 24)
+    assert stored_runs(conn) == sorted(fake.runs)
     assert [row[:2] for row in stored(conn)] == [
         ("open_meteo_icon_d2:catchment:mean", 9 * 48),
         ("open_meteo_icon_d2:ring:p90", 9 * 48),
@@ -130,26 +130,26 @@ def test_new_run_is_available_from_the_slot_of_its_fetch(conn: Conn) -> None:
 
 
 def test_failing_run_stops_the_catch_up_but_keeps_earlier_runs(conn: Conn) -> None:
-    fake = FakeOpenMeteo(RUN_AT, {RUN_AT - timedelta(hours=18): (503, {})})
+    fake = FakeOpenMeteo(RUN_AT, {RUN_AT - timedelta(hours=6): (503, {})})
     with fake.client() as client:
         assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 2 * 96
-    # The failing run was tried twice, the run after it not at all.
-    assert fake.runs == runs_back(24, 21, 18, 18)
-    assert stored_runs(conn) == runs_back(24, 21)
+    # The failing run was tried twice, the run before it not at all.
+    assert fake.runs == runs_back(0, 3, 6, 6)
+    assert stored_runs(conn) == runs_back(3, 0)
 
 
 def test_data_of_another_run_is_rejected(conn: Conn) -> None:
-    fake = FakeOpenMeteo(RUN_AT, {RUN_AT - timedelta(hours=24): (200, run_answer(RUN_AT))})
+    fake = FakeOpenMeteo(RUN_AT, {RUN_AT: (200, run_answer(RUN_AT + timedelta(hours=3)))})
     with fake.client() as client:
         assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 0
     assert stored(conn) == []
 
 
 def test_rate_limit_is_not_retried(conn: Conn) -> None:
-    fake = FakeOpenMeteo(RUN_AT, {RUN_AT - timedelta(hours=24): (429, {"reason": "Hourly limit"})})
+    fake = FakeOpenMeteo(RUN_AT, {RUN_AT: (429, {"reason": "Hourly limit"})})
     with fake.client() as client:
         assert ingest_new_runs(client, conn, SETTINGS, POINTS, MINUTE) == 0
-    assert fake.runs == runs_back(24)
+    assert fake.runs == [RUN_AT]
     assert stored(conn) == []
 
 

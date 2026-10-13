@@ -1,7 +1,7 @@
 """Turns weather model point values into the stored rain forecast series. Pure, no I/O."""
 
 import statistics
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -107,10 +107,12 @@ def aggregate_hour(
     ]
 
 
-def missing_runs(newest: datetime, stored: datetime | None, look_back: timedelta) -> list[datetime]:
-    """The runs from newest - look_back to newest that start after `stored`, oldest first."""
-    runs = [newest - RUN_INTERVAL * back for back in range(look_back // RUN_INTERVAL, -1, -1)]
-    return [run for run in runs if stored is None or run > stored]
+def missing_runs(
+    newest: datetime, stored: Collection[datetime], look_back: timedelta
+) -> list[datetime]:
+    """The runs from newest back to newest - look_back that aren't stored, newest first."""
+    runs = [newest - RUN_INTERVAL * back for back in range(look_back // RUN_INTERVAL + 1)]
+    return [run for run in runs if run not in stored]
 
 
 def check_run(series: PointSeries, run_at: datetime, horizon_hours: int) -> None:

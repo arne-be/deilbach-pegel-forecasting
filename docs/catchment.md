@@ -91,7 +91,7 @@ Series ids carry the source: `open_meteo_icon_d2:catchment:mean` and `open_meteo
 
 Open-Meteo's model metadata says which run is the newest: `https://api.open-meteo.com/data/dwd_icon_d2/static/meta.json` has `last_run_initialisation_time` (the run's start, Unix seconds) and `last_run_availability_time` (when Open-Meteo started serving it). Runs start at 00, 03, … 21 UTC and come out about 85 minutes later (run 09:00 was served from 10:25).
 
-The hourly step reads the metadata first. It then wants every run of the last 24 hours up to the newest that starts after the newest stored run of the live catchment series. If there is none, it stops: no forecast request. Otherwise it fetches them oldest first, at most 4 per hour, so after a long outage the next hours fetch the rest. A run only 24 hours late still covers half the horizon; older ones are left to the archive.
+The hourly step reads the metadata first. It then wants every run of the last 24 hours, up to the newest, that the live catchment series doesn't have yet. If there is none, it stops: no forecast request. Otherwise it fetches them newest first, at most 4 per hour: the level forecast needs the newest run, older ones only matter for training, so after a long outage the next hours fetch the rest. A run only 24 hours late still covers half the horizon; older ones are left to the archive.
 
 Each run comes from Open-Meteo's Single Runs API (`single-runs-api.open-meteo.com/v1/forecast`), which takes the forecast parameters plus `run=2026-10-13T09:00`. The live forecast API only serves the newest run, so a missed run was lost before. Single Runs keeps runs from about May 2026 on and answers HTTP 400 for older ones. It doesn't take `start_hour`, so we ask for `forecast_hours=50`: the hours from the run start to run + 49 h. For run 09:00 on 2026-10-13 it gave the same values as the live API. It served the 18:00 run before the metadata named it, so going by the metadata never asks too early.
 
@@ -101,7 +101,7 @@ Only run < valid_at ≤ run + 48 h is stored. `precipitation` is the sum of the 
 
 The request uses `cell_selection=nearest`. Without it Open-Meteo may pick a neighbouring cell with a better-matching elevation; one of our 70 points came back 0.02° off.
 
-Each request (metadata and runs) gets two tries of at most 60 seconds, 5 seconds apart, on a timeout, network error or 5xx. From Lambda, single requests have timed out and got HTTP 503; the first request for a new run once took longer than 15 seconds. HTTP 429 isn't retried. A failing run stops the catch-up for this hour and keeps the runs stored before it; the next hour starts again from there.
+Each request (metadata and runs) gets two tries of at most 60 seconds, 5 seconds apart, on a timeout, network error or 5xx. From Lambda, single requests have timed out and got HTTP 503; the first request for a new run once took longer than 15 seconds. HTTP 429 isn't retried. A failing run stops the catch-up for this hour and keeps the runs stored before it; the next hour tries the missing runs again.
 
 #### Archive: Previous Runs API
 

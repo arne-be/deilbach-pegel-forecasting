@@ -1,4 +1,4 @@
-"""Forecasts made by others, e.g. ICON-D2 rain: idempotent upserts and the newest run."""
+"""Forecasts made by others, e.g. ICON-D2 rain: idempotent upserts and the stored runs."""
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -22,7 +22,7 @@ UPSERT_SQL = """
     WHERE input_forecasts.value IS DISTINCT FROM excluded.value
 """
 
-NEWEST_RUN_SQL = "SELECT max(run_at) FROM input_forecasts WHERE series_id = %s"
+RUNS_SINCE_SQL = "SELECT DISTINCT run_at FROM input_forecasts WHERE series_id = %s AND run_at >= %s"
 
 
 def upsert_input_forecasts(
@@ -47,11 +47,10 @@ def upsert_input_forecasts(
         return cursor.rowcount
 
 
-def newest_run_at(conn: psycopg.Connection[TupleRow], series_id: str) -> datetime | None:
-    """The start of the newest stored run of this series, or None if there is none."""
-    row = conn.execute(NEWEST_RUN_SQL, (series_id,)).fetchone()
-    if row is None or row[0] is None:
-        return None
+def stored_runs_since(
+    conn: psycopg.Connection[TupleRow], series_id: str, since: datetime
+) -> set[datetime]:
+    """The starts of the stored runs of this series from `since` on."""
+    rows = conn.execute(RUNS_SINCE_SQL, (series_id, since)).fetchall()
     # Timestamps come back in the session time zone; the core types require UTC.
-    run_at: datetime = row[0]
-    return run_at.astimezone(UTC)
+    return {row[0].astimezone(UTC) for row in rows}
