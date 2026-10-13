@@ -4,7 +4,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from pegel.config import load_config
-from pegel.core.series import InputForecastValue, Series, SeriesValue, level_series
+from pegel.core.series import (
+    InputForecastValue,
+    Series,
+    SeriesValue,
+    cleaned_level_series,
+    level_series,
+)
 
 AT = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
 
@@ -62,3 +68,14 @@ def test_forecast_cannot_be_available_before_its_run() -> None:
 def test_period_must_be_positive() -> None:
     with pytest.raises(ValueError, match="period"):
         Series("x", "rain", "mm", "radar", "zone", "observation", period=timedelta(0))
+
+
+def test_cleaned_level_series_measures_the_same_as_the_raw_one() -> None:
+    station = load_config().station("kupferdreh")
+    cleaned, raw = cleaned_level_series(station), level_series(station)
+    assert (cleaned.id, cleaned.variable, cleaned.unit, cleaned.kind) == (
+        "kupferdreh:cleaned_kalman",
+        raw.variable,
+        raw.unit,
+        raw.kind,
+    )
