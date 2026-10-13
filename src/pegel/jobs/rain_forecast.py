@@ -20,6 +20,7 @@ from pegel.core.rain_forecast import (
     forecast_series,
     run_values,
 )
+from pegel.core.schedule import issue_time
 from pegel.jobs.pipeline import Conn, HourlyStep
 
 logger = logging.getLogger(__name__)
@@ -43,10 +44,12 @@ ARCHIVE_MAX_CALLS = 9000
 ARCHIVE_SETTLE_TIME = timedelta(hours=3)
 
 
-def hourly_step(client: httpx.Client, settings: RainForecastSettings) -> HourlyStep:
+def hourly_step(
+    client: httpx.Client, settings: RainForecastSettings, issue_minute: int
+) -> HourlyStep:
     """The hourly job's rain forecast step. Ignores the issue time: it stores runs as they come."""
     points = open_meteo.load_points(config_file(settings.points_file))
-    return lambda conn, _issued_at: ingest_newest_run(client, conn, settings, points)
+    return lambda conn, _issued_at: ingest_newest_run(client, conn, settings, points, issue_minute)
 
 
 def ingest_newest_run(
@@ -54,8 +57,11 @@ def ingest_newest_run(
     conn: Conn,
     settings: RainForecastSettings,
     points: Sequence[GridPoint],
+    issue_minute: int,
 ) -> int:
     """Stores the newest ICON-D2 run if it isn't stored yet. Returns the changed row count.
+
+    The run is available from the issue slot of the fetch, so the run that fetched it may use it.
 
     Without a new run it only reads the small metadata file, no forecast request. Requests get
     one short try each, so a slow Open-Meteo can't hold up the level forecast.
@@ -79,7 +85,7 @@ def ingest_newest_run(
             "open-meteo rate limit, next run catches up", extra=context | {"error": str(error)}
         )
         return 0
-    fetched_at = datetime.now(UTC)
+    seen_at = issue_time(datetime.now(UTC), issue_minute)
     check_run(series, run_at, settings.horizon_hours)
     # check_run catches a whole answer from another run. This catches the next run finishing
     # while the answer was being built, which could mix both runs within one point's hours.
@@ -93,7 +99,7 @@ def ingest_newest_run(
         run_at,
         settings.horizon_hours,
         settings.ring_percentile,
-        fetched_at,
+        seen_at,
     )
     ensure_series(
         conn,
@@ -104,7 +110,7 @@ def ingest_newest_run(
             timedelta(minutes=settings.available_after_minutes),
         ),
     )
-    changed = upsert_input_forecasts(conn, values)
+    changed = upsert_input_forecasts(conn, values, seen_at)
     logger.info(
         "stored rain forecast run", extra=context | {"values": len(values), "changed": changed}
     )
@@ -177,7 +183,8 @@ def backfill_archive(
             )
             if value.valid_at <= settled_until
         ]
-        chunk_changed = upsert_input_forecasts(conn, values)
+        seen_at = issue_time(datetime.now(UTC), issue_minute)
+        chunk_changed = upsert_input_forecasts(conn, values, seen_at)
         changed += chunk_changed
         logger.info(
             "stored rain forecast archive chunk",

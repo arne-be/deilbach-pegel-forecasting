@@ -11,6 +11,7 @@ from psycopg.rows import TupleRow
 from pegel.adapters.sources import open_meteo
 from pegel.config import load_config
 from pegel.core.rain_forecast import GridPoint, RunMismatchError
+from pegel.core.schedule import issue_time
 from pegel.jobs.rain_forecast import backfill_archive, ingest_newest_run
 
 Conn = psycopg.Connection[TupleRow]
@@ -67,32 +68,33 @@ def stored(conn: Conn) -> list[tuple[Any, ...]]:
 def test_new_run_is_stored_once(conn: Conn) -> None:
     fake = FakeOpenMeteo([meta(RUN_AT)], forecast_ok())
     with fake.client() as client:
-        assert ingest_newest_run(client, conn, SETTINGS, POINTS) == 96
+        assert ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE) == 96
         assert [row[:2] for row in stored(conn)] == [
             ("open_meteo_icon_d2:catchment:mean", 48),
             ("open_meteo_icon_d2:ring:p90", 48),
         ]
         requests_before = len(fake.urls)
-        assert ingest_newest_run(client, conn, SETTINGS, POINTS) == 0
+        assert ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE) == 0
     # The rerun only read the metadata.
     assert fake.urls[requests_before:] == [open_meteo.META_URL]
 
 
-def test_new_run_is_available_from_its_fetch(conn: Conn) -> None:
-    before = datetime.now(UTC)
+def test_new_run_is_available_from_the_slot_of_its_fetch(conn: Conn) -> None:
+    before = issue_time(datetime.now(UTC), MINUTE)
     with FakeOpenMeteo([meta(RUN_AT)], forecast_ok()).client() as client:
-        ingest_newest_run(client, conn, SETTINGS, POINTS)
+        ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE)
     row = conn.execute(
         "SELECT min(available_at), max(available_at) FROM input_forecasts"
     ).fetchone()
-    assert row is not None and before <= row[0] == row[1] <= datetime.now(UTC)
+    assert row is not None and row[0] == row[1]
+    assert row[0] in {before, issue_time(datetime.now(UTC), MINUTE)}
 
 
 def test_run_published_during_fetch_is_not_stored(conn: Conn) -> None:
     later_run = datetime(2026, 10, 13, 12, tzinfo=UTC)
     fake = FakeOpenMeteo([meta(RUN_AT), meta(later_run)], forecast_ok())
     with fake.client() as client:
-        assert ingest_newest_run(client, conn, SETTINGS, POINTS) == 0
+        assert ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE) == 0
     assert stored(conn) == []
 
 
@@ -100,14 +102,14 @@ def test_data_of_another_run_is_rejected(conn: Conn) -> None:
     earlier_run = datetime(2026, 10, 13, 6, tzinfo=UTC)
     fake = FakeOpenMeteo([meta(earlier_run)], forecast_ok())
     with fake.client() as client, pytest.raises(RunMismatchError):
-        ingest_newest_run(client, conn, SETTINGS, POINTS)
+        ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE)
     assert stored(conn) == []
 
 
 def test_rate_limit_skips_the_run(conn: Conn) -> None:
     fake = FakeOpenMeteo([meta(RUN_AT)], httpx.Response(429, json={"reason": "Hourly limit"}))
     with fake.client() as client:
-        assert ingest_newest_run(client, conn, SETTINGS, POINTS) == 0
+        assert ingest_newest_run(client, conn, SETTINGS, POINTS, MINUTE) == 0
     assert stored(conn) == []
 
 

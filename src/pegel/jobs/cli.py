@@ -57,7 +57,12 @@ def run_hourly_from_env(config: PegelConfig, issued_at: datetime | None = None) 
     with sources_from_env() as (fetch, conn), httpx.Client() as open_meteo_client:
         # Extra inputs such as rain register here as (job name, step).
         extra_steps: list[tuple[str, HourlyStep]] = [
-            ("rain_forecast", rain_forecast.hourly_step(open_meteo_client, config.rain.forecast)),
+            (
+                "rain_forecast",
+                rain_forecast.hourly_step(
+                    open_meteo_client, config.rain.forecast, config.forecast.issue_minute
+                ),
+            ),
         ]
         return run_hourly(fetch, conn, config, issued_at, extra_steps)
 
