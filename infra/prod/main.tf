@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "6.66.0"
     }
+    grafana = {
+      source  = "grafana/grafana"
+      version = "4.46.0"
+    }
   }
 
   # The bucket is passed at init: tofu init -backend-config="bucket=$TF_STATE_BUCKET"
@@ -108,6 +112,12 @@ resource "aws_secretsmanager_secret" "influx_client_key" {
 resource "aws_secretsmanager_secret" "jobs_database_url" {
   name        = "deilbach-pegel/jobs-database-url"
   description = "Neon prod pooled connection string, role pegel_jobs"
+}
+
+# Read only by the deploy job for migrations, never by the Lambda.
+resource "aws_secretsmanager_secret" "migrate_database_url" {
+  name        = "deilbach-pegel/migrate-database-url"
+  description = "Neon prod direct connection string, role pegel_owner, for dbmate in the deploy job"
 }
 
 resource "aws_budgets_budget" "monthly" {

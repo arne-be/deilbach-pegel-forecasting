@@ -47,6 +47,13 @@ aws secretsmanager put-secret-value --secret-id deilbach-pegel/jobs-database-url
 rm "$tmp"
 ```
 
+Migration database: the direct (not pooled) connection string of the Neon `prod` branch for the role `pegel_owner`. The deploy job uses it to run dbmate. Copy it from the Neon console and pass it from the clipboard, so it never lands in the shell history (`$(...)` drops the trailing newline):
+
+```
+aws secretsmanager put-secret-value --secret-id deilbach-pegel/migrate-database-url --secret-string "$(pbpaste)"
+pbcopy </dev/null
+```
+
 ## 2. Migrate prod
 
 The `prod` branch starts empty. The next deploy migrates it, using the migration database secret from step 1. If that secret was still empty when the deploy ran, the deploy stopped at the migrate step; rerun the failed deploy job.

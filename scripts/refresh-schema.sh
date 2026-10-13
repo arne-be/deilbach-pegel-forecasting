@@ -28,7 +28,7 @@ done
 
 # In Neon these roles are created by hand (docs/setup-neon.md); the grants need them.
 docker exec "$NAME" psql -q -U postgres -d pegel \
-  -c "CREATE ROLE pegel_jobs NOLOGIN; CREATE ROLE pegel_api NOLOGIN;"
+  -c "CREATE ROLE pegel_jobs NOLOGIN; CREATE ROLE pegel_api NOLOGIN; CREATE ROLE pegel_grafana NOLOGIN;"
 
 docker run --rm --network "$NAME" -v "$repo_root/db:/db" \
   -e DATABASE_URL="postgres://postgres:postgres@$NAME:5432/pegel?sslmode=disable" \

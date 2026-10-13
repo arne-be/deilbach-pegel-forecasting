@@ -7,6 +7,7 @@ description: Infrastructure, security and monitoring standards
 - **Infrastructure as code.** No manual changes in the AWS console that aren't also in code.
 - **Least privilege.** Each component gets only the permissions it needs; read-only access to source systems.
 - Secrets come from environment variables or AWS Secrets Manager, never from the repo.
+- **Deployed and CI secrets live in AWS Secrets Manager, not GitHub secrets.** Workflows read them through the GitHub OIDC roles, so every secret sits in one place, defined in OpenTofu and covered by IAM. If a role can't read a secret yet, widen that role in `infra/bootstrap/` for that one secret ARN.
 - **Structured logging** with timestamps and context (job, time window, station). Never log secrets or personal data.
 - **Monitor freshness.** Alert when observations or forecasts are older than expected, not only when a job crashes.
 - Keep running costs small; prefer scheduled or serverless jobs over always-on servers where it fits.

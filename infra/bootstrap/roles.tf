@@ -1,6 +1,9 @@
 # The two CI roles. Plan: read only, pull requests from this repo. Deploy:
-# manages deilbach-pegel* resources, only from main. A fork's pull request
-# gets no OIDC token for this repo's subject, so it gets no AWS access.
+# manages deilbach-pegel* resources, only from main. Both can read the Grafana
+# token and no other secret value, because tofu plan needs it for the dashboards.
+# A fork's pull request gets no OIDC token from GitHub, and infra.yml skips the
+# AWS steps for forks. The trust policy alone would let one in, so never run
+# infra.yml on pull_request_target.
 
 data "aws_iam_policy_document" "github_trust" {
   for_each = {
@@ -61,10 +64,16 @@ data "aws_iam_policy_document" "github_plan" {
   }
 
   statement {
-    sid       = "NoSecretValues"
-    effect    = "Deny"
+    sid       = "GrafanaToken"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = ["*"]
+    resources = [aws_secretsmanager_secret.grafana_token.arn]
+  }
+
+  statement {
+    sid           = "NoOtherSecretValues"
+    effect        = "Deny"
+    actions       = ["secretsmanager:GetSecretValue"]
+    not_resources = [aws_secretsmanager_secret.grafana_token.arn]
   }
 }
 
@@ -78,6 +87,8 @@ resource "aws_iam_role_policy" "github_plan" {
 
 locals {
   region_account = "eu-central-1:${local.account_id}"
+  # ?????? is the random suffix Secrets Manager adds; not *, so similarly named secrets don't match.
+  migrate_secret_arn = "arn:aws:secretsmanager:${local.region_account}:secret:deilbach-pegel/migrate-database-url-??????"
 }
 
 data "aws_iam_policy_document" "github_deploy" {
@@ -163,11 +174,19 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = ["*"]
   }
 
+  # Grafana reads its token; the deploy job migrates the prod database. ReadOnlyAccess has no secret values.
   statement {
-    sid       = "NoSecretValues"
-    effect    = "Deny"
+    sid       = "ReadableSecrets"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = ["*"]
+    resources = [aws_secretsmanager_secret.grafana_token.arn, local.migrate_secret_arn]
+  }
+
+  # An explicit deny beats any allow, so it has to leave out the secrets above.
+  statement {
+    sid           = "NoOtherSecretValues"
+    effect        = "Deny"
+    actions       = ["secretsmanager:GetSecretValue"]
+    not_resources = [aws_secretsmanager_secret.grafana_token.arn, local.migrate_secret_arn]
   }
 
   # The CI roles must not be able to widen their own permissions or trust.
