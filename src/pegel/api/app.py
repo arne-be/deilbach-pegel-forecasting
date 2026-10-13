@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from pegel.adapters.env_files import load_env_files, main_checkout
 from pegel.adapters.storage.connection import connect
 from pegel.adapters.storage.forecasts import newest_forecast
-from pegel.adapters.storage.observations import fetch_observations
+from pegel.adapters.storage.observations import fetch_values
 from pegel.api.schemas import (
     ForecastPointResponse,
     ForecastResponse,
@@ -19,6 +19,7 @@ from pegel.api.schemas import (
 )
 from pegel.config import PegelConfig, load_config
 from pegel.core.history import DISPLAY_TIME_ZONE, history_days, utc_window
+from pegel.core.series import cleaned_level_series_id
 
 # Only plain dates, so a day has one spelling and one cache entry (no times, no timestamps).
 DAY_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
@@ -91,7 +92,7 @@ def history(
         Query(alias="to", pattern=DAY_PATTERN, description="Last day, included; defaults to today"),
     ] = None,
 ) -> HistoryResponse:
-    """Observed levels for whole days. Without a range, the last days up to today."""
+    """Observed levels, outliers removed, for whole days. Without a range, the last days."""
     try:
         # fromisoformat also rejects days that don't exist, like 2026-02-30.
         first_day, last_day = history_days(
@@ -105,13 +106,14 @@ def history(
     station_id = config.forecast.station_id
     # The connection opens only after validation, so bad requests never wake the database.
     with connect(database_url) as conn:
-        observations = fetch_observations(conn, station_id, *utc_window(first_day, last_day))
+        values = fetch_values(
+            conn, cleaned_level_series_id(station_id), *utc_window(first_day, last_day)
+        )
     return HistoryResponse(
         station_id=station_id,
         first_day=first_day,
         last_day=last_day,
         observations=[
-            HistoryPoint(observed_at=observation.observed_at, level_cm=observation.level_cm)
-            for observation in observations
+            HistoryPoint(observed_at=value.valid_at, level_cm=value.value) for value in values
         ],
     )
