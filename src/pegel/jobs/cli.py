@@ -22,7 +22,7 @@ from pegel.config import PegelConfig, load_config
 from pegel.core.forecasts import Forecast
 from pegel.core.schedule import issue_time
 from pegel.core.summary import summarize
-from pegel.jobs.pipeline import Conn, FetchLevels, backfill, fetch_by_source, run_hourly
+from pegel.jobs.pipeline import Conn, FetchLevels, HourlyStep, backfill, fetch_by_source, run_hourly
 
 DISPLAY_TIME_ZONE = ZoneInfo("Europe/Berlin")
 
@@ -51,7 +51,9 @@ def run_hourly_from_env(config: PegelConfig, issued_at: datetime | None = None) 
     """The hourly run, as scheduled. Without an issue time, it uses the latest scheduled run."""
     issued_at = issued_at or issue_time(datetime.now(UTC), config.forecast.issue_minute)
     with sources_from_env() as (fetch, conn):
-        return run_hourly(fetch, conn, config, issued_at)
+        # Extra inputs such as rain register here as (job name, step).
+        extra_steps: list[tuple[str, HourlyStep]] = []
+        return run_hourly(fetch, conn, config, issued_at, extra_steps)
 
 
 @contextmanager

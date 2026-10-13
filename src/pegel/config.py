@@ -59,12 +59,37 @@ class ApiSettings(_Frozen):
     history_max_days: int = Field(gt=0)
 
 
+class RadarRainSettings(_Frozen):
+    source: str
+    # Radar cells per series, written by scripts/build_catchment.py next to this config.
+    cells_file: str
+    # Each hourly run refetches this many hours, so a late or missed radar file is picked up.
+    ingest_lookback_hours: int = Field(gt=0)
+
+
+class RainForecastSettings(_Frozen):
+    source: str
+    # Rows loaded from the forecast archive for training get their own source.
+    archive_source: str
+    # Weather model grid points to fetch, written by scripts/build_catchment.py.
+    points_file: str
+    horizon_hours: int = Field(gt=0)
+    # The "storm nearby" series is this percentile over the forecast ring.
+    ring_percentile: int = Field(gt=0, lt=100)
+
+
+class RainSettings(_Frozen):
+    radar: RadarRainSettings
+    forecast: RainForecastSettings
+
+
 class PegelConfig(_Frozen):
     stations: tuple[Station, ...]
     forecast: ForecastSettings
     categories: tuple[Category, ...]
     freshness: Freshness
     api: ApiSettings
+    rain: RainSettings
 
     @model_validator(mode="after")
     def _check_consistency(self) -> "PegelConfig":
@@ -89,6 +114,11 @@ class PegelConfig(_Frozen):
             if station.id == station_id:
                 return station
         raise KeyError(f"unknown station {station_id!r}")
+
+
+def config_file(name: str) -> Path:
+    """A data file that lives next to config/pegel.json, e.g. the radar cells."""
+    return DEFAULT_CONFIG_PATH.parent / name
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> PegelConfig:

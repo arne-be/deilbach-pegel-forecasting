@@ -22,6 +22,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - LANUV level history from open data CSV files (`pegel backfill --source lanuv-files`): `src/pegel/adapters/sources/lanuv_files.py`
 - Generic series tables (`series`, `observations`, `input_forecasts`): `src/pegel/core/series.py`, `src/pegel/adapters/storage/series.py`, `observations.py`, `input_forecasts.py`
 - Catchment, zones and forecast ring: `config/catchment.geojson`, `scripts/build_catchment.py`, `docs/catchment.md`
+- Rain config (`rain` in `config/pegel.json`, `config/radolan_cells.json`, `config/icon_d2_points.json`) and extra hourly steps: `src/pegel/config.py`, `src/pegel/jobs/pipeline.py`
 - `scripts/influx-query.sh` and the docs
 
 ## Layout

@@ -139,6 +139,28 @@ def test_backfill_twice_adds_nothing(conn: Conn) -> None:
     assert backfill(source, conn, STATION, start, ISSUED_AT, MINUTE) == 0
 
 
+def test_extra_steps_run_with_the_issue_time(conn: Conn) -> None:
+    calls: list[datetime] = []
+
+    def step(step_conn: Conn, issued_at: datetime) -> int:
+        calls.append(issued_at)
+        return 0
+
+    run_hourly(
+        FakeSource(readings_before(ISSUED_AT, [0.1])), conn, CONFIG, ISSUED_AT, [("rain", step)]
+    )
+    assert calls == [ISSUED_AT]
+
+
+def test_failing_extra_step_does_not_stop_the_forecast(conn: Conn) -> None:
+    def broken(step_conn: Conn, issued_at: datetime) -> int:
+        raise RuntimeError("radar down")
+
+    source = FakeSource(readings_before(ISSUED_AT, [0.1]))
+    result = run_hourly(source, conn, CONFIG, ISSUED_AT, [("rain", broken)])
+    assert result.issued_at == ISSUED_AT
+
+
 def available_at(conn: Conn) -> list[datetime]:
     rows = conn.execute(
         "SELECT available_at FROM observations WHERE series_id = %s ORDER BY valid_at",
