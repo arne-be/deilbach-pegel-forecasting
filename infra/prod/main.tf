@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "6.66.0"
     }
+    grafana = {
+      source  = "grafana/grafana"
+      version = "4.46.0"
+    }
   }
 
   # The bucket is passed at init: tofu init -backend-config="bucket=$TF_STATE_BUCKET"
