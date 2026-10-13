@@ -7,7 +7,7 @@
 set -euo pipefail
 
 POSTGRES_IMAGE="postgres:17-alpine"
-DBMATE_IMAGE="ghcr.io/amacneil/dbmate:2.36.0"
+DBMATE_IMAGE="ghcr.io/amacneil/dbmate:2.36.0"  # same version as mise.toml and .github/workflows/infra.yml
 NAME="pegel-schema-$$"
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"

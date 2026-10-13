@@ -73,4 +73,11 @@ jobs:
           image="${{ steps.ecr.outputs.registry }}/deilbach-pegel-jobs:${GITHUB_SHA}"
           docker build --platform linux/arm64 --provenance=false --target jobs -t "$image" ../..
           docker push "$image"
+      # Before the Lambda moves to the new image, so new code never meets the old schema.
+      - name: Migrate the prod database
+        run: |
+          DATABASE_URL="$(aws secretsmanager get-secret-value --secret-id deilbach-pegel/migrate-database-url --query SecretString --output text)"
+          echo "::add-mask::$DATABASE_URL"
+          export DATABASE_URL
+          docker run --rm -v "$GITHUB_WORKSPACE/db:/db" -e DATABASE_URL ghcr.io/amacneil/dbmate:2.36.0 --wait --no-dump-schema migrate
       - run: tofu apply -input=false -auto-approve
