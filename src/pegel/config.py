@@ -76,6 +76,8 @@ class RainForecastSettings(_Frozen):
     horizon_hours: int = Field(gt=0)
     # The "storm nearby" series is this percentile over the forecast ring.
     ring_percentile: int = Field(gt=0, lt=100)
+    # How long after run_at a run is reliably served (docs/catchment.md); for live and archive.
+    available_after_minutes: int = Field(ge=0)
 
 
 class RainSettings(_Frozen):

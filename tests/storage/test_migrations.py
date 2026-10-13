@@ -216,9 +216,8 @@ def test_kind_migration_down_restores_the_tables(before_kind: Conn) -> None:
 AVAILABLE_AT_MIGRATION = "20261013180000"
 # The issue minute in config/pegel.json when the migration was written; it's fixed in its SQL.
 MIGRATION_ISSUE_MINUTE = 30
-# Rain delays the migration was written for; config/pegel.json gets them with the rain jobs.
+# The radar rain delay the migration was written for; config/pegel.json gets it with radar.
 RADOLAN_MINUTES = 35
-OPEN_METEO_MINUTES = 120
 
 
 def migration_delays() -> dict[str, timedelta]:
@@ -229,13 +228,15 @@ def migration_delays() -> dict[str, timedelta]:
 
 
 def test_available_at_migration_delays_match_the_config() -> None:
+    config = load_config()
     expected = {
         level_series_id(station.id): timedelta(minutes=station.available_after_minutes)
-        for station in load_config().stations
+        for station in config.stations
     }
     expected["radolan_rw"] = timedelta(minutes=RADOLAN_MINUTES)
-    expected["open_meteo_icon_d2"] = timedelta(minutes=OPEN_METEO_MINUTES)
-    expected["open_meteo_previous_runs"] = timedelta(minutes=OPEN_METEO_MINUTES)
+    rain_forecast = config.rain.forecast
+    for source in (rain_forecast.source, rain_forecast.archive_source):
+        expected[source] = timedelta(minutes=rain_forecast.available_after_minutes)
     assert migration_delays() == expected
 
 

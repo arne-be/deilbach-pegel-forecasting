@@ -14,14 +14,15 @@ import httpx
 
 from pegel.adapters.env_files import load_env_files, main_checkout
 from pegel.adapters.logging import configure_logging
-from pegel.adapters.sources import lanuv
+from pegel.adapters.sources import lanuv, open_meteo
 from pegel.adapters.sources.influx import fetch_levels, influx_settings_from_env, ssl_context
 from pegel.adapters.sources.lanuv_files import LevelFiles
 from pegel.adapters.storage.connection import connect
-from pegel.config import PegelConfig, load_config
+from pegel.config import PegelConfig, config_file, load_config
 from pegel.core.forecasts import Forecast
 from pegel.core.schedule import issue_time
 from pegel.core.summary import summarize
+from pegel.jobs import rain_forecast
 from pegel.jobs.pipeline import Conn, FetchLevels, HourlyStep, backfill, fetch_by_source, run_hourly
 
 DISPLAY_TIME_ZONE = ZoneInfo("Europe/Berlin")
@@ -32,6 +33,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_logging()
     load_env_files(main_checkout())
     config = load_config()
+    if arguments.command == "backfill-forecast":
+        end = arguments.end or datetime.now(UTC).date()
+        return _backfill_forecast(config, arguments.start, end)
     if arguments.command == "backfill":
         start = _utc_midnight(arguments.start)
         end = _utc_midnight(arguments.end) if arguments.end else datetime.now(UTC)
@@ -50,9 +54,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 def run_hourly_from_env(config: PegelConfig, issued_at: datetime | None = None) -> Forecast:
     """The hourly run, as scheduled. Without an issue time, it uses the latest scheduled run."""
     issued_at = issued_at or issue_time(datetime.now(UTC), config.forecast.issue_minute)
-    with sources_from_env() as (fetch, conn):
+    with sources_from_env() as (fetch, conn), httpx.Client() as open_meteo_client:
         # Extra inputs such as rain register here as (job name, step).
-        extra_steps: list[tuple[str, HourlyStep]] = []
+        extra_steps: list[tuple[str, HourlyStep]] = [
+            (
+                "rain_forecast",
+                rain_forecast.hourly_step(
+                    open_meteo_client, config.rain.forecast, config.forecast.issue_minute
+                ),
+            ),
+        ]
         return run_hourly(fetch, conn, config, issued_at, extra_steps)
 
 
@@ -100,6 +111,27 @@ def _backfill_lanuv_files(
             )
 
 
+def _backfill_forecast(config: PegelConfig, start: date, end: date) -> int:
+    """Loads the ICON-D2 forecast archive. Needs only the database and Open-Meteo."""
+    settings = config.rain.forecast
+    points = open_meteo.load_points(config_file(settings.points_file))
+    with httpx.Client() as client, connect(_required_env("JOBS_DATABASE_URL")) as conn:
+        conn.autocommit = True
+        issue_minute = config.forecast.issue_minute
+        result = rain_forecast.backfill_archive(
+            client, conn, settings, points, start, end, issue_minute, now=datetime.now(UTC)
+        )
+    loaded_until = result.resume_from or end
+    print(
+        f"Forecast archive {start} to {loaded_until} (exclusive): {result.changed} rows stored, "
+        f"about {result.calls:.0f} Open-Meteo calls"
+    )
+    if result.resume_from is None:
+        return 0
+    print(f"Stopped early (call budget or rate limit). Resume with --from {result.resume_from}")
+    return 1
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pegel")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -116,6 +148,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     backfill_parser.add_argument(
         "--to", dest="end", type=date.fromisoformat, help="UTC date, exclusive (default: now)"
+    )
+    forecast_parser = commands.add_parser(
+        "backfill-forecast", help="load the ICON-D2 rain forecast archive from Open-Meteo"
+    )
+    forecast_parser.add_argument(
+        "--from", dest="start", type=date.fromisoformat, required=True, help="UTC date"
+    )
+    forecast_parser.add_argument(
+        "--to", dest="end", type=date.fromisoformat, help="UTC date, exclusive (default: today)"
     )
     hourly_parser = commands.add_parser("run-hourly", help="ingest recent hours and forecast")
     hourly_parser.add_argument(

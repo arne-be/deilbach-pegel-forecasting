@@ -77,7 +77,47 @@ Why every second point: on three rainy days in 2024 and 2026, the mean of 9 poin
 
 Forecasts per zone are left out for now. Single zones would get only 1 to 3 points. Open-Meteo keeps its archive, so we can fetch all points later and test whether zones help.
 
-For training before we started collecting, Open-Meteo's Previous Runs API has ICON-D2 from February 2024. It gives, for each hour, the forecast from the newest run and from the run about a day earlier, not every lead time. These rows are stored under their own source, `open_meteo_previous_runs`, with an approximate run time.
+Series ids carry the source: `open_meteo_icon_d2:catchment:mean` and `open_meteo_icon_d2:ring:p90`. The code is `src/pegel/core/rain_forecast.py`, `src/pegel/adapters/sources/open_meteo.py` and `src/pegel/jobs/rain_forecast.py`.
+
+#### Which run a forecast comes from
+
+The forecast answer doesn't say which run it comes from. Open-Meteo's model metadata does: `https://api.open-meteo.com/data/dwd_icon_d2/static/meta.json` has `last_run_initialisation_time` (the run's start, Unix seconds) and `last_run_availability_time` (when Open-Meteo started serving it). Runs start at 00, 03, … 21 UTC and come out about 85 minutes later (run 09:00 was served from 10:25).
+
+The hourly step reads the metadata first. If the newest stored run of the live catchment series is that run or later, it stops: no forecast request. Otherwise it asks for the hours from run + 1 h to run + 49 h and checks:
+
+- The hours run from run + 1 h without a gap, and each point has data from run + 1 h to exactly run + 48 h and none after. A run's data ends at its horizon, so data still from the previous run ends 3 hours early and data from the next run 3 hours late. Either way nothing is stored.
+- The metadata still names the same run after the fetch.
+
+Hours before the run in Open-Meteo's answer come from older runs, so only run < valid_at ≤ run + 48 h is stored. `precipitation` is the sum of the preceding hour (Open-Meteo docs), so the time Open-Meteo gives is already `valid_at`.
+
+The request uses `cell_selection=nearest`. Without it Open-Meteo may pick a neighbouring cell with a better-matching elevation; one of our 70 points came back 0.02° off.
+
+Each request gets one try of at most 15 seconds, so a slow Open-Meteo can't hold up the level forecast in the same Lambda run. On an error or HTTP 429 the step logs and skips; the next hourly run fetches the run it missed, if it's still the newest.
+
+#### Archive: Previous Runs API
+
+For training before we started collecting, Open-Meteo's Previous Runs API (`previous-runs-api.open-meteo.com`) has ICON-D2 with both variables from late January 2024; we load from 2024-02-01. It doesn't keep every lead time, only two per hour:
+
+| Variable | Comes from | Lead time |
+|---|---|---|
+| `precipitation` (day 0) | newest run that started before valid_at | 1 to 3 h |
+| `precipitation_previous_day1` | newest run that started before valid_at − 24 h | 25 to 27 h |
+
+`previous_day2` is empty, since ICON-D2 reaches only 48 hours.
+
+We checked this against Open-Meteo's Single Runs API, which serves whole runs by start time but only from April 2026. On a rainy day (2026-10-01) nearly every rainy hour matched the run the rule predicts. Two of the day-1 values matched no run, so the run time is a close approximation, not exact. The rule is assumed to hold for 2024 too.
+
+These rows go under their own source, `open_meteo_previous_runs`, with run_at set by that rule (`archive_run_at`). Both variables go into the same two series. Their lead times differ, so they never share a key. Hours where any point is missing are skipped. The last 3 hours before the fetch are left out, because their day-0 values may still come from a longer lead time.
+
+**For training:** a run is only out about 85 minutes after run_at (measured 84.8 and 85.8 min for the 09 and 12 UTC runs on 2026-10-13, as `last_run_availability_time − last_run_initialisation_time`). Training uses a value only if its `available_at` ≤ the issue time. The live step stamps a run with the issue slot (:30) of the run that fetched it; the exact fetch time stays in `fetched_at`. Archive rows get what the live system would have done: the first hourly run (:30) at or after run_at + `available_after`, which is `rain.forecast.available_after_minutes` (120) for both sources. Any delay between 91 and 150 minutes gives the same :30 run, so 120 keeps a wide margin at no cost. Most day-0 values (lead 1 to 3 h) weren't available until after their hour had started, so treat them as close to an observation, not a forecast.
+
+Backfill:
+
+```
+uv run pegel backfill-forecast --from 2024-02-01 [--to 2026-10-13]
+```
+
+It asks for 14 days of all 70 points per request (70 calls by Open-Meteo's count) and waits a minute between requests, so it stays well under 600 calls a minute and 5,000 an hour. From 2024-02-01 to October 2026 that's 71 requests, about 5,000 calls and 71 minutes. It stops before 9,000 calls in one invocation and prints the date to resume from. Reruns change nothing.
 
 ### Later
 
