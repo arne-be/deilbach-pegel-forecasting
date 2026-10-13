@@ -10,9 +10,10 @@ STEADY = [-26.0] * 6
 
 
 def hourly(levels: list[float], start: datetime = START) -> list[SeriesValue]:
+    times = [start + timedelta(hours=hour) for hour in range(len(levels))]
     return [
-        SeriesValue("kupferdreh:level", start + timedelta(hours=hour), level)
-        for hour, level in enumerate(levels)
+        SeriesValue("kupferdreh:level", time, level, time)
+        for time, level in zip(times, levels, strict=True)
     ]
 
 
