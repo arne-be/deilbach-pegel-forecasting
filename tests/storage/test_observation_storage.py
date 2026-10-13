@@ -6,16 +6,28 @@ from psycopg.rows import TupleRow
 
 from pegel.adapters.storage.observations import (
     fetch_observations,
+    fetch_values,
     newest_observation,
     upsert_observations,
+    upsert_values,
 )
+from pegel.adapters.storage.series import ensure_series
+from pegel.config import load_config
 from pegel.core.observations import Observation
+from pegel.core.series import Series, SeriesValue, level_series
 
 STATION = "kupferdreh"
 START = datetime(2026, 10, 12, 0, 0, tzinfo=UTC)
 FAR_FUTURE = datetime(2100, 1, 1, tzinfo=UTC)
+HOUR = timedelta(hours=1)
 
 Conn = psycopg.Connection[TupleRow]
+RAIN = Series("radar:zone:test", "rain", "mm", "radar", "zone:test", "mean")
+
+
+@pytest.fixture(autouse=True)
+def series(conn: Conn) -> None:
+    ensure_series(conn, [level_series(load_config().station(STATION)), RAIN])
 
 
 def hourly(levels: list[float]) -> list[Observation]:
@@ -26,39 +38,39 @@ def hourly(levels: list[float]) -> list[Observation]:
 
 
 def row_count(conn: Conn) -> int:
-    row = conn.execute("SELECT count(*) FROM raw_observations").fetchone()
+    row = conn.execute("SELECT count(*) FROM observations").fetchone()
     assert row is not None
     return int(row[0])
 
 
 def test_rerun_adds_no_duplicates(conn: Conn) -> None:
     observations = hourly([0.4, 0.5, 0.6])
-    upsert_observations(conn, observations, "influx")
-    upsert_observations(conn, observations, "influx")
+    upsert_observations(conn, observations)
+    upsert_observations(conn, observations)
     assert row_count(conn) == 3
 
 
 def test_rerun_with_same_values_reports_no_changes(conn: Conn) -> None:
     observations = hourly([0.4, 0.5, 0.6])
-    upsert_observations(conn, observations, "influx")
-    assert upsert_observations(conn, observations, "influx") == 0
+    upsert_observations(conn, observations)
+    assert upsert_observations(conn, observations) == 0
 
 
 def test_changed_value_is_updated(conn: Conn) -> None:
-    upsert_observations(conn, hourly([0.4, 0.5]), "influx")
-    changed = upsert_observations(conn, hourly([0.4, 0.55]), "influx")
+    upsert_observations(conn, hourly([0.4, 0.5]))
+    changed = upsert_observations(conn, hourly([0.4, 0.55]))
     stored = fetch_observations(conn, STATION, START, START + timedelta(hours=2))
     assert (changed, [o.level_m for o in stored]) == (1, [0.4, 0.55])
 
 
 def test_negative_levels_are_kept(conn: Conn) -> None:
-    upsert_observations(conn, hourly([-0.25, -0.3]), "influx")
+    upsert_observations(conn, hourly([-0.25, -0.3]))
     stored = fetch_observations(conn, STATION, START, START + timedelta(hours=2))
     assert [o.level_m for o in stored] == [-0.25, -0.3]
 
 
 def test_window_includes_start_and_excludes_end(conn: Conn) -> None:
-    upsert_observations(conn, hourly([0.1, 0.2, 0.3, 0.4]), "influx")
+    upsert_observations(conn, hourly([0.1, 0.2, 0.3, 0.4]))
     stored = fetch_observations(
         conn, STATION, START + timedelta(hours=1), START + timedelta(hours=3)
     )
@@ -66,20 +78,20 @@ def test_window_includes_start_and_excludes_end(conn: Conn) -> None:
 
 
 def test_window_comes_back_oldest_first(conn: Conn) -> None:
-    upsert_observations(conn, list(reversed(hourly([0.1, 0.2, 0.3]))), "influx")
+    upsert_observations(conn, list(reversed(hourly([0.1, 0.2, 0.3]))))
     stored = fetch_observations(conn, STATION, START, START + timedelta(hours=3))
     assert [o.observed_at for o in stored] == [START + timedelta(hours=h) for h in range(3)]
 
 
 def test_timestamps_come_back_utc_whatever_the_session_time_zone(conn: Conn) -> None:
-    upsert_observations(conn, hourly([0.1]), "influx")
+    upsert_observations(conn, hourly([0.1]))
     conn.execute("SET TIME ZONE 'Europe/Berlin'")
     stored = newest_observation(conn, STATION, FAR_FUTURE)
     assert stored == Observation(STATION, START, 0.1)
 
 
 def test_newest_observation_is_the_latest(conn: Conn) -> None:
-    upsert_observations(conn, hourly([0.1, 0.2, 0.3]), "influx")
+    upsert_observations(conn, hourly([0.1, 0.2, 0.3]))
     assert newest_observation(conn, STATION, FAR_FUTURE) == hourly([0.1, 0.2, 0.3])[-1]
 
 
@@ -96,15 +108,38 @@ def test_naive_window_is_rejected(conn: Conn) -> None:
 def test_api_role_cannot_insert(conn: Conn) -> None:
     conn.execute("SET ROLE pegel_api")
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
-        upsert_observations(conn, hourly([0.1]), "influx")
+        upsert_observations(conn, hourly([0.1]))
 
 
 def test_jobs_role_can_upsert(conn: Conn) -> None:
     conn.execute("SET ROLE pegel_jobs")
-    assert upsert_observations(conn, hourly([0.1, 0.2]), "influx") == 2
+    assert upsert_observations(conn, hourly([0.1, 0.2])) == 2
 
 
 def test_newest_observation_ignores_readings_after_the_bound(conn: Conn) -> None:
-    upsert_observations(conn, hourly([0.1, 0.2, 0.3]), source="influx")
+    upsert_observations(conn, hourly([0.1, 0.2, 0.3]))
     bound = START + timedelta(hours=1)
     assert newest_observation(conn, STATION, bound) == hourly([0.1, 0.2])[-1]
+
+
+def test_values_of_an_unknown_series_are_rejected(conn: Conn) -> None:
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        upsert_values(conn, [SeriesValue("nowhere:level", START, 0.1)])
+
+
+def test_values_round_trip_with_coverage(conn: Conn) -> None:
+    values = [SeriesValue(RAIN.id, START, 1.5, 0.75), SeriesValue(RAIN.id, START + HOUR, 0.0)]
+    upsert_values(conn, values)
+    assert fetch_values(conn, RAIN.id, START, FAR_FUTURE) == values
+
+
+def test_changed_coverage_counts_as_a_change(conn: Conn) -> None:
+    upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, 0.75)])
+    assert upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, 0.75)]) == 0
+    assert upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5, 1.0)]) == 1
+
+
+def test_series_are_kept_apart(conn: Conn) -> None:
+    upsert_values(conn, [SeriesValue(RAIN.id, START, 1.5)])
+    upsert_observations(conn, hourly([0.4]))
+    assert [o.level_m for o in fetch_observations(conn, STATION, START, FAR_FUTURE)] == [0.4]

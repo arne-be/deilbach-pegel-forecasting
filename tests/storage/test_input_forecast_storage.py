@@ -1,0 +1,72 @@
+from datetime import UTC, datetime, timedelta
+
+import psycopg
+import pytest
+from psycopg.rows import TupleRow
+
+from pegel.adapters.storage.input_forecasts import newest_run_at, upsert_input_forecasts
+from pegel.adapters.storage.series import ensure_series
+from pegel.core.series import InputForecastValue, Series
+
+Conn = psycopg.Connection[TupleRow]
+RAIN = Series("icon_d2:catchment:mean", "rain", "mm", "icon_d2", "catchment", "mean")
+RUN_AT = datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
+HOUR = timedelta(hours=1)
+
+
+@pytest.fixture(autouse=True)
+def series(conn: Conn) -> None:
+    ensure_series(conn, [RAIN])
+
+
+def run(run_at: datetime, values: list[float]) -> list[InputForecastValue]:
+    return [
+        InputForecastValue(RAIN.id, run_at, run_at + (hour + 1) * HOUR, value)
+        for hour, value in enumerate(values)
+    ]
+
+
+def stored_values(conn: Conn) -> list[float]:
+    rows = conn.execute("SELECT value FROM input_forecasts ORDER BY run_at, valid_at").fetchall()
+    return [row[0] for row in rows]
+
+
+def test_rerun_adds_nothing(conn: Conn) -> None:
+    assert upsert_input_forecasts(conn, run(RUN_AT, [0.1, 0.2])) == 2
+    assert upsert_input_forecasts(conn, run(RUN_AT, [0.1, 0.2])) == 0
+    assert stored_values(conn) == [0.1, 0.2]
+
+
+def test_changed_value_is_updated(conn: Conn) -> None:
+    upsert_input_forecasts(conn, run(RUN_AT, [0.1, 0.2]))
+    assert upsert_input_forecasts(conn, run(RUN_AT, [0.1, 0.3])) == 1
+    assert stored_values(conn) == [0.1, 0.3]
+
+
+def test_runs_are_kept_side_by_side(conn: Conn) -> None:
+    upsert_input_forecasts(conn, run(RUN_AT, [0.1]))
+    upsert_input_forecasts(conn, run(RUN_AT + 3 * HOUR, [0.5]))
+    assert stored_values(conn) == [0.1, 0.5]
+
+
+def test_newest_run_at(conn: Conn) -> None:
+    upsert_input_forecasts(conn, run(RUN_AT + 3 * HOUR, [0.5]))
+    upsert_input_forecasts(conn, run(RUN_AT, [0.1]))
+    conn.execute("SET TIME ZONE 'Europe/Berlin'")
+    assert newest_run_at(conn, RAIN.id) == RUN_AT + 3 * HOUR
+
+
+def test_newest_run_at_of_empty_series_is_none(conn: Conn) -> None:
+    assert newest_run_at(conn, RAIN.id) is None
+
+
+def test_unknown_series_is_rejected(conn: Conn) -> None:
+    unknown = InputForecastValue("nowhere:rain", RUN_AT, RUN_AT + HOUR, 0.1)
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        upsert_input_forecasts(conn, [unknown])
+
+
+def test_api_role_cannot_insert(conn: Conn) -> None:
+    conn.execute("SET ROLE pegel_api")
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        upsert_input_forecasts(conn, run(RUN_AT, [0.1]))

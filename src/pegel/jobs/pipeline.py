@@ -9,11 +9,13 @@ from psycopg.rows import TupleRow
 
 from pegel.adapters.storage.forecasts import save_forecast
 from pegel.adapters.storage.observations import newest_observation, upsert_observations
+from pegel.adapters.storage.series import ensure_series
 from pegel.config import PegelConfig, Station
 from pegel.core.forecasts import Forecast
 from pegel.core.observations import Observation
 from pegel.core.persistence import persistence_forecast
 from pegel.core.schedule import monthly_windows
+from pegel.core.series import level_series
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +31,8 @@ class NoObservationError(Exception):
 def ingest(fetch: FetchLevels, conn: Conn, station: Station, start: datetime, end: datetime) -> int:
     """Fetches and stores one window. Returns the number of new or changed rows."""
     observations = fetch(station, start, end)
-    changed = upsert_observations(conn, observations, source=station.source)
+    ensure_series(conn, [level_series(station)])
+    changed = upsert_observations(conn, observations)
     logger.info(
         "ingested window",
         extra={

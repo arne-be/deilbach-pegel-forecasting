@@ -50,6 +50,13 @@ If training ever takes longer than Lambda's 15 minutes, the jobs image runs as a
 
 **Neon Postgres (free plan, Frankfurt)** holds observations (raw and cleaned), forecasts and model metadata. That's about 100 MB per year; the free plan allows 1 GB.
 
+Measured and forecast inputs live in three generic tables, so a new input needs a new row, not a new table or migration:
+- `series`: what a series is (variable, unit, source, location, area aggregation, period), with a readable id such as `kupferdreh:level` or `radolan_rw:zone:neviges`. Each job ensures its own series rows before it writes values.
+- `observations`: measured values per series and time, e.g. gauge levels, radar rain, soil moisture.
+- `input_forecasts`: forecasts made by others per series, model run and valid time, e.g. ICON-D2 rain.
+
+Our own level forecasts stay in `forecasts` and `forecast_points`.
+
 Neon suspends the database when it's idle and wakes it on the next connection. The free plan includes 100 compute hours per month. If they run out, the database stays off until the next month. That's why normal page visits never touch the database (see below).
 
 Neon is set up by hand once, following [setup-neon.md](setup-neon.md). The schema and grants come from migrations. Three roles: one for migrations, one for the jobs (read and write) and one for the API (read only).
