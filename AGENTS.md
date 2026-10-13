@@ -26,6 +26,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Rain config (`rain` in `config/pegel.json`, `config/radolan_cells.json`, `config/icon_d2_points.json`) and extra hourly steps: `src/pegel/config.py`, `src/pegel/jobs/pipeline.py`
 - Radar rain (DWD RADOLAN RW): hourly step `radar_rain` and `pegel backfill-radar`: `src/pegel/adapters/sources/radolan.py`, `src/pegel/core/radar.py`, `src/pegel/jobs/radar.py`
 - `scripts/influx-query.sh` and the docs
+- Outlier removal exploration (three methods compared, plots, recommendation): `analysis/outliers/`
 
 ## Layout
 
