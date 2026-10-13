@@ -37,6 +37,9 @@ CATCH_UP = timedelta(hours=24)
 # Each run is one request of about 70 calls; four keep a long outage's catch-up from holding up
 # the level forecast, and the next hours fetch the rest.
 MAX_RUNS_PER_HOUR = 4
+# No older run is started after this: on a slow Open-Meteo one run can take 125 s (2 x 60 s and
+# the backoff), and four would push the 900 s Lambda past its limit and lose the level forecast.
+CATCH_UP_BUDGET_SECONDS = 120.0
 # Previous Runs variables and how many days before valid_at their run started.
 ARCHIVE_VARIABLES = {"precipitation": 0, "precipitation_previous_day1": 1}
 ARCHIVE_CHUNK_DAYS = 14
@@ -65,14 +68,17 @@ def ingest_new_runs(
     settings: RainForecastSettings,
     points: Sequence[GridPoint],
     issue_minute: int,
+    *,
+    clock: Callable[[], float] = time.monotonic,
 ) -> int:
     """Stores the runs of the last CATCH_UP not stored yet, newest first: the level forecast
     needs the newest, older runs only matter for training. Returns the changed row count.
 
     A run is available from the issue slot of its fetch, so the run that fetched it may use it, and
     a run caught up late is honestly late. Without a new run it only reads the small metadata file.
-    A failing run stops the catch-up for this hour; the next hour tries again from there.
+    A failing run, or the time budget, stops the catch-up for this hour; the next hour goes on.
     """
+    started = clock()
     newest = open_meteo.latest_run(client)
     stored = stored_runs_since(conn, catchment_series_id(settings.source), newest - CATCH_UP)
     runs = missing_runs(newest, stored, CATCH_UP)[:MAX_RUNS_PER_HOUR]
@@ -85,8 +91,11 @@ def ingest_new_runs(
     changed = 0
     for run_at in runs:
         context = {"job": "rain_forecast", "run_at": run_at.isoformat()}
+        if run_at != newest and clock() - started > CATCH_UP_BUDGET_SECONDS:
+            logger.warning("rain forecast time budget used, next hour catches up", extra=context)
+            break
         try:
-            changed += ingest_run(client, conn, settings, points, issue_minute, run_at)
+            changed += ingest_run(client, conn, settings, points, issue_minute, run_at, context)
         except (open_meteo.OpenMeteoError, RunMismatchError):
             logger.exception("rain forecast run failed, next hour catches up", extra=context)
             break
@@ -100,6 +109,7 @@ def ingest_run(
     points: Sequence[GridPoint],
     issue_minute: int,
     run_at: datetime,
+    context: dict[str, str],
 ) -> int:
     """Fetches, checks and stores one run. Returns the changed row count."""
     # One hour past the horizon, so check_run can tell a shortened answer from a whole run.
@@ -117,13 +127,7 @@ def ingest_run(
     )
     changed = upsert_input_forecasts(conn, values, seen_at)
     logger.info(
-        "stored rain forecast run",
-        extra={
-            "job": "rain_forecast",
-            "run_at": run_at.isoformat(),
-            "values": len(values),
-            "changed": changed,
-        },
+        "stored rain forecast run", extra=context | {"values": len(values), "changed": changed}
     )
     return changed
 

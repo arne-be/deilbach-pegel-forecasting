@@ -124,7 +124,7 @@ def check_run(series: PointSeries, run_at: datetime, horizon_hours: int) -> None
     """
     last_hour = run_at + timedelta(hours=horizon_hours)
     if last_hour + HOUR not in series.times:
-        raise ValueError("ask for at least one hour after the horizon to check the run")
+        raise RunMismatchError(f"no data for the hour after the horizon, run {run_at.isoformat()}")
     expected_times = [run_at + HOUR * (hour + 1) for hour in range(len(series.times))]
     if list(series.times) != expected_times:
         raise RunMismatchError(f"hours don't run without a gap from {run_at + HOUR}")

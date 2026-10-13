@@ -101,7 +101,7 @@ Only run < valid_at ≤ run + 48 h is stored. `precipitation` is the sum of the 
 
 The request uses `cell_selection=nearest`. Without it Open-Meteo may pick a neighbouring cell with a better-matching elevation; one of our 70 points came back 0.02° off.
 
-Each request (metadata and runs) gets two tries of at most 60 seconds, 5 seconds apart, on a timeout, network error or 5xx. From Lambda, single requests have timed out and got HTTP 503; the first request for a new run once took longer than 15 seconds. HTTP 429 isn't retried. A failing run stops the catch-up for this hour and keeps the runs stored before it; the next hour tries the missing runs again.
+Each request (metadata and runs) gets two tries of at most 60 seconds, 5 seconds apart, on a timeout, network error or 5xx. From Lambda, single requests have timed out and got HTTP 503; the first request for a new run once took longer than 15 seconds. HTTP 429 isn't retried. A failing run stops the catch-up for this hour and keeps the runs stored before it; the next hour tries the missing runs again. After 2 minutes the step starts no older run, since a slow Open-Meteo can take about 2 minutes per run and the level forecast must still fit in the Lambda's 15 minutes.
 
 #### Archive: Previous Runs API
 

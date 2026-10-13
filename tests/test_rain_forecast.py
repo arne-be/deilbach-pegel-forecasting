@@ -10,6 +10,7 @@ from pegel.core.rain_forecast import (
     archive_run_at,
     archive_values,
     check_run,
+    missing_runs,
     run_values,
 )
 
@@ -101,8 +102,18 @@ def test_check_run_rejects_a_point_starting_late() -> None:
         check_run(series, RUN_AT, 3)
 
 
+def test_missing_runs_newest_first_within_the_look_back() -> None:
+    day = timedelta(hours=24)
+    back = [RUN_AT - HOUR * hours for hours in range(0, 25, 3)]
+    assert missing_runs(RUN_AT, set(), day) == back
+    assert back[-1] == RUN_AT - day  # 24 h back is included, 27 h not
+    assert missing_runs(RUN_AT, {RUN_AT}, day) == back[1:]
+    stored = set(back) - {back[3], back[5]}
+    assert missing_runs(RUN_AT, stored, day) == [back[3], back[5]]
+
+
 def test_check_run_needs_the_hour_after_the_horizon() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(RunMismatchError):
         check_run(PointSeries(hours_after_run(3), [[0.0] * 3] * 3), RUN_AT, 3)
 
 

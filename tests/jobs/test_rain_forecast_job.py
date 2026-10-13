@@ -138,6 +138,17 @@ def test_failing_run_stops_the_catch_up_but_keeps_earlier_runs(conn: Conn) -> No
     assert stored_runs(conn) == runs_back(3, 0)
 
 
+def test_time_budget_stops_the_catch_up_after_the_newest_run(conn: Conn) -> None:
+    seconds = iter([0.0, 60.0, 121.0])  # start, before the second run, before the third
+    fake = FakeOpenMeteo(RUN_AT)
+    with fake.client() as client:
+        changed = ingest_new_runs(
+            client, conn, SETTINGS, POINTS, MINUTE, clock=lambda: next(seconds)
+        )
+    assert changed == 2 * 96
+    assert fake.runs == runs_back(0, 3)
+
+
 def test_data_of_another_run_is_rejected(conn: Conn) -> None:
     fake = FakeOpenMeteo(RUN_AT, {RUN_AT: (200, run_answer(RUN_AT + timedelta(hours=3)))})
     with fake.client() as client:
