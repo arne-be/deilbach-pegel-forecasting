@@ -103,12 +103,7 @@ def ingest_newest_run(
     )
     ensure_series(
         conn,
-        forecast_series(
-            settings.source,
-            settings.ring_percentile,
-            LIVE_NOTE,
-            timedelta(minutes=settings.available_after_minutes),
-        ),
+        forecast_series(settings.source, settings.ring_percentile, LIVE_NOTE),
     )
     changed = upsert_input_forecasts(conn, values, seen_at)
     logger.info(
@@ -144,7 +139,7 @@ def backfill_archive(
     """
     source, percentile = settings.archive_source, settings.ring_percentile
     available_after = timedelta(minutes=settings.available_after_minutes)
-    ensure_series(conn, forecast_series(source, percentile, ARCHIVE_NOTE, available_after))
+    ensure_series(conn, forecast_series(source, percentile, ARCHIVE_NOTE))
     settled_until = now.astimezone(UTC) - ARCHIVE_SETTLE_TIME
     changed, calls = 0, 0.0
     chunk_start = first_day

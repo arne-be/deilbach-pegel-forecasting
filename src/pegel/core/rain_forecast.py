@@ -44,9 +44,7 @@ def ring_series_id(source: str, percentile: int) -> str:
     return f"{source}:ring:p{percentile}"
 
 
-def forecast_series(
-    source: str, percentile: int, note: str, available_after: timedelta
-) -> list[Series]:
+def forecast_series(source: str, percentile: int, note: str) -> list[Series]:
     """The two stored rain forecast series of one source. `note` says where runs come from."""
     return [
         Series(
@@ -56,7 +54,6 @@ def forecast_series(
             source=source,
             location="catchment",
             kind="forecast",
-            available_after=available_after,
             aggregation="mean",
             period=HOUR,
             description=f"ICON-D2 rain, mean over the catchment points. {note}",
@@ -68,7 +65,6 @@ def forecast_series(
             source=source,
             location="ring_10km",
             kind="forecast",
-            available_after=available_after,
             aggregation=f"p{percentile}",
             period=HOUR,
             description=f"ICON-D2 rain, {percentile}th percentile over the ring points. {note}",
