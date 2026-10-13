@@ -62,8 +62,10 @@ resource "aws_lambda_function" "hourly" {
   package_type  = "Image"
   image_uri     = "${aws_ecr_repository.jobs.repository_url}:${var.jobs_image_tag}"
   architectures = ["arm64"]
-  timeout       = 300
-  memory_size   = 512
+  # Lambda's maximum. Normal runs take seconds; if every source stalls, their own timeouts and
+  # retries add up to about 10 minutes, and the level forecast is saved last.
+  timeout     = 900
+  memory_size = 512
   # shortcut: no reserved concurrency of 1, because AWS refuses any reservation while the
   # account limit is 10. Overlapping runs are safe since every write is an upsert. Add it
   # back once the Lambda concurrency quota is raised.
