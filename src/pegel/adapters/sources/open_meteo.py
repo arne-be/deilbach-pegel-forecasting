@@ -27,7 +27,7 @@ MODEL = "icon_d2"
 ARCHIVE_TIMEOUT_SECONDS = 60.0
 MAX_ATTEMPTS = 3
 # Live requests get one try; the next hourly run catches up. From Lambda the first request for a
-# new run took over 15 s (2026-10-13), and the Lambda has 300 s, so 60 s still leaves room for
+# new run took over 15 s (2026-10-13), and the Lambda has 900 s, so 60 s still leaves room for
 # the level forecast.
 LIVE_TIMEOUT_SECONDS = 60.0
 BACKOFF_BASE_SECONDS = 5.0
