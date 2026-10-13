@@ -1,7 +1,7 @@
 """The ingest and forecast steps. Each takes its time window, so it can rerun for any period."""
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
 
 import psycopg
@@ -44,6 +44,13 @@ def ingest(fetch: FetchLevels, conn: Conn, station: Station, start: datetime, en
     return changed
 
 
+def fetch_by_source(
+    fetchers: Mapping[str, FetchLevels], station: Station, start: datetime, end: datetime
+) -> list[Observation]:
+    """Fetches from the station's own source. Bind `fetchers` to get a FetchLevels."""
+    return fetchers[station.source](station, start, end)
+
+
 def backfill(
     fetch: FetchLevels, conn: Conn, station: Station, start: datetime, end: datetime
 ) -> int:
@@ -79,8 +86,28 @@ def forecast(conn: Conn, config: PegelConfig, issued_at: datetime) -> Forecast:
 def run_hourly(
     fetch: FetchLevels, conn: Conn, config: PegelConfig, issued_at: datetime
 ) -> Forecast:
-    """Ingests the recent hours, then forecasts. Only uses readings up to the issue time."""
-    station = config.station(config.forecast.station_id)
+    """Ingests the recent hours of every station, then forecasts.
+
+    Only uses readings up to the issue time. A failing upstream station is logged and skipped,
+    so it can't block the forecast; a failing forecast station fails the run.
+    """
+    forecast_station = config.station(config.forecast.station_id)
     start = issued_at - timedelta(hours=config.forecast.ingest_lookback_hours)
-    ingest(fetch, conn, station, start, issued_at)
+    ingest(fetch, conn, forecast_station, start, issued_at)
+    upstream_start = issued_at - timedelta(hours=config.forecast.upstream_ingest_lookback_hours)
+    for station in config.stations:
+        if station.id == forecast_station.id:
+            continue
+        try:
+            ingest(fetch, conn, station, upstream_start, issued_at)
+        except Exception:
+            logger.exception(
+                "upstream ingest failed, continuing without it",
+                extra={
+                    "job": "ingest",
+                    "station": station.id,
+                    "window_start": upstream_start.isoformat(),
+                    "window_end": issued_at.isoformat(),
+                },
+            )
     return forecast(conn, config, issued_at)

@@ -31,6 +31,9 @@ class ForecastSettings(_Frozen):
     issue_minute: int = Field(ge=0, le=59)
     # Each hourly run refetches this many hours, so readings that arrive late are picked up.
     ingest_lookback_hours: int = Field(gt=0)
+    # The same for the upstream stations. Longer, so missed runs heal on their own; LANUV only
+    # serves the last seven days.
+    upstream_ingest_lookback_hours: int = Field(gt=0, le=168)
 
 
 class Category(_Frozen):

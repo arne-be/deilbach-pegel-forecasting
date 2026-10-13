@@ -8,7 +8,13 @@ from pegel.adapters.storage.forecasts import newest_forecast
 from pegel.adapters.storage.observations import fetch_observations
 from pegel.config import Station, load_config
 from pegel.core.observations import Observation
-from pegel.jobs.pipeline import NoObservationError, backfill, forecast, run_hourly
+from pegel.jobs.pipeline import (
+    NoObservationError,
+    backfill,
+    fetch_by_source,
+    forecast,
+    run_hourly,
+)
 
 Conn = psycopg.Connection[TupleRow]
 CONFIG = load_config()
@@ -60,7 +66,43 @@ def test_hourly_run_fetches_the_lookback_window(conn: Conn) -> None:
     source = FakeSource(readings_before(ISSUED_AT, [0.1]))
     run_hourly(source, conn, CONFIG, ISSUED_AT)
     lookback = timedelta(hours=CONFIG.forecast.ingest_lookback_hours)
-    assert source.windows == [(ISSUED_AT - lookback, ISSUED_AT)]
+    assert source.windows[0] == (ISSUED_AT - lookback, ISSUED_AT)
+
+
+def test_hourly_run_fetches_every_upstream_station(conn: Conn) -> None:
+    source = FakeSource(readings_before(ISSUED_AT, [0.1]))
+    run_hourly(source, conn, CONFIG, ISSUED_AT)
+    lookback = timedelta(hours=CONFIG.forecast.upstream_ingest_lookback_hours)
+    upstream_count = len(CONFIG.stations) - 1
+    assert source.windows[1:] == [(ISSUED_AT - lookback, ISSUED_AT)] * upstream_count
+
+
+def test_failing_upstream_station_does_not_stop_the_forecast(conn: Conn) -> None:
+    readings = FakeSource(readings_before(ISSUED_AT, [0.1, 0.2]))
+
+    def source(station: Station, start: datetime, end: datetime) -> list[Observation]:
+        if station.id == "nierenhof":
+            raise RuntimeError("portal down")
+        return readings(station, start, end)
+
+    result = run_hourly(source, conn, CONFIG, ISSUED_AT)
+    langenberg = fetch_observations(conn, "langenberg", LONG_AGO, ISSUED_AT)
+    assert result.newest_observation_at == ISSUED_AT.replace(minute=22) and langenberg
+
+
+def test_failing_forecast_station_fails_the_run(conn: Conn) -> None:
+    def source(station: Station, start: datetime, end: datetime) -> list[Observation]:
+        raise RuntimeError("influx down")
+
+    with pytest.raises(RuntimeError, match="influx down"):
+        run_hourly(source, conn, CONFIG, ISSUED_AT)
+
+
+def test_fetch_by_source_uses_the_station_source() -> None:
+    lanuv_station = CONFIG.station("langenberg")
+    fetchers = {"influx": FakeSource({}), "lanuv": FakeSource({})}
+    fetch_by_source(fetchers, lanuv_station, LONG_AGO, ISSUED_AT)
+    assert (fetchers["influx"].windows, fetchers["lanuv"].windows) == ([], [(LONG_AGO, ISSUED_AT)])
 
 
 def test_rerun_gives_the_same_forecast(conn: Conn) -> None:
