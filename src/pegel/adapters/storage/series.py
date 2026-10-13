@@ -8,7 +8,7 @@ from psycopg.rows import TupleRow
 from pegel.core.series import Series
 
 # Unchanged rows are skipped, so the returned count says what actually changed.
-# The kind is never updated here: ensure_series rejects a change before this runs.
+# Kind, variable and unit are never updated here: ensure_series rejects a change first.
 ENSURE_SQL = """
     INSERT INTO series (id, variable, unit, source, location, kind, aggregation, period,
                         description)
@@ -16,26 +16,33 @@ ENSURE_SQL = """
     FROM unnest(%s::text[], %s::text[], %s::text[], %s::text[], %s::text[], %s::text[],
                 %s::text[], %s::interval[], %s::text[])
     ON CONFLICT (id) DO UPDATE
-    SET variable = excluded.variable, unit = excluded.unit, source = excluded.source,
-        location = excluded.location, aggregation = excluded.aggregation,
-        period = excluded.period, description = excluded.description
-    WHERE (series.variable, series.unit, series.source, series.location, series.aggregation,
-           series.period, series.description)
-        IS DISTINCT FROM (excluded.variable, excluded.unit, excluded.source, excluded.location,
-                          excluded.aggregation, excluded.period, excluded.description)
+    SET source = excluded.source, location = excluded.location,
+        aggregation = excluded.aggregation, period = excluded.period,
+        description = excluded.description
+    WHERE (series.source, series.location, series.aggregation, series.period, series.description)
+        IS DISTINCT FROM (excluded.source, excluded.location, excluded.aggregation,
+                          excluded.period, excluded.description)
 """
 
-STORED_KINDS_SQL = "SELECT id, kind FROM series WHERE id = ANY(%s) FOR UPDATE"
+STORED_DEFINITIONS_SQL = (
+    "SELECT id, kind, variable, unit FROM series WHERE id = ANY(%s) ORDER BY id FOR UPDATE"
+)
 
 
-class SeriesKindChangeError(Exception):
-    """A series exists with the other kind. Changing it would orphan or mislabel its values."""
+class SeriesDefinitionChangeError(Exception):
+    """A stored series differs in kind, variable or unit.
+
+    Changing any of them would relabel the stored values without converting them.
+    Migrate the values instead.
+    """
 
 
 def ensure_series(conn: psycopg.Connection[TupleRow], series: Sequence[Series]) -> int:
     """Insert or update series rows; return how many were new or changed.
 
-    Raises SeriesKindChangeError, and changes nothing, if a series exists with another kind.
+    Source, location, aggregation, period and description may change. Raises
+    SeriesDefinitionChangeError, and changes nothing, if a stored series has another kind,
+    variable or unit.
     """
     if not series:
         return 0
@@ -50,14 +57,14 @@ def ensure_series(conn: psycopg.Connection[TupleRow], series: Sequence[Series]) 
         [one.period for one in series],
         [one.description for one in series],
     )
-    wanted_kinds = {one.id: one.kind for one in series}
+    wanted = {one.id: (one.kind, one.variable, one.unit) for one in series}
     with conn.transaction(), conn.cursor() as cursor:
-        cursor.execute(STORED_KINDS_SQL, (list(wanted_kinds),))
-        for series_id, stored_kind in cursor.fetchall():
-            if stored_kind != wanted_kinds[series_id]:
-                raise SeriesKindChangeError(
-                    f"series {series_id!r} is stored with kind {stored_kind!r}, "
-                    f"not {wanted_kinds[series_id]!r}"
+        cursor.execute(STORED_DEFINITIONS_SQL, (list(wanted),))
+        for series_id, *stored in cursor.fetchall():
+            if tuple(stored) != wanted[series_id]:
+                raise SeriesDefinitionChangeError(
+                    f"series {series_id!r} is stored as (kind, variable, unit) "
+                    f"{tuple(stored)!r}, not {wanted[series_id]!r}"
                 )
         cursor.execute(ENSURE_SQL, params)
         return cursor.rowcount

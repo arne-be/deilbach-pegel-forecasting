@@ -5,7 +5,7 @@ import psycopg
 import pytest
 from psycopg.rows import TupleRow
 
-from pegel.adapters.storage.series import SeriesKindChangeError, ensure_series
+from pegel.adapters.storage.series import SeriesDefinitionChangeError, ensure_series
 from pegel.core.series import Series
 
 Conn = psycopg.Connection[TupleRow]
@@ -60,8 +60,20 @@ def test_jobs_role_can_ensure(conn: Conn) -> None:
     assert ensure_series(conn, [RAIN]) == 1
 
 
-def test_kind_of_an_existing_series_cannot_change(conn: Conn) -> None:
+@pytest.mark.parametrize(
+    "changes", [{"kind": "forecast"}, {"unit": "cm"}, {"variable": "soil_moisture"}]
+)
+def test_kind_variable_and_unit_of_a_stored_series_cannot_change(
+    conn: Conn, changes: dict[str, str]
+) -> None:
     ensure_series(conn, [RAIN])
-    with pytest.raises(SeriesKindChangeError, match="stored with kind 'observation'"):
-        ensure_series(conn, [replace(RAIN, kind="forecast", description="changed")])
+    with pytest.raises(SeriesDefinitionChangeError, match="radolan_rw:zone:neviges"):
+        ensure_series(conn, [replace(RAIN, description="changed", **changes)])  # type: ignore[arg-type]
     assert stored(conn) == [(*astuple(RAIN),)]
+
+
+def test_other_metadata_may_change(conn: Conn) -> None:
+    ensure_series(conn, [RAIN])
+    changed = replace(RAIN, source="radolan_yw", location="zone:velbert", description="new")
+    assert ensure_series(conn, [changed]) == 1
+    assert stored(conn) == [(*astuple(changed),)]
