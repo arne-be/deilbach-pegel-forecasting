@@ -6,14 +6,13 @@ Rules (docs/decisions/0008), with t the issue time:
 - Hourly windows (`<gauge>_lag_k`, `radar_<area>_lag_k`): lag k is the newest known value with
   t - (k+1) h < valid_at <= t - k h, else NaN. The windows don't overlap, so a gap stays a gap
   and no value fills two lags.
-- `kd_last_cm`, `kd_last_at`, `kd_last_raw_cm`: the newest known cleaned (raw) value, of any
-  age; `kd_last_at` says how old it is. The raw value is the newest raw one, not the raw value at
-  `kd_last_at`, since the cleaned series leaves out outliers.
+- `kd_last_cm`, `kd_last_at`: the newest known cleaned value, of any age; `kd_last_at` says how
+  old it is.
 - `kd_base_30d_cm`: the median of the cleaned hourly windows lag 0 to 719 (30 days).
 - ICON-D2 column k is the hourly sum with valid_at = floor(t) + (k-1) h, from the newest run
   with available_at <= t; `icon_lead_k` = valid_at - run_at in hours. Archive and live rows
   are passed together, so whichever run is newest wins.
-- `target_k`, `target_raw_k`: the reading closest to floor(t) + k h + 22 min, at most the
+- `target_k`: the cleaned reading closest to floor(t) + k h + 22 min, at most the
   tolerance off (inclusive), else NaN.
 
 All times are UTC, so daylight saving time plays no part.
@@ -72,7 +71,6 @@ def build_rows(
     issued_at: pd.DatetimeIndex,
     station_id: str,
     cleaned: pd.DataFrame,
-    raw: pd.DataFrame,
     upstream: Mapping[str, pd.DataFrame],
     radar: Mapping[str, pd.DataFrame],
     icon_mean: pd.DataFrame,
@@ -82,7 +80,7 @@ def build_rows(
 ) -> pd.DataFrame:
     """One row per issue time, with exactly `contract.dataset_columns(list(radar), leads)`.
 
-    `cleaned` and `raw` are the forecast station's (`station_id`) levels, `upstream` the other
+    `cleaned` is the forecast station's (`station_id`) cleaned level, `upstream` the other
     gauges of `contract.GAUGE_PREFIXES` by station id, `radar` the radar series by area.
     """
     issued_at = _checked_issue_times(issued_at)
@@ -90,7 +88,6 @@ def build_rows(
     last = newest_known(cleaned, issued_at)
     columns[contract.KD_LAST_CM] = last["value"].to_numpy()
     columns[contract.KD_LAST_AT] = last["valid_at"].to_numpy()
-    columns[contract.KD_LAST_RAW_CM] = newest_known(raw, issued_at)["value"].to_numpy()
     station_hours = hourly_windows(cleaned, issued_at, BASE_HOURS)
     # DataFrame.median skips NaN and gives NaN for an empty window, without a warning.
     columns[contract.KD_BASE_30D_CM] = pd.DataFrame(station_hours).median(axis=1).to_numpy()
@@ -105,13 +102,11 @@ def build_rows(
     mean, lead_hours = icon_by_lead(icon_mean, issued_at, leads)
     p90, _ = icon_by_lead(icon_p90, issued_at, leads)
     targets = targets_by_lead(cleaned, issued_at, leads, target_tolerance)
-    raw_targets = targets_by_lead(raw, issued_at, leads, target_tolerance)
     for prefix, matrix in (
         (contract.ICON_MEAN, mean),
         (contract.ICON_P90, p90),
         (contract.ICON_LEAD, lead_hours),
         (contract.TARGET, targets),
-        (contract.TARGET_RAW, raw_targets),
     ):
         columns.update(zip(contract.lead_columns(prefix, leads), matrix.T, strict=True))
     return pd.DataFrame(columns)[contract.dataset_columns(list(radar), leads)]
