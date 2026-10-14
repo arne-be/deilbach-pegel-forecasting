@@ -38,6 +38,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Simple models 2 to 4 of the ladder (`recession`, `damped_trend`, `upstream`), fitted per lead on the change: `src/pegel/evaluation/models/simple.py`
 - Ridge model per lead, level or change target, with or without ICON-D2 (`ridge:level`, `ridge:change`, `…:no_icon`): `src/pegel/evaluation/models/ridge.py`
 - Rain change models `rain_change` and `rain_change:split` (last level plus a per-lead linear change from upstream, radar and ICON-D2): `src/pegel/evaluation/models/rain_change.py`, `docs/models/rain-change.md`
+- Curated change models v2 `rain_change:v2:split` and `ridge:change:v2` (named physical inputs per lead, inner-split candidate list): `src/pegel/evaluation/models/curated.py`, `docs/models/rain-change-v2.md`, `docs/models/ridge-change-v2.md`, `analysis/model-evaluation/models-v2-candidates.csv`
 
 ## Layout
 

@@ -30,7 +30,7 @@ Mask = npt.NDArray[np.bool_]
 InputFunction = Callable[[pd.DataFrame, int, dict[str, int]], Array]
 
 RISING_CM = 0.5
-# Chosen on inner time splits of the training rows (analysis/model-evaluation, PR body).
+# Chosen on inner time splits of the training rows, see models-v2-candidates.csv.
 RISE_HOURS_SLOW = 24.0
 RISE_HOURS_FAST = 6.0
 ICON_HINGE_MM = 5.0
