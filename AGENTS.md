@@ -34,6 +34,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Evaluation harness, persistence model, model registry and runner (`python -m pegel.evaluation.predict <dataset> --out <dir>`, writes `predictions.parquet`): `src/pegel/evaluation/harness.py`, `registry.py`, `predict.py`, `models/`
 - Model features shared by training and the live job, and the three target forms (level, change, hourly step): `src/pegel/core/features.py`, `src/pegel/evaluation/targets.py`
 - Evaluation metrics, flood events and the scoring runner (`python -m pegel.evaluation.score`): `src/pegel/evaluation/metrics.py`, `events.py`, `score.py`
+- Rain change models `rain_change` and `rain_change:split` (last level plus a per-lead linear change from upstream, radar and ICON-D2): `src/pegel/evaluation/models/rain_change.py`, `docs/models/rain-change.md`
 
 ## Layout
 
