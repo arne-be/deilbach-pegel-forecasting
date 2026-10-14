@@ -105,3 +105,11 @@ def test_registry_has_four_ridge_variants_with_unique_names() -> None:
     assert {"ridge:level", "ridge:change", "ridge:level:no_icon", "ridge:change:no_icon"} <= set(
         names
     )
+
+
+def test_validation_rows_start_a_full_embargo_after_the_fit_rows_in_any_row_order() -> None:
+    dataset = eval_dataset(hours=300).sample(frac=1, random_state=0)
+    early, late = Ridge(SETTINGS)._split_by_time(dataset)
+    gap = late[contract.ISSUED_AT].min() - early[contract.ISSUED_AT].max()
+    assert gap >= pd.Timedelta(hours=LEADS)
+    assert len(late) == pytest.approx(0.2 * len(dataset), abs=1)

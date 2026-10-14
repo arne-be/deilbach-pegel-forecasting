@@ -11,8 +11,8 @@ model's own previous forecast.
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from sklearn.linear_model import Ridge as SklearnRidge  # type: ignore[import-untyped]
-from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
+from sklearn.linear_model import Ridge as SklearnRidge
+from sklearn.preprocessing import StandardScaler
 
 from pegel.config import EvaluationSettings
 from pegel.core.features import UPSTREAM_LAG_HOURS, features
@@ -96,20 +96,20 @@ class Ridge:
         """The newest rows for validation; an embargo of the longest lead keeps their targets
         out of the earlier rows, as between training and test."""
         issued_at = train[contract.ISSUED_AT]
-        cut = issued_at.iloc[int(len(train) * (1 - VALIDATION_FRACTION))]
+        cut = issued_at.sort_values().iloc[int(len(train) * (1 - VALIDATION_FRACTION))]
         embargo = pd.Timedelta(hours=self._leads)
         return train[issued_at < cut - embargo], train[issued_at >= cut]
 
     def _validation_error(self, early: pd.DataFrame, late: pd.DataFrame, alpha: float) -> float:
         self._fit(early, alpha)
-        errors = self._predict_target(late) - self._target(late)
+        errors = self._predict_target(late) - targets.to_target(late, self._kind, self._leads)
         return float(np.nanmean(np.abs(errors)))
 
     def _fit(self, train: pd.DataFrame, alpha: float) -> None:
         frame = features(train, with_icon=self._with_icon)
         self._imputer.fit(frame)
         inputs = self._scaler.fit_transform(self._imputer.transform(frame))
-        target = self._target(train)
+        target = targets.to_target(train, self._kind, self._leads)
         self._models = []
         for lead in range(self._leads):
             known = ~np.isnan(target[:, lead])
@@ -122,7 +122,3 @@ class Ridge:
         frame = features(rows, with_icon=self._with_icon)
         inputs = self._scaler.transform(self._imputer.transform(frame))
         return np.column_stack([model.predict(inputs) for model in self._models]).astype(np.float64)
-
-    def _target(self, rows: pd.DataFrame) -> npt.NDArray[np.float64]:
-        # The dataset may hold more leads than the settings it is scored with.
-        return targets.to_target(rows, self._kind)[:, : self._leads]
