@@ -7,6 +7,8 @@
 
 Find the best point forecast for Kupferdreh for leads 1 to 24 hours. Every model is scored on the same issue times, the same targets and the same folds. The result is a table and a graph of the error per lead time for every model.
 
+A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](../model-evaluation.md).
+
 ## Decisions
 
 ### Scope
