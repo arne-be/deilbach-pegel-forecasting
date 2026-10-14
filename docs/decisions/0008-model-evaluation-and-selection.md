@@ -81,9 +81,17 @@ A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](
 
 **High water is also scored against the raw series.** The Kalman filter can flatten a real fast rise, and peaks are where that matters.
 
-**Events.** A flood event is a peak above 95 cm. Two peaks less than 24 hours apart are one event. For each event: error in peak height and peak timing. Hits, misses and false alarms at 95 cm and at 145 cm (category 2), counted per event and lead.
+**Events.** A flood event is a peak above 95 cm. Two peaks less than 24 hours apart are one event. For each event: error in peak height and peak timing, from the forecasts issued before the peak.
 
-**Warning lead time.** For each crossing of 95 and 145 cm: the first issue time whose forecast showed the crossing, and how many hours before the crossing that was.
+**Warnings are scored on crossings.** A warning only helps if it comes before the level crosses a threshold. Each threshold is its own warning: 95 cm and every category bound in config (145, 165, 185 and 225 cm).
+
+- A crossing is an hour above the threshold after an hour that was not. Only first crossings count: no hour above the threshold in the 24 hours before. Re-crossings during a flood are left out.
+- A forecast crosses the threshold when the last known level at its issue time is not above it and any of its 24 values is. Its crossing time is the first hour above.
+- A first crossing is warned by every forecast issued before it whose crossing time is at most 6 hours from it. The warning time is the crossing minus the first such issue time.
+- A crossing is a hit at 3 hours if it was warned at least 3 hours ahead, and the same for 6 hours. `crossings.csv` has one row per model, threshold and crossing.
+- A forecast crossing with no observed crossing within 6 hours is a false alarm. A run of hourly issue times with false alarms counts once, so a warning that stays up counts once. `false_alarms.csv` gives the count per model and threshold, and per month of test issue times.
+
+**Hits, misses and false alarms per lead stay as a diagnostic only.** They count overlaps of forecast and observed episodes, so a forecast issued during a flood scores a hit by staying high. Persistence gets all its hits that way.
 
 **Lag check.** On high water, the time shift that best fits the forecast to the observed level. If that shift equals the lead, the model is only a delayed persistence.
 
@@ -91,7 +99,7 @@ A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](
 
 **Output.** `predictions.parquet` (issue time, lead, model, fold, prediction, target) and `scores.csv` (model, fold, subset, lead, n, MAE, RMSE, bias, skill). Plots are made from these files.
 
-**Thresholds live in config.** 75 and 95 cm go into `config/pegel.json`; 145 cm is already category 2 there.
+**Thresholds live in config.** 75 and 95 cm go into `config/pegel.json`; the category bounds are already there.
 
 ### Experiment log
 
@@ -142,7 +150,7 @@ Anything beyond that (other boosting setups, neural networks) only if LightGBM l
 
 **A model wins over a simpler one** when its mean MAE over leads 1 to 24 is lower in at least 3 of 4 folds, and its high-water MAE, pooled over all folds, is not worse. Otherwise the simpler model stays.
 
-**A model that misses more warnings can't win.** It must not have more misses at 95 or 145 cm than the simpler model, whatever its MAE.
+**A model that warns worse can't win.** If it misses more crossings with at least 3 hours of warning, or raises more false alarms per month, at any threshold, it loses to the simpler model, whatever its MAE. Per-lead hit counts don't decide, because they credit forecasts issued during a flood.
 
 **Ties go to the simpler model.**
 
