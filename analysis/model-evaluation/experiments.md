@@ -43,7 +43,7 @@ Mean MAE of persistence over leads 1-24 h: 2.8 cm over all issue times, 8.3 cm a
 First crossings of 95 cm warned at least 3 h ahead: persistence 0 of 6.
 False alarms at 95 cm: 0.00 per month.
 
-**Notes:** Persistence MAE 0.66 cm at +1 h and 4.01 cm at +24 h over all issue times; 1.36 cm at +1 h and 12.99 cm at +24 h at high water. At 95 cm it hits 7 of 8 flood episodes at +1 h and 5 of 8 at +24 h, with 5 false alarms at +24 h; the one episode above 145 cm (2024-11-19) is hit at +1 h to +5 h and missed from +6 h on. It warns ahead of none of the 6 first crossings of 95 cm; its two warnings are re-crossings (2025-01-08, 2025-01-27). Peaks are underforecast by 27.6 cm at +6 h and 36.9 cm at +12 h on average; the lag check gives a shift equal to the lead. All 8 flood episodes fall in F1 and F2. No bootstrap band and no skill plot: the run has only persistence.
+**Notes:** Persistence MAE 0.66 cm at +1 h and 4.01 cm at +24 h over all issue times; 1.36 cm at +1 h and 12.99 cm at +24 h at high water. At 95 cm its per-lead alarms (a diagnostic) hit 7 of 8 flood episodes at +1 h and 5 of 8 at +24 h; the one episode above 145 cm (2024-11-19) is hit at +1 h to +5 h and missed from +6 h on. It warns ahead of none of the 6 first crossings of 95 cm; its two warnings are re-crossings (2025-01-08, 2025-01-27). Peaks are underforecast by 27.6 cm at +6 h and 36.9 cm at +12 h on average; the lag check gives a shift equal to the lead. All 8 flood episodes fall in F1 and F2. No bootstrap band and no skill plot: the run has only persistence. The files `crossings.csv` and `false_alarms.csv` were written by the crossing scorer of PR #73 (not yet merged) after the rest of the run.
 
 | model | mean MAE all (cm) | mean MAE high water (cm) | MAE +24 h high water (cm) | skill +24 h high water | 95 cm crossings warned >= 3 h | false alarms per month at 95 cm |
 |---|---|---|---|---|---|---|
@@ -106,37 +106,37 @@ First crossings per threshold (no hour above it in the 24 hours before) and how 
 
 | model | threshold_cm | crossings | warned >= 3 h | warned >= 6 h | median hours ahead |
 |---|---|---|---|---|---|
-| persistence | 95.00 | 6 | 0 | 0 | - |
-| persistence | 145.00 | 1 | 0 | 0 | - |
+| persistence | 95 | 6 | 0 | 0 | - |
+| persistence | 145 | 1 | 0 | 0 | - |
 
 False alarms: forecast crossings with no observed crossing within 6 hours; a warning that stays up counts once.
 
 | model | threshold_cm | count | per_month |
 |---|---|---|---|
-| persistence | 95.00 | 0 | 0.00 |
-| persistence | 145.00 | 0 | 0.00 |
-| persistence | 165.00 | 0 | 0.00 |
-| persistence | 185.00 | 0 | 0.00 |
-| persistence | 225.00 | 0 | 0.00 |
+| persistence | 95 | 0 | 0.00 |
+| persistence | 145 | 0 | 0.00 |
+| persistence | 165 | 0 | 0.00 |
+| persistence | 185 | 0 | 0.00 |
+| persistence | 225 | 0 | 0.00 |
 
 Old rule (`warnings.csv`): every crossing and the first forecast that showed it. A re-crossing starts while the level was above the threshold in the 24 hours before; its warning is not counted as lead time.
 
 | model | threshold_cm | crossings | warned | median hours ahead | min hours ahead | re-crossings | re-crossings warned |
 |---|---|---|---|---|---|---|---|
-| persistence | 95.00 | 6 | 0 | - | - | 2 | 2 |
-| persistence | 145.00 | 1 | 0 | - | - | 0 | 0 |
+| persistence | 95 | 6 | 0 | - | - | 2 | 2 |
+| persistence | 145 | 1 | 0 | - | - | 0 | 0 |
 
 </details>
 
 <details>
 <summary>Alarms per lead (diagnostic)</summary>
 
-Flood episodes per threshold: hits / misses / false alarms of the lead-k forecasts. A forecast issued during a flood scores a hit by staying high.
+Flood episodes per threshold: hits / misses / false alarms of the lead-k forecasts, counted as overlapping episodes per lead. A different rule from the crossings and false alarms in the headline: a forecast issued during a flood scores a hit by staying high. A diagnostic only.
 
 | model | threshold_cm | +1 h | +6 h | +12 h | +24 h |
 |---|---|---|---|---|---|
-| persistence | 95.00 | 7 / 1 / 1 | 7 / 1 / 3 | 6 / 2 / 4 | 5 / 3 / 5 |
-| persistence | 145.00 | 1 / 0 / 0 | 0 / 1 / 1 | 0 / 1 / 1 | 0 / 1 / 1 |
+| persistence | 95 | 7 / 1 / 1 | 7 / 1 / 3 | 6 / 2 / 4 | 5 / 3 / 5 |
+| persistence | 145 | 1 / 0 / 0 | 0 / 1 / 1 | 0 / 1 / 1 | 0 / 1 / 1 |
 
 </details>
 
