@@ -23,7 +23,7 @@ from pegel.core.rain_forecast import (
     run_values,
 )
 from pegel.core.schedule import issue_time
-from pegel.jobs.pipeline import Conn, HourlyStep
+from pegel.jobs.pipeline import Conn, HourlyStep, log_source_delay
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,8 @@ def ingest_new_runs(
     """
     started = clock()
     newest = open_meteo.latest_run(client)
+    # The newest run start, not a valid time: valid times lie in the future.
+    log_source_delay(settings.source, settings.source, datetime.now(UTC), newest)
     stored = stored_runs_since(conn, catchment_series_id(settings.source), newest - CATCH_UP)
     runs = missing_runs(newest, stored, CATCH_UP)[:MAX_RUNS_PER_HOUR]
     if not runs:

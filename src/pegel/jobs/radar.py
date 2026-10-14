@@ -22,7 +22,7 @@ from pegel.adapters.storage.series import ensure_series
 from pegel.config import PegelConfig, config_file
 from pegel.core.radar import radar_series, radar_values
 from pegel.core.schedule import issue_time, monthly_windows, scheduled_available_at
-from pegel.jobs.pipeline import Conn, HourlyStep
+from pegel.jobs.pipeline import Conn, HourlyStep, log_source_delay
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,11 @@ def radar_step(
         lookback = timedelta(hours=config.rain.radar.ingest_lookback_hours)
         times = product_times(issued_at - lookback, issued_at)
         grids = list(_published(partial(fetch_live, client), times, "radar_rain"))
-        seen_at = issue_time(now(), config.forecast.issue_minute)
+        fetched_at = now()
+        newest_at = max((grid.product_time for grid in grids), default=None)
+        source = config.rain.radar.source
+        log_source_delay(source, source, fetched_at, newest_at, issued_at)
+        seen_at = issue_time(fetched_at, config.forecast.issue_minute)
         changed, _ = store_grids(conn, config, grids, "radar_rain", seen_at)
         logger.info(
             "ingested radar rain",

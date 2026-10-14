@@ -1,4 +1,6 @@
+import logging
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import psycopg
 import pytest
@@ -17,6 +19,7 @@ from pegel.jobs.pipeline import (
     clean_history,
     fetch_by_source,
     forecast,
+    log_source_delay,
     run_hourly,
 )
 
@@ -245,3 +248,44 @@ def test_clean_history_covers_every_month(conn: Conn) -> None:
     assert [value.valid_at for value in fetch_values(conn, CLEANED_ID, start, ISSUED_AT)] == sorted(
         readings
     )
+
+
+def delay_logs(caplog: pytest.LogCaptureFixture) -> list[dict[str, Any]]:
+    return [vars(record) for record in caplog.records if record.getMessage() == "source delay"]
+
+
+def test_source_delay_is_fetch_time_minus_newest_timestamp(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+    fetched_at = ISSUED_AT + timedelta(minutes=1)
+    log_source_delay("influx", "kupferdreh", fetched_at, ISSUED_AT.replace(minute=22), ISSUED_AT)
+    [entry] = delay_logs(caplog)
+    assert (entry["delay_minutes"], entry["empty"], entry["rerun"]) == (9, False, False)
+
+
+def test_empty_fetch_logs_no_delay(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    log_source_delay("lanuv", "langenberg", ISSUED_AT, None)
+    [entry] = delay_logs(caplog)
+    assert (entry["newest_at"], entry["delay_minutes"], entry["empty"]) == (None, None, True)
+
+
+def test_rerun_of_a_past_issue_time_is_marked(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    log_source_delay("influx", "kupferdreh", ISSUED_AT + timedelta(days=1), ISSUED_AT, ISSUED_AT)
+    assert [entry["rerun"] for entry in delay_logs(caplog)] == [True]
+
+
+def test_hourly_run_logs_a_delay_per_station(conn: Conn, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    run_hourly(FakeSource(readings_before(ISSUED_AT, [10.0])), conn, CONFIG, ISSUED_AT)
+    logged = sorted(entry["series"] for entry in delay_logs(caplog))
+    assert logged == sorted(station.id for station in CONFIG.stations)
+
+
+def test_backfill_logs_no_delay(conn: Conn, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.INFO)
+    source = FakeSource(readings_before(ISSUED_AT, [10.0]))
+    backfill(source, conn, STATION, ISSUED_AT - timedelta(days=1), ISSUED_AT, MINUTE)
+    assert delay_logs(caplog) == []

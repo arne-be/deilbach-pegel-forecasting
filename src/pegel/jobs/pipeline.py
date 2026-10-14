@@ -43,6 +43,35 @@ class NoObservationError(Exception):
     """There is no observation to base a forecast on."""
 
 
+def log_source_delay(
+    source: str,
+    series: str,
+    fetched_at: datetime,
+    newest_at: datetime | None,
+    issued_at: datetime | None = None,
+) -> None:
+    """Logs how far the newest fetched timestamp lags behind the fetch, for later analysis.
+
+    A rerun of a past issue time only fetches up to that time, so its delay says nothing about
+    the source; `rerun` marks it. Pass no issue time for sources that ignore it.
+    """
+    delay = None if newest_at is None else (fetched_at - newest_at) // timedelta(minutes=1)
+    logger.info(
+        "source delay",
+        extra={
+            "job": "source_delay",
+            "source": source,
+            "series": series,
+            "fetched_at": fetched_at.isoformat(),
+            "newest_at": newest_at.isoformat() if newest_at else None,
+            "delay_minutes": delay,
+            "empty": newest_at is None,
+            "issued_at": issued_at.isoformat() if issued_at else None,
+            "rerun": issued_at is not None and fetched_at - issued_at >= timedelta(hours=1),
+        },
+    )
+
+
 def ingest(
     fetch: FetchLevels,
     conn: Conn,
@@ -60,7 +89,11 @@ def ingest(
     hourly run would first have used it in.
     """
     observations = fetch(station, start, end)
-    seen_at = issue_time(datetime.now(UTC), issue_minute)
+    fetched_at = datetime.now(UTC)
+    seen_at = issue_time(fetched_at, issue_minute)
+    if live:
+        newest_at = max((one.observed_at for one in observations), default=None)
+        log_source_delay(station.source, station.id, fetched_at, newest_at, end)
     series = level_series(station)
     ensure_series(conn, [series])
     values = [
