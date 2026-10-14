@@ -42,6 +42,7 @@ def test_damped_trend_recovers_its_factors() -> None:
     model = DampedTrend(SETTINGS)
     model.fit(dataset)
     np.testing.assert_allclose(model.coefficients[0], FACTORS, atol=1e-9)
+    np.testing.assert_allclose(model.predict(dataset), dataset[TARGETS].to_numpy())
 
 
 def test_upstream_recovers_both_factors() -> None:
@@ -50,8 +51,10 @@ def test_upstream_recovers_both_factors() -> None:
     nierenhof = (dataset["nh_lag_0"] - dataset["nh_lag_3"]).to_numpy()
     change = np.outer(langenberg, FACTORS) + np.outer(nierenhof, 1 - FACTORS)
     model = Upstream(SETTINGS)
-    model.fit(_with_targets(dataset, change))
+    dataset = _with_targets(dataset, change)
+    model.fit(dataset)
     np.testing.assert_allclose(model.coefficients, [FACTORS, 1 - FACTORS], atol=1e-9)
+    np.testing.assert_allclose(model.predict(dataset), dataset[TARGETS].to_numpy())
 
 
 def test_change_3h_pairs_the_last_level_with_the_lag_three_hours_older() -> None:
@@ -79,7 +82,9 @@ def test_a_missing_input_falls_back_to_persistence(model_class: type) -> None:
     forecast = model.predict(rows)
     assert forecast.shape == (len(rows), LEADS)
     assert (forecast[0] == rows[contract.KD_LAST_CM][0]).all()
-    assert (forecast[1:] != rows[[contract.KD_LAST_CM]].to_numpy()[1:]).any()
+    others = rows.iloc[1:]
+    expected = others[[contract.KD_LAST_CM]].to_numpy() + model.inputs(others) @ model.coefficients
+    np.testing.assert_allclose(forecast[1:], expected)
 
 
 def test_fit_skips_rows_without_a_target() -> None:

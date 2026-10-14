@@ -91,7 +91,8 @@ def kupferdreh_change_3h(rows: pd.DataFrame) -> Array:
     Lag 0 is missing at about 4 in 10 issue times, since the reading of the hour often arrives
     after :30, so `kd_lag_0 - kd_lag_3` would lose them. Lag k covers ages in [k h, (k+1) h),
     so a last level 40 minutes old pairs with lag 3 and one 70 minutes old with lag 4. NaN when
-    that lag is missing or beyond the window.
+    that lag is missing or beyond the window. It assumes an hourly reading (Kupferdreh reports at
+    about :22), so the lag holds a value about 3 hours older than the last level.
     """
     age = rows[contract.ISSUED_AT] - rows[contract.KD_LAST_AT]
     lag = np.floor(age.dt.total_seconds().to_numpy(dtype=np.float64) / 3600) + CHANGE_HOURS
