@@ -14,7 +14,7 @@ import numpy.typing as npt
 import pandas as pd
 
 from pegel.config import EvaluationSettings
-from pegel.core.features import features
+from pegel.core.features import features, kupferdreh_change
 from pegel.evaluation import contract
 from pegel.evaluation.targets import from_target, to_target
 
@@ -86,19 +86,5 @@ class Upstream(_LinearChange):
 
 
 def kupferdreh_change_3h(rows: pd.DataFrame) -> Array:
-    """The last level minus the hourly lag 3 hours older than the lag the last level falls in.
-
-    Lag 0 is missing at about 4 in 10 issue times, since the reading of the hour often arrives
-    after :30, so `kd_lag_0 - kd_lag_3` would lose them. Lag k covers ages in [k h, (k+1) h),
-    so a last level 40 minutes old pairs with lag 3 and one 70 minutes old with lag 4. NaN when
-    that lag is missing or beyond the window. It assumes an hourly reading (Kupferdreh reports at
-    about :22), so the lag holds a value about 3 hours older than the last level.
-    """
-    age = rows[contract.ISSUED_AT] - rows[contract.KD_LAST_AT]
-    lag = np.floor(age.dt.total_seconds().to_numpy(dtype=np.float64) / 3600) + CHANGE_HOURS
-    lags = rows[contract.level_lag_columns("kupferdreh")].to_numpy(dtype=np.float64)
-    inside = lag < contract.LEVEL_LAG_HOURS
-    earlier: Array = np.full(len(rows), np.nan)
-    positions = np.flatnonzero(inside)
-    earlier[positions] = lags[positions, lag[inside].astype(int)]
-    return rows[contract.KD_LAST_CM].to_numpy(dtype=np.float64) - earlier
+    """The last level minus the level about 3 hours older; see `features.kupferdreh_change`."""
+    return kupferdreh_change(rows, CHANGE_HOURS)
