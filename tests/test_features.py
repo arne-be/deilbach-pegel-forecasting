@@ -83,10 +83,21 @@ def test_step_features_repeat_each_issue_time_once_per_lead() -> None:
     assert not [c for c in result.columns if str(c).startswith("icon_")]
 
 
-def test_step_rain_looks_back_six_hours_clipped_at_lead_one() -> None:
+def test_step_rain_looks_back_six_hours_and_is_nan_before_the_issue_time() -> None:
     dataset = eval_dataset(hours=2)
     result = step_features(dataset)
     assert result.at[(1, 10), "step_icon_mean_0"] == dataset.at[1, "icon_mean_10"]
     assert result.at[(1, 10), "step_icon_p90_5"] == dataset.at[1, "icon_p90_5"]
     assert result.at[(1, 2), "step_icon_mean_1"] == dataset.at[1, "icon_mean_1"]
-    assert result.at[(1, 2), "step_icon_lead_5"] == dataset.at[1, "icon_lead_1"]
+    assert pd.isna(result.at[(1, 2), "step_icon_mean_2"])
+    assert pd.isna(result.at[(1, 2), "step_icon_lead_5"])
+
+
+def test_step_features_group_by_lead_and_survive_a_repeated_index() -> None:
+    dataset = eval_dataset(hours=3)
+    dataset.index = pd.Index([7, 7, 8])
+    result = step_features(dataset)
+    assert len(result) == 3 * LEADS
+    assert list(result.groupby("lead").size()) == [3] * LEADS
+    first_rows = result["kd_last_cm"].iloc[::LEADS].to_numpy()
+    np.testing.assert_array_equal(first_rows, dataset["kd_last_cm"].to_numpy())

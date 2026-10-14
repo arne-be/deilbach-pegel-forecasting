@@ -57,23 +57,26 @@ def features(dataset: pd.DataFrame, *, with_icon: bool = True) -> pd.DataFrame:
 def step_features(dataset: pd.DataFrame, *, with_icon: bool = True) -> pd.DataFrame:
     """One row per issue time and lead, issue time first, for the pooled hourly-step model.
 
-    Index (dataset index, lead), so `.to_numpy().reshape(n, leads)` maps back. Instead of all
-    ICON-D2 hours, each row gets those of the 6 hours up to its step: `step_<prefix>_<j>` is
-    the value at lead k-j, clipped at lead 1 because hours before the issue time have none.
+    Index (dataset position, lead), unnamed so `groupby("lead")` finds the column, and
+    `.to_numpy().reshape(n, leads)` maps back. Instead of all ICON-D2 hours, each row gets
+    those of the 6 hours up to its step: `step_<prefix>_<j>` is the value at lead k-j, NaN
+    for hours before the issue time, which radar covers.
     """
     leads = _leads(dataset)
     base = features(dataset, with_icon=False)
     lead_numbers = np.arange(1, leads + 1)
-    long = base.loc[base.index.repeat(leads)]
-    long.index = pd.MultiIndex.from_product([base.index, lead_numbers], names=[None, LEAD])
+    long = base.iloc[np.repeat(np.arange(len(base)), leads)]
+    long.index = pd.MultiIndex.from_product([base.index, lead_numbers])
     long[LEAD] = np.tile(lead_numbers, len(base))
     if not with_icon:
         return long
     for prefix in ICON_PREFIXES:
         values = dataset[contract.lead_columns(prefix, leads)].to_numpy(dtype=float)
+        # Column 0 is NaN and stands for every hour before the issue time.
+        padded = np.hstack([np.full((len(values), 1), np.nan), values])
         for hours_before in range(STEP_RAIN_HOURS):
-            positions = np.maximum(lead_numbers - hours_before, 1) - 1
-            long[f"step_{prefix}_{hours_before}"] = values[:, positions].ravel()
+            positions = np.maximum(lead_numbers - hours_before, 0)
+            long[f"step_{prefix}_{hours_before}"] = padded[:, positions].ravel()
     return long
 
 
