@@ -51,6 +51,7 @@ def _warnings() -> pd.DataFrame:
             "crossing_at": ["2024-10-02T00:30Z"] * 3,
             "first_warning_at": [None, None, "2024-10-01T18:30Z"],
             "warning_hours": [float("nan"), float("nan"), 6.0],
+            "re_crossing": [False, False, False],
         }
     )
 
@@ -90,6 +91,58 @@ def test_warning_table_counts_warned_crossings() -> None:
     assert table.loc[("ridge", 95.0), "median hours ahead"] == 6.0
 
 
+def test_mark_re_crossings_flags_a_level_above_threshold_within_a_day() -> None:
+    observed = pd.Series(
+        [100.0, 90.0, 90.0, 100.0], index=pd.date_range(START, periods=4, freq="h")
+    )
+    warnings = pd.DataFrame(
+        {
+            "model": [PERSISTENCE, PERSISTENCE],
+            "threshold_cm": [95.0, 95.0],
+            "crossing_at": [str(START), str(START + pd.Timedelta(hours=3))],
+            "warning_hours": [float("nan"), 3.0],
+        }
+    )
+    marked = report.mark_re_crossings(warnings, observed)
+    assert list(marked["re_crossing"]) == [False, True]
+    table = report.warning_table(marked)
+    assert table.loc[(PERSISTENCE, 95.0), "crossings"] == 1
+    assert table.loc[(PERSISTENCE, 95.0), "warned"] == 0
+    assert table.loc[(PERSISTENCE, 95.0), "re-crossings warned"] == 1
+    assert pd.isna(table.loc[(PERSISTENCE, 95.0), "median hours ahead"])
+
+
+def test_peak_and_lag_tables_keep_leads_6_and_12() -> None:
+    peaks = pd.DataFrame(
+        {
+            "event": [1, 2, 1, 1],
+            "model": ["ridge", "ridge", "ridge", PERSISTENCE],
+            "lead": [6, 6, 1, 6],
+            "height_error_cm": [-10.0, 4.0, 0.0, -20.0],
+            "at_peak_error_cm": [-10.0, 2.0, 0.0, -20.0],
+            "timing_error_hours": [1.0, 3.0, 0.0, float("nan")],
+        }
+    )
+    table = report.peak_table(peaks)
+    assert list(table.index) == [(PERSISTENCE, 6), ("ridge", 6)]
+    assert table.loc[("ridge", 6), "mean abs height error (cm)"] == 7.0
+    assert table.loc[("ridge", 6), "mean timing error (h)"] == 2.0
+    lag = pd.DataFrame(
+        {"model": [PERSISTENCE] * 3, "lead": [1, 6, 12], "n": 5, "shift_hours": [1, 6, 12]}
+    )
+    assert list(report.lag_table(lag).loc[PERSISTENCE]) == [6, 12]
+
+
+def test_colours_follow_the_registry_and_keep_persistence_grey() -> None:
+    from pegel.evaluation.report_plots import MODEL_COLOURS, PERSISTENCE_COLOUR, colours
+
+    palette = colours(["zeta", "ridge", PERSISTENCE], ["persistence", "ridge"])
+    assert palette[PERSISTENCE] == PERSISTENCE_COLOUR
+    assert palette["ridge"] == MODEL_COLOURS[0]
+    assert palette["zeta"] == MODEL_COLOURS[1]
+    assert colours(["ridge"], ["persistence", "ridge"])["ridge"] == MODEL_COLOURS[0]
+
+
 def test_markdown_table_formats_floats_and_missing_values() -> None:
     table = pd.DataFrame({"mae": [1.234, float("nan")]}, index=pd.Index(["a", "b"], name="model"))
     assert report.markdown_table(table).splitlines() == [
@@ -113,6 +166,14 @@ def _run_info() -> dict[str, object]:
         "dirty": True,
         "models": ["ridge", PERSISTENCE],
         "created_at": "2026-10-14T16:10:18+00:00",
+        "settings": {
+            "window_first_day": "2024-02-01",
+            "window_last_day": "2026-04-12",
+            "leads_hours": LEADS,
+            "high_water_cm": 75.0,
+            "flood_cm": 95.0,
+            "target_tolerance_minutes": 10,
+        },
     }
 
 

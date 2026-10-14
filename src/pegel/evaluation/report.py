@@ -15,11 +15,17 @@ from typing import Any
 
 import pandas as pd
 
+from pegel.config import EvaluationSettings
+from pegel.evaluation import contract
 from pegel.evaluation.metrics import ALL_FOLDS, PERSISTENCE
+from pegel.evaluation.registry import MODELS
 
 REPORT_DIR = Path("analysis/model-evaluation")
 TABLE_LEADS = (1, 3, 6, 12, 24)
 ALARM_LEADS = (1, 6, 12, 24)
+PEAK_LEADS = (6, 12)
+# A crossing with the level above the threshold this long before it continues a flood.
+RE_CROSSING_WINDOW = pd.Timedelta(hours=24)
 CSV_TABLES = ("scores", "bootstrap", "events", "peaks", "alarms", "warnings", "lag")
 
 
@@ -66,20 +72,79 @@ def alarm_table(alarms: pd.DataFrame) -> pd.DataFrame:
     return table.reindex(sorted(table.index, key=lambda key: (order.index(key[0]), key[1])))
 
 
+def registered_models(settings: EvaluationSettings) -> list[str]:
+    """Model names in registry order; the registry only grows, so the order is stable."""
+    return [factory(settings).name for factory in MODELS]
+
+
+def observed_from_predictions(predictions: pd.DataFrame) -> pd.Series:
+    """The observed cleaned level by target time, from the targets in the predictions."""
+    known = predictions.dropna(subset=["target"])
+    at = known[contract.ISSUED_AT] + known["lead"] * pd.Timedelta(hours=1)
+    return known["target"].groupby(at).first().sort_index()
+
+
+def mark_re_crossings(warnings: pd.DataFrame, observed: pd.Series) -> pd.DataFrame:
+    """Adds `re_crossing`: the level was above the threshold within RE_CROSSING_WINDOW before
+    the crossing. A forecast that keeps a high level then shows the crossing without
+    foreseeing anything, so its warning hours are not a lead time."""
+    crossing_at = pd.to_datetime(warnings["crossing_at"], utc=True)
+    re_crossing = [
+        bool((observed[at - RE_CROSSING_WINDOW : at - pd.Timedelta(hours=1)] > threshold).any())
+        for at, threshold in zip(crossing_at, warnings["threshold_cm"], strict=True)
+    ]
+    return warnings.assign(re_crossing=re_crossing)
+
+
 def warning_table(warnings: pd.DataFrame) -> pd.DataFrame:
     """Per model and threshold: observed crossings, how many any forecast showed, and how far
-    ahead the first warning came (median and minimum over the warned crossings)."""
-    grouped = warnings.groupby(["model", "threshold_cm"])
+    ahead the first warning came. Re-crossings (see `mark_re_crossings`) are counted apart
+    and left out of the hours ahead."""
+    first = warnings[~warnings["re_crossing"]].groupby(["model", "threshold_cm"])
+    again = warnings[warnings["re_crossing"]].groupby(["model", "threshold_cm"])
     table = pd.DataFrame(
         {
-            "crossings": grouped.size(),
-            "warned": grouped["warning_hours"].count(),
-            "median hours ahead": grouped["warning_hours"].median(),
-            "min hours ahead": grouped["warning_hours"].min(),
+            "crossings": first.size(),
+            "warned": first["warning_hours"].count(),
+            "median hours ahead": first["warning_hours"].median(),
+            "min hours ahead": first["warning_hours"].min(),
+            "re-crossings": again.size(),
+            "re-crossings warned": again["warning_hours"].count(),
         }
     )
+    table = table.fillna({"crossings": 0, "warned": 0, "re-crossings": 0, "re-crossings warned": 0})
+    counts = ["crossings", "warned", "re-crossings", "re-crossings warned"]
+    table[counts] = table[counts].astype(int)
     order = model_order(list(warnings["model"]))
     return table.reindex(sorted(table.index, key=lambda key: (order.index(key[0]), key[1])))
+
+
+def peak_table(peaks: pd.DataFrame) -> pd.DataFrame:
+    """Mean peak errors over the flood events per model, for the forecasts issued 6 and 12
+    hours before each peak."""
+    rows = peaks[peaks["lead"].isin(PEAK_LEADS)].assign(
+        abs_height=lambda frame: frame["height_error_cm"].abs()
+    )
+    grouped = rows.groupby(["model", "lead"])
+    table = pd.DataFrame(
+        {
+            "events": grouped.size(),
+            "mean abs height error (cm)": grouped["abs_height"].mean(),
+            "mean at-peak error (cm)": grouped["at_peak_error_cm"].mean(),
+            "mean timing error (h)": grouped["timing_error_hours"].mean(),
+        }
+    )
+    order = model_order(list(rows["model"]))
+    return table.reindex(sorted(table.index, key=lambda key: (order.index(key[0]), key[1])))
+
+
+def lag_table(lag: pd.DataFrame) -> pd.DataFrame:
+    """The lag check's best shift on high water at +6 h and +12 h; equal to the lead means a
+    delayed persistence."""
+    rows = lag[lag["lead"].isin(PEAK_LEADS)]
+    table = rows.pivot(index="model", columns="lead", values="shift_hours")
+    table = table.rename(columns=lambda lead: f"shift at +{lead} h")
+    return table.reindex(model_order(list(table.index)))
 
 
 def _cell(value: Any) -> str:
@@ -121,7 +186,9 @@ def section(
     scores = tables["scores"]
     for subset in scores["subset"].unique() if not scores.empty else []:
         lines += ["", f"Subset `{subset}`:", "", markdown_table(lead_table(scores, subset))]
-    alarms, warnings = tables["alarms"], tables["warnings"]
+    alarms, warnings, peaks, lag = (
+        tables.get(name, pd.DataFrame()) for name in ("alarms", "warnings", "peaks", "lag")
+    )
     if not alarms.empty:
         lines += [
             "",
@@ -136,9 +203,30 @@ def section(
             "",
             "### Warnings",
             "",
-            "Observed crossings and the first forecast that showed them.",
+            "Observed crossings and the first forecast that showed them. A re-crossing starts"
+            " while the level was above the threshold in the 24 hours before; its warning is"
+            " not counted as lead time.",
             "",
             markdown_table(warning_table(warnings)),
+        ]
+    if not peaks.empty:
+        lines += [
+            "",
+            "### Peaks",
+            "",
+            "Forecasts issued k hours before each flood peak: highest value minus peak, value at"
+            " the peak minus peak, and timing of the highest value (positive is late).",
+            "",
+            markdown_table(peak_table(peaks)),
+        ]
+    if not lag.empty:
+        lines += [
+            "",
+            "### Lag check",
+            "",
+            "Shift in hours that best matches the forecast to the observed level on high water.",
+            "",
+            markdown_table(lag_table(lag)),
         ]
     lines += ["", "### Plots", ""]
     lines += [f"![{plot.stem}]({plot.as_posix()})" for plot in plots]
@@ -171,10 +259,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_info = json.loads((run / "run.json").read_text())
     tables = {name: read_csv(run / f"{name}.csv") for name in CSV_TABLES}
     predictions = pd.read_parquet(run / "predictions.parquet")
+    if not tables["warnings"].empty:
+        observed = observed_from_predictions(predictions)
+        tables["warnings"] = mark_re_crossings(tables["warnings"], observed)
+    registered = registered_models(EvaluationSettings.model_validate(run_info["settings"]))
     log = arguments.report_dir / "experiments.md"
     plot_dir = arguments.report_dir / "plots" / run.name
     check_new_run(log, run.name)
-    plots = report_plots.write_plots(predictions, tables, plot_dir)
+    plots = report_plots.write_plots(predictions, tables, registered, plot_dir)
     relative = [plot.relative_to(arguments.report_dir) for plot in plots]
     append_section(log, run.name, section(run.name, run_info, tables, relative, arguments.notes))
     return 0

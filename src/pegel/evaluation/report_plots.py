@@ -10,10 +10,9 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from pegel.evaluation import contract
 from pegel.evaluation.events import forecast_levels
 from pegel.evaluation.metrics import ALL_FOLDS, PERSISTENCE, SUBSET_ALL
-from pegel.evaluation.report import model_order
+from pegel.evaluation.report import model_order, observed_from_predictions
 
 PERSISTENCE_COLOUR = "#808080"
 # tab10 without its grey, which is reserved for persistence.
@@ -23,9 +22,15 @@ EVENT_MARGIN = pd.Timedelta(hours=24)
 DPI = 100
 
 
-def colours(models: list[str]) -> dict[str, str | tuple[float, float, float]]:
-    others = [model for model in model_order(models) if model != PERSISTENCE]
-    palette: dict[str, str | tuple[float, float, float]] = {PERSISTENCE: PERSISTENCE_COLOUR}
+Palette = dict[str, str | tuple[float, float, float]]
+
+
+def colours(models: list[str], registered: list[str]) -> Palette:
+    """A colour per model by its place in the registry, so a model keeps its colour across
+    runs; models not in the registry come after the registered ones."""
+    unregistered = sorted(set(models) - set(registered))
+    others = [model for model in [*registered, *unregistered] if model != PERSISTENCE]
+    palette: Palette = {PERSISTENCE: PERSISTENCE_COLOUR}
     palette.update({model: MODEL_COLOURS[i % len(MODEL_COLOURS)] for i, model in enumerate(others)})
     return palette
 
@@ -49,10 +54,9 @@ def _by_lead(scores: pd.DataFrame, fold: str, subset: str) -> pd.DataFrame:
     return rows.pivot(index="lead", columns="model", values=["mae", "skill"])
 
 
-def mae_plot(scores: pd.DataFrame, bootstrap: pd.DataFrame, path: Path) -> Path:
+def mae_plot(scores: pd.DataFrame, bootstrap: pd.DataFrame, palette: Palette, path: Path) -> Path:
     """MAE per lead for each subset, pooled over folds, with the bootstrap band on `all`."""
     subsets = list(scores["subset"].unique())
-    palette = colours(list(scores["model"]))
     figure, axes = plt.subplots(1, len(subsets), figsize=(5 * len(subsets), 4), squeeze=False)
     for ax, subset in zip(axes[0], subsets, strict=True):
         mae = _by_lead(scores, ALL_FOLDS, subset)["mae"]
@@ -60,13 +64,12 @@ def mae_plot(scores: pd.DataFrame, bootstrap: pd.DataFrame, path: Path) -> Path:
             ax.plot(mae.index, mae[model], color=palette[model], label=model)
             band = bootstrap[bootstrap["model"] == model] if not bootstrap.empty else bootstrap
             if subset == SUBSET_ALL and not band.empty:
-                # The interval of the gain over persistence, placed around the model's MAE.
+                # A band clear of the grey line means a gain significant at 90 %.
                 band = band.set_index("lead").reindex(mae.index)
-                base = mae[model] - band["mae_difference"]
                 ax.fill_between(
                     mae.index,
-                    base + band["low"],
-                    base + band["high"],
+                    mae[PERSISTENCE] + band["low"],
+                    mae[PERSISTENCE] + band["high"],
                     color=palette[model],
                     alpha=0.2,
                 )
@@ -76,25 +79,23 @@ def mae_plot(scores: pd.DataFrame, bootstrap: pd.DataFrame, path: Path) -> Path:
     return _save(figure, path)
 
 
-def skill_plot(scores: pd.DataFrame, path: Path) -> Path:
+def skill_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
     """Skill per lead against persistence, one panel per subset."""
     subsets = list(scores["subset"].unique())
-    palette = colours(list(scores["model"]))
     figure, axes = plt.subplots(1, len(subsets), figsize=(5 * len(subsets), 4), squeeze=False)
     for ax, subset in zip(axes[0], subsets, strict=True):
         skill = _by_lead(scores, ALL_FOLDS, subset)["skill"]
         for model in model_order(list(skill.columns)):
             ax.plot(skill.index, skill[model], color=palette[model], label=model)
-        _lead_axes(ax, "skill vs persistence (1 - MAE / MAE persistence)", subset)
+        _lead_axes(ax, "skill" if ax is axes[0][0] else "", subset)
     axes[0][0].legend()
     return _save(figure, path)
 
 
-def fold_plot(scores: pd.DataFrame, path: Path) -> Path:
+def fold_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
     """MAE per lead per fold, a row per subset, a column per fold."""
     subsets = list(scores["subset"].unique())
     folds = sorted(set(scores["fold"]) - {ALL_FOLDS})
-    palette = colours(list(scores["model"]))
     figure, axes = plt.subplots(
         len(subsets),
         len(folds),
@@ -121,24 +122,17 @@ def fold_plot(scores: pd.DataFrame, path: Path) -> Path:
     return _save(figure, path)
 
 
-def observed_from_predictions(predictions: pd.DataFrame) -> pd.Series:
-    """The observed cleaned level by target time, from the targets in the predictions."""
-    known = predictions.dropna(subset=["target"])
-    at = known[contract.ISSUED_AT] + known["lead"] * pd.Timedelta(hours=1)
-    return known["target"].groupby(at).first().sort_index()
-
-
 def event_plot(
     predictions: pd.DataFrame,
     observed: pd.Series,
     event: pd.Series,
     thresholds: list[float],
+    palette: Palette,
     path: Path,
 ) -> Path:
     """Observed level around one flood and each model's lead-6 and lead-12 forecasts."""
     start = pd.Timestamp(event["start"]) - EVENT_MARGIN
     end = pd.Timestamp(event["end"]) + EVENT_MARGIN
-    palette = colours(list(predictions["model"]))
     figure, ax = plt.subplots(figsize=(9, 4))
     ax.plot(observed[start:end], color="black", linewidth=2, label="observed")
     for model in model_order(list(predictions["model"])):
@@ -157,16 +151,22 @@ def event_plot(
 
 
 def write_plots(
-    predictions: pd.DataFrame, tables: dict[str, pd.DataFrame], plot_dir: Path
+    predictions: pd.DataFrame,
+    tables: dict[str, pd.DataFrame],
+    registered: list[str],
+    plot_dir: Path,
 ) -> list[Path]:
     """Every plot the tables allow; a missing or empty table only skips its plots."""
     plot_dir.mkdir(parents=True, exist_ok=True)
     scores, events, alarms = tables["scores"], tables["events"], tables["alarms"]
+    palette = colours(list(predictions["model"]), registered)
     plots: list[Path] = []
     if not scores.empty:
-        plots.append(mae_plot(scores, tables["bootstrap"], plot_dir / "mae.png"))
-        plots.append(skill_plot(scores, plot_dir / "skill.png"))
-        plots.append(fold_plot(scores, plot_dir / "mae-folds.png"))
+        plots.append(mae_plot(scores, tables["bootstrap"], palette, plot_dir / "mae.png"))
+        # Skill is 0 by definition for persistence, so a run of it alone has nothing to show.
+        if set(scores["model"]) != {PERSISTENCE}:
+            plots.append(skill_plot(scores, palette, plot_dir / "skill.png"))
+        plots.append(fold_plot(scores, palette, plot_dir / "mae-folds.png"))
     if events.empty:
         return plots
     thresholds = sorted(alarms["threshold_cm"].unique()) if not alarms.empty else []
@@ -174,6 +174,8 @@ def write_plots(
     for number, event in enumerate(events.to_dict("records"), start=1):
         name = f"event-{number}-{pd.Timestamp(event['peak_at']):%Y-%m-%d}.png"
         plots.append(
-            event_plot(predictions, observed, pd.Series(event), thresholds, plot_dir / name)
+            event_plot(
+                predictions, observed, pd.Series(event), thresholds, palette, plot_dir / name
+            )
         )
     return plots
