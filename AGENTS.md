@@ -60,6 +60,7 @@ docs/                       architecture, setup guides, decision records
 Already there today:
 - `.claude/rules/` — standards for code style, testing, git, pipelines, ML and operations
 - `.claude/hooks/` — Claude Code hooks, registered in `.claude/settings.json`
+- `.claude/agents/` — data and ML subagents, see its `README.md`
 - `.github/` — PR template and CI workflows (`secret-scan.yml`: gitleaks; `python.yml`: mypy, pytest, ruff)
 - `.githooks/` — gitleaks pre-commit hook; enable with `git config core.hooksPath .githooks`
 - `.env.example` — template for local config; real values go in the gitignored `.env` and `.env.local`
