@@ -30,6 +30,7 @@ def _dataset(observed: pd.Series) -> pd.DataFrame:
     """One issue time per observed hour; the target for lead k is the level k hours later."""
     dataset = pd.DataFrame({contract.ISSUED_AT: observed.index})
     dataset[contract.KD_LAST_CM] = observed.to_numpy()
+    dataset[contract.KD_LAST_AT] = observed.index
     dataset[contract.KD_LAST_RAW_CM] = observed.to_numpy()
     for lead in range(1, LEADS + 1):
         later = observed.shift(-lead).to_numpy()

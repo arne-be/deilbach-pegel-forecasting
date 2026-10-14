@@ -39,7 +39,9 @@ def score_tables(
     thresholds = alarm_thresholds(config)
     warning_levels = warning_thresholds(config)
     observed = events.observed_levels(dataset, leads)
-    last_levels = dataset.set_index(contract.ISSUED_AT)[contract.KD_LAST_CM]
+    last_readings = dataset.set_index(contract.ISSUED_AT)[
+        [contract.KD_LAST_CM, contract.KD_LAST_AT]
+    ]
     # Only events the predictions cover; the dataset also spans the training periods.
     first = predictions[contract.ISSUED_AT].min()
     last = predictions[contract.ISSUED_AT].max() + pd.Timedelta(hours=leads)
@@ -52,9 +54,11 @@ def score_tables(
         "alarms": events.alarms(predictions, observed, thresholds),
         "warnings": events.warning_lead_times(predictions, observed, thresholds),
         "crossings": crossings.crossing_warnings(
-            predictions, observed, last_levels, warning_levels
+            predictions, observed, last_readings, warning_levels
         ),
-        "false_alarms": crossings.false_alarms(predictions, observed, last_levels, warning_levels),
+        "false_alarms": crossings.false_alarms(
+            predictions, observed, last_readings, warning_levels
+        ),
         "lag": events.lag_check(predictions, dataset, leads, settings.high_water_cm),
     }
 

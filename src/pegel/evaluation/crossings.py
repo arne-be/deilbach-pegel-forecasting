@@ -7,18 +7,24 @@ count. Times are target times on the hourly hh:30 grid, as in `events`.
 The rules:
 
 - An observed crossing is an hour above the threshold whose previous hour was not above it.
-  It is a first crossing when no hour in the RE_CROSSING_HOURS before it was above the
+  A missing hour counts as not above, so a gap at the crossing moves the crossing to the first
+  known hour after the gap, which can add up to the gap length to `warning_hours`. It is a
+  first crossing when no hour in the RE_CROSSING_HOURS before it was above the
   threshold. Re-crossings are left out of the warnings: during a flood a forecast that stays
   high shows them without foreseeing anything.
 - A forecast crossing is an issue time whose last known level (`kd_last_cm`, what the model
-  saw) is not above the threshold and whose forecast is above it at some lead. Its time is
-  the target time of the first such lead.
+  saw) is known, at most STALE_HOURS old and not above the threshold, and whose forecast is
+  above it at some lead. Its time is the target time of the first such lead. Without a fresh
+  reading there is no telling whether the forecast rises from below.
 - A first crossing is warned by every forecast crossing issued before it and at most
   MATCH_HOURS away from it. The warning time is the crossing time minus the earliest such
   issue time, even if later forecasts drop the crossing again.
 - A forecast crossing with no observed crossing (first or re-crossing) within MATCH_HOURS is
   false. A run of hourly issue times with false forecast crossings is one false alarm, so a
-  warning that stays up for many hours counts once.
+  warning that stays up for many hours counts once. A run that flickers off for one hour, or
+  is broken by a missing issue hour, counts twice. A warning that comes more than
+  MATCH_HOURS too early is one false alarm, even if later forecasts warn of the crossing in
+  time.
 """
 
 from collections.abc import Sequence
@@ -30,6 +36,7 @@ from pegel.evaluation import contract
 
 RE_CROSSING_HOURS = 24
 MATCH_HOURS = 6
+STALE_HOURS = 3
 HOURS_PER_MONTH = 24 * 365.25 / 12
 
 _HOUR = pd.Timedelta(hours=1)
@@ -56,18 +63,24 @@ def observed_crossings(observed: pd.Series, threshold_cm: float) -> pd.DataFrame
 
 
 def forecast_crossings(
-    predictions: pd.DataFrame, last_levels: pd.Series, threshold_cm: float
+    predictions: pd.DataFrame, last_readings: pd.DataFrame, threshold_cm: float
 ) -> pd.DataFrame:
     """Per model, the issue times whose forecast crosses the threshold from below, with the
-    target time of the first lead above it (`crossing_at`)."""
+    target time of the first lead above it (`crossing_at`).
+
+    `last_readings` holds `kd_last_cm` and `kd_last_at` by issue time.
+    """
     frames = []
     for model, rows in predictions.groupby("model"):
         wide = rows.pivot_table(
             index=contract.ISSUED_AT, columns="lead", values="prediction", aggfunc="first"
         )
         above = wide.gt(threshold_cm)
-        level = last_levels.reindex(wide.index)
-        crossing = above.any(axis=1) & ~(level > threshold_cm).to_numpy()
+        reading = last_readings.reindex(wide.index)
+        age = wide.index - reading[contract.KD_LAST_AT]
+        fresh = age <= pd.Timedelta(hours=STALE_HOURS)
+        below = reading[contract.KD_LAST_CM] <= threshold_cm
+        crossing = above.any(axis=1) & below & fresh
         if not crossing.any():
             continue
         first_lead = above[crossing].idxmax(axis=1).astype(int)
@@ -88,7 +101,7 @@ def forecast_crossings(
 def crossing_warnings(
     predictions: pd.DataFrame,
     observed: pd.Series,
-    last_levels: pd.Series,
+    last_readings: pd.DataFrame,
     thresholds_cm: Sequence[float],
 ) -> pd.DataFrame:
     """One row per model, threshold and first crossing: the first warning and its lead.
@@ -102,7 +115,7 @@ def crossing_warnings(
     rows: list[dict[str, object]] = []
     for threshold in thresholds_cm:
         seen = observed_crossings(observed, threshold)
-        warned = forecast_crossings(predictions, last_levels, threshold)
+        warned = forecast_crossings(predictions, last_readings, threshold)
         for crossing_at in seen.loc[~seen["re_crossing"], "crossing_at"]:
             at = issued[contract.ISSUED_AT]
             covering = issued[(at >= crossing_at - window) & (at < crossing_at)]
@@ -129,7 +142,7 @@ def crossing_warnings(
 def false_alarms(
     predictions: pd.DataFrame,
     observed: pd.Series,
-    last_levels: pd.Series,
+    last_readings: pd.DataFrame,
     thresholds_cm: Sequence[float],
 ) -> pd.DataFrame:
     """False alarms per model and threshold, and per month of issue times scored."""
@@ -137,7 +150,7 @@ def false_alarms(
     rows: list[dict[str, object]] = []
     for threshold in thresholds_cm:
         seen = observed_crossings(observed, threshold)["crossing_at"].to_numpy("datetime64[ns]")
-        warned = forecast_crossings(predictions, last_levels, threshold)
+        warned = forecast_crossings(predictions, last_readings, threshold)
         for model in sorted(months.index):
             own = warned[warned["model"] == model].sort_values(contract.ISSUED_AT)
             forecast_at = own["crossing_at"].to_numpy("datetime64[ns]")
