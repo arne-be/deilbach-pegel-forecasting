@@ -1,6 +1,7 @@
 """Scores a predictions file against its dataset and writes the result tables as CSV.
 
-    uv run python -m pegel.evaluation.score <predictions.parquet> <dataset.parquet> --out <dir>
+    uv run --group analysis python -m pegel.evaluation.score \
+        <predictions.parquet> <dataset.parquet> --out <dir>
 
 Analysis only: reads Parquet (pyarrow, `analysis` group), so no job may import it.
 """
