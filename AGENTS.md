@@ -185,7 +185,7 @@ uv run pegel backfill-radar --from 2023-01-01 [--to 2026-10-01] [--cache-dir ~/.
 
 The frozen dataset for model evaluation (docs/decisions/0008) is built by a person from prod. It only reads: every transaction is read-only. It needs the `analysis` group (`uv sync --group analysis`) and writes `eval.parquet` and `eval.manifest.json` to a folder outside the repo; it never overwrites them. `--to` is inclusive.
 ```
-JOBS_DATABASE_URL="$(pbpaste)" uv run pegel build-eval-set --from 2024-02-01 --to 2026-04-12 --out ~/data/deilbach-pegel/eval/2026-10-14/
+JOBS_DATABASE_URL="$(pbpaste)" uv run --group analysis pegel build-eval-set --from 2024-02-01 --to 2026-04-12 --out ~/data/deilbach-pegel/eval/2026-10-14/
 pbcopy </dev/null
 ```
 
