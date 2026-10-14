@@ -93,7 +93,7 @@ Find the best point forecast for Kupferdreh for leads 1 to 24 hours. Every model
 
 ### Experiment log
 
-**Every scored run is appended to `analysis/model-evaluation/experiments.md`.** One section per run: date, code commit, dataset checksum, the models with their targets and feature sets, the mean MAE and skill per subset, and a short note on what was tried and what we learned. Nothing in it is edited afterwards; a later run that changes a conclusion says so in its own section. This keeps every comparison of models, features and approaches in one place.
+**Every scored run is appended to `analysis/model-evaluation/experiments.md`.** One section per run: date, code commit, dataset checksum, the models with their targets and feature sets, the mean MAE and skill per subset, the plots (MAE per lead for both subsets, skill per lead, and the event plots), and a short note on what was tried and what we learned. The plots are PNG files in `analysis/model-evaluation/plots/<run>/`, committed and embedded in the section. Nothing in it is edited afterwards; a later run that changes a conclusion says so in its own section. This keeps every comparison of models, features and approaches in one place.
 
 ### Model ladder
 
@@ -148,9 +148,9 @@ Anything beyond that (other boosting setups, neural networks) only if LightGBM l
 
 ### Dependencies
 
-**pandas goes into the main dependencies**, so the live job computes features with the same code as training. The Lambda image grows by pandas and numpy.
+**Everything the live forecast needs goes into the main dependencies and the Lambda image:** pandas for the features, scikit-learn and lightgbm for the models. The live job computes features with the same code as training, and any model from the ladder can go live without a dependency change.
 
-**A uv dependency group `analysis`** with pyarrow, scikit-learn and lightgbm, pinned. Not in the Lambda image until a chosen model needs it live.
+**A uv dependency group `analysis`** with what only the evaluation needs: pyarrow for the Parquet files and matplotlib for the plots. Pinned, not in the Lambda image.
 
 ### Order of work
 
@@ -172,7 +172,7 @@ Only A touches `pyproject.toml`, `uv.lock` and `config/pegel.json`. Each PR adds
 - Only 6 floods fall in the test folds, all in winter. There is no summer thunderstorm event to test on.
 - LANUV is sometimes later than the 25 minutes we assume (for example 2026-10-14 12:30). The backtest assumes 25 minutes; live may have one hour less upstream data now and then.
 - Picking the best of many models on the same folds is mild overfitting to those folds. The live shadow run checks it.
-- The Lambda image gets bigger with pandas.
+- The Lambda image gets bigger with pandas, scikit-learn and lightgbm (and their numpy and scipy).
 
 ## Rejected
 
