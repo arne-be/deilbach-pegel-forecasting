@@ -25,7 +25,7 @@ def _linear_dataset(hours: int = 800) -> pd.DataFrame:
 
 
 def _without_targets(dataset: pd.DataFrame) -> pd.DataFrame:
-    return dataset.drop(columns=TARGETS + contract.lead_columns(contract.TARGET_RAW, LEADS))
+    return dataset.loc[:, ~dataset.columns.str.startswith(f"{contract.TARGET}_")]
 
 
 def test_recovers_a_linear_relation() -> None:
