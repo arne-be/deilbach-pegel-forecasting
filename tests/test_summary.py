@@ -18,9 +18,9 @@ def _forecast(levels_by_lead: dict[int, float]) -> Forecast:
     return Forecast("kupferdreh", "test", OBSERVED_AT, OBSERVED_AT, points)
 
 
-# Rising to a peak of 150 cm at lead 20, then falling back.
+# Rising to a peak of 195 cm at lead 20, then falling back.
 FORECAST = _forecast(
-    {1: 60.0, 2: 70.0, 3: 90.0, 4: 110.0, 20: 150.0, 24: 130.0, 30: 190.0, 48: 80.0}
+    {1: 105.0, 2: 115.0, 3: 135.0, 4: 155.0, 20: 195.0, 24: 175.0, 30: 235.0, 48: 125.0}
 )
 
 
@@ -29,7 +29,7 @@ def _summary_for(hours: int) -> HorizonSummary:
 
 
 def test_short_horizon_ignores_later_higher_points() -> None:
-    assert _summary_for(3).max_level_cm == 90.0
+    assert _summary_for(3).max_level_cm == 135.0
 
 
 def test_horizon_includes_the_point_at_its_end() -> None:
@@ -46,7 +46,7 @@ def test_summary_category_matches_the_max_level() -> None:
 
 
 def test_longest_horizon_finds_the_overall_peak() -> None:
-    assert _summary_for(48).max_level_cm == 190.0
+    assert _summary_for(48).max_level_cm == 235.0
 
 
 def test_one_summary_per_horizon_in_the_given_order() -> None:
@@ -64,7 +64,7 @@ def test_lead_counts_from_the_newest_observation_not_the_issue_time() -> None:
     late_issue = Forecast(
         "kupferdreh", "test", OBSERVED_AT + timedelta(hours=2), OBSERVED_AT, FORECAST.points
     )
-    assert summarize(late_issue, [3], CATEGORIES)[0].max_level_cm == 90.0
+    assert summarize(late_issue, [3], CATEGORIES)[0].max_level_cm == 135.0
 
 
 def test_horizon_without_points_is_rejected() -> None:

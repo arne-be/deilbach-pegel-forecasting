@@ -11,7 +11,7 @@ Hourly water level forecast for the **Deilbach at Kupferdreh** (Essen), 48 hours
 - Water levels from public gauges further upstream (e.g. Langenberg).
 - Observed rain and rain forecasts for the Deilbach catchment around Velbert.
 - Everything is stored in our own database on AWS. Source systems are **read only**.
-- Spikes and gaps are cleaned automatically. Negative levels are valid and kept.
+- Spikes and gaps are cleaned automatically. Raw readings are kept, shifted to our zero point; cleaned levels never drop below 0.
 
 **Forecast**
 - A new forecast every hour for the next 48 hours.
@@ -38,21 +38,21 @@ How old the newest stored value of each source is when the hourly run starts at 
 | DWD RADOLAN RW | 40 min, every run | our own cutoff: the run only takes products before the issue time, the newest is hh-1:50. DWD's own delay is about 26 min ([docs/catchment.md](docs/catchment.md)) | 35 |
 | ICON-D2 (Open-Meteo) | newest run 90, 150 or 210 min old (sometimes 270) | a run every 3 hours, served about 90 min after it starts | 120 |
 
-The delay is the run time minus the newest `valid_at` that had `ingested_at` before the run (`ingested_at` only changes when a value is new or changed), so the same query works for any source and period. Two days at low water are a small sample, and since we only look at hh:30, we only know that Langenberg's batch arrives sometime between hh:05 and hh:30.
+The delay is the run time minus the newest `valid_at` that had `ingested_at` before the run (`ingested_at` only changes when a value is new or changed), so the same query works for any source and period. Two days at low water are a small sample, and since the runs only look at hh:30, they only show that Langenberg's batch arrives sometime between hh:05 and hh:30; the live probe below narrows it down.
 
 All LANUV gauges use 25 minutes, to keep it simple. A live probe on 2026-10-14 saw Langenberg's batch land between hh:13 and hh:18, so 25 matches what the hh:30 run sees. For Nierenhof, 15 would let backtests use hh:10 and hh:15 values that the live run didn't have when a batch was skipped. For Neviges, 25 only costs a few minutes of data in some hours.
 
 ## Flood categories
 
-Levels are relative to the local zero point: the concrete ledge of the sewer outlet. The water can be up to 25 cm below it. All levels are in centimetres.
+Levels are relative to the local zero point, 45 cm below the concrete ledge of the sewer outlet. The water never drops below it, so levels are never negative. All levels are in centimetres.
 
 | Category | Level | What happens |
 |---|---|---|
-| 1 · unkritisch | up to 100 cm | No action needed. |
-| 2 · kritisch | 100–120 cm | From 120 cm: close the backflow valve and connect the pump. The Deilbach overflows at the Kupferdreh car park. |
-| 3 · sehr kritisch | 120–140 cm | From 140 cm water goes over the wall. Set up mobile flood barriers. |
-| 4 · extrem kritisch | 140–180 cm | Barriers and raised wall keep water out of the yard. Lay sandbags in the yard. |
-| 5 · Chaos | above 180 cm | Water flows into the yard. Clear the ground floor flat, switch off power. |
+| 1 · unkritisch | up to 145 cm | No action needed. |
+| 2 · kritisch | 145–165 cm | From 165 cm: close the backflow valve and connect the pump. The Deilbach overflows at the Kupferdreh car park. |
+| 3 · sehr kritisch | 165–185 cm | From 185 cm water goes over the wall. Set up mobile flood barriers. |
+| 4 · extrem kritisch | 185–225 cm | Barriers and raised wall keep water out of the yard. Lay sandbags in the yard. |
+| 5 · Chaos | above 225 cm | Water flows into the yard. Clear the ground floor flat, switch off power. |
 
 ## Plan (first version, one week)
 
@@ -84,7 +84,7 @@ Levels are relative to the local zero point: the concrete ledge of the sewer out
    scripts/influx-query.sh
    scripts/influx-query.sh "SELECT * FROM \"level\" WHERE \"label\" = 'Deilbach' ORDER BY time DESC LIMIT 5"
    ```
-   The data is in measurement `level`, tags `label` and `device`, fields `level` (mm, relative to the staff gauge zero, so negative values are real) and `battery`. Readings are hourly, starting 2023-03-06.
+   The data is in measurement `level`, tags `label` and `device`, fields `level` (mm, relative to the concrete ledge, so often negative; ingest adds 45 cm to move it to our zero point) and `battery`. Readings are hourly, starting 2023-03-06.
 4. Enable the secret scan before your first commit:
    ```
    brew install gitleaks
@@ -96,7 +96,7 @@ On AWS, credentials and the client key come from AWS Secrets Manager, not from e
 
 ## Known limitations
 
-- **Few floods in the data.** Records start in March 2023. The highest level so far was 120 cm on 19.11.2024; there are no examples of category 3 or higher. The model will be reliable in normal conditions and much less certain in the situations that matter most.
+- **Few floods in the data.** Records start in March 2023. The highest level so far was 165 cm on 19.11.2024; there are no examples of category 3 or higher. The model will be reliable in normal conditions and much less certain in the situations that matter most.
 - **Short lead time from gauges.** Langenberg leads Kupferdreh by about one hour. Beyond a few hours the forecast depends almost entirely on the rain forecast, which is often off for a small catchment.
 - **Data access.** Still to confirm: automatic access to the public gauge data, how far back it goes, and whether we may show it on the website.
 - **Historical rain forecasts** may be hard to find, which limits how well the model can learn from them.

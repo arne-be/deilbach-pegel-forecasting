@@ -152,6 +152,8 @@ Loads history in monthly chunks with the same code the hourly job uses. It's the
 uv run pegel backfill --source influx --from 2023-03-01
 ```
 
+Changing a station's `level_offset_cm` needs a data migration like `db/migrations/20261014120000_shift_kupferdreh_levels.sql`, not a re-ingest: the upsert would treat every shifted value as a revision.
+
 After loading Kupferdreh history, or after changing the `cleaning` settings, rewrite its cleaned series. It needs only the database:
 ```
 uv run pegel clean --from 2023-03-01 [--to 2026-01-01]
