@@ -84,6 +84,14 @@ Then:
 
 6. **LightGBM, one model per lead**, with the same features as the linear model.
 
+**Each learned model is tried with three targets**, as separate entries in the scores:
+
+- **Level:** the level at hh+k:22.
+- **Change:** the level at hh+k:22 minus the last level at the issue time. The model's prediction is added to the last level.
+- **Hourly step:** the level at hh+k:22 minus the level one hour earlier. Each lead gets its own model. The steps are summed onto the last level. A training row needs both readings of its step.
+
+Models 2 to 4 already predict a change from the last level, so they get no variants. For the ridge model, the hourly step gives the same forecast as the change, because the sum of linear models is a linear model. So ridge is tried with level and change, and LightGBM with all three.
+
 Anything beyond that (other boosting setups, neural networks) only if LightGBM leaves a clear gap, for example on rising limbs.
 
 **Every model has the same interface:** `fit(train rows)` and `predict(rows) → 24 values per issue time`. Feature code lives in `src/pegel/core/features.py` and is shared with the live job.
