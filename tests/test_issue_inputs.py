@@ -133,6 +133,7 @@ def test_rows_have_the_contract_columns_and_the_30_day_base() -> None:
     areas = radar_areas()
     rows = build_rows(
         at(T),
+        "kupferdreh",
         cleaned,
         empty,
         {"langenberg": empty, "nierenhof": empty},

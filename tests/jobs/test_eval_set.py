@@ -16,6 +16,7 @@ from pegel.adapters.storage.series import ensure_series
 from pegel.config import load_config
 from pegel.core.radar import radar_series
 from pegel.core.rain_forecast import forecast_series
+from pegel.core.schedule import scheduled_available_at
 from pegel.core.series import (
     InputForecastValue,
     SeriesValue,
@@ -51,10 +52,17 @@ def seed(conn: Conn) -> None:
         for series in [level_series(s) for s in stations] + [cleaned_level_series(stations[0])]
         for hour, at in enumerate(hours)
     ]
+    radar_delay = timedelta(minutes=rain.radar.available_after_minutes)
     rains = [
-        SeriesValue(series.id, at + timedelta(minutes=50), 0.4, at + 2 * HOUR, 1.0)
+        SeriesValue(
+            series.id,
+            at + timedelta(minutes=50),
+            float(hour),
+            scheduled_available_at(at + timedelta(minutes=50), radar_delay, 30),
+            1.0,
+        )
         for series in radar.values()
-        for at in hours
+        for hour, at in enumerate(hours)
     ]
     upsert_values(conn, levels + rains, START)
     run_at = datetime(2025, 1, 14, 21, tzinfo=UTC)
@@ -80,6 +88,9 @@ def test_build_eval_set_writes_the_contract_columns_and_manifest(
     assert dataset[contract.KD_LAST_AT][0] == pd.Timestamp("2025-01-14T23:22Z")
     assert dataset["target_1"][0] == 65.0
     assert dataset["icon_lead_1"][0] == 3.0
+    # The 23:50 product is known from 00:30 on, so it is lag 0 there.
+    assert dataset["radar_catchment_lag_0"][0] == 3.0
+    assert dataset["radar_catchment_lag_1"][0] == 2.0
     manifest = contract.Manifest.model_validate_json(
         path.with_suffix(".manifest.json").read_text(encoding="utf-8")
     )
@@ -88,6 +99,16 @@ def test_build_eval_set_writes_the_contract_columns_and_manifest(
     assert manifest.config["evaluation"] == CONFIG.evaluation.model_dump(mode="json")
     with pytest.raises(SystemExit):
         eval_set.run(CONFIG, database_url, DAY, DAY, tmp_path)
+
+
+def test_connection_is_read_only(conn: Conn, database_url: str) -> None:
+    seed(conn)
+    with (
+        eval_set.connect_read_only(database_url) as read_only,
+        pytest.raises(psycopg.errors.ReadOnlySqlTransaction),
+    ):
+        read_only.execute("DELETE FROM observations")
+    assert conn.execute("SELECT count(*) FROM observations").fetchone() != (0,)
 
 
 def test_lambda_handler_imports_without_pyarrow() -> None:

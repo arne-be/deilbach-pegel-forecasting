@@ -70,6 +70,7 @@ def forecast_frame(values: Sequence[InputForecastValue]) -> pd.DataFrame:
 
 def build_rows(
     issued_at: pd.DatetimeIndex,
+    station_id: str,
     cleaned: pd.DataFrame,
     raw: pd.DataFrame,
     upstream: Mapping[str, pd.DataFrame],
@@ -81,7 +82,8 @@ def build_rows(
 ) -> pd.DataFrame:
     """One row per issue time, with exactly `contract.dataset_columns(list(radar), leads)`.
 
-    `upstream` holds the LANUV gauges by station id, `radar` the radar series by area.
+    `cleaned` and `raw` are the forecast station's (`station_id`) levels, `upstream` the other
+    gauges of `contract.GAUGE_PREFIXES` by station id, `radar` the radar series by area.
     """
     issued_at = _checked_issue_times(issued_at)
     columns: dict[str, object] = {contract.ISSUED_AT: issued_at}
@@ -89,16 +91,14 @@ def build_rows(
     columns[contract.KD_LAST_CM] = last["value"].to_numpy()
     columns[contract.KD_LAST_AT] = last["valid_at"].to_numpy()
     columns[contract.KD_LAST_RAW_CM] = newest_known(raw, issued_at)["value"].to_numpy()
-    kupferdreh_hours = hourly_windows(cleaned, issued_at, BASE_HOURS)
+    station_hours = hourly_windows(cleaned, issued_at, BASE_HOURS)
     # DataFrame.median skips NaN and gives NaN for an empty window, without a warning.
-    columns[contract.KD_BASE_30D_CM] = pd.DataFrame(kupferdreh_hours).median(axis=1).to_numpy()
-    windows = {"kupferdreh": kupferdreh_hours[:, : contract.LEVEL_LAG_HOURS]}
-    for station_id, frame in upstream.items():
-        windows[station_id] = hourly_windows(frame, issued_at, contract.LEVEL_LAG_HOURS)
-    for station_id in contract.GAUGE_PREFIXES:
-        columns.update(
-            zip(contract.level_lag_columns(station_id), windows[station_id].T, strict=True)
-        )
+    columns[contract.KD_BASE_30D_CM] = pd.DataFrame(station_hours).median(axis=1).to_numpy()
+    windows = {station_id: station_hours[:, : contract.LEVEL_LAG_HOURS]}
+    for gauge, frame in upstream.items():
+        windows[gauge] = hourly_windows(frame, issued_at, contract.LEVEL_LAG_HOURS)
+    for gauge in contract.GAUGE_PREFIXES:
+        columns.update(zip(contract.level_lag_columns(gauge), windows[gauge].T, strict=True))
     for area, frame in radar.items():
         lags = hourly_windows(frame, issued_at, contract.RADAR_LAG_HOURS)
         columns.update(zip(contract.radar_lag_columns(area), lags.T, strict=True))
