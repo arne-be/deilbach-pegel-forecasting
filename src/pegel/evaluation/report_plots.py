@@ -23,8 +23,12 @@ from pegel.evaluation.report_tables import (
 )
 
 PERSISTENCE_COLOUR = "#808080"
-# tab10 without its grey, which is reserved for persistence.
-MODEL_COLOURS = [c for i, c in enumerate(plt.get_cmap("tab10").colors) if i != 7]  # type: ignore[attr-defined]
+# tab20's dark shades, then its light ones, without the greys reserved for persistence: 18
+# distinct colours, so a run of all registered models doesn't reuse one.
+_TAB20 = plt.get_cmap("tab20").colors  # type: ignore[attr-defined]
+MODEL_COLOURS = [
+    c for i, c in [*enumerate(_TAB20)][0::2] + [*enumerate(_TAB20)][1::2] if i not in (14, 15)
+]
 EVENT_LEADS = {6: "-", 12: "--"}
 EVENT_MARGIN = pd.Timedelta(hours=24)
 WARNING_COLUMNS = 4
@@ -84,7 +88,7 @@ def mae_plot(scores: pd.DataFrame, bootstrap: pd.DataFrame, palette: Palette, pa
                 )
         _lead_axes(ax, "MAE (cm)", subset)
         ax.set_ylim(bottom=0)
-    axes[0][0].legend()
+    _legend_below(figure, axes[0][0])
     return _save(figure, path)
 
 
@@ -97,8 +101,19 @@ def skill_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
         for model in model_order(list(skill.columns)):
             ax.plot(skill.index, skill[model], color=palette[model], label=model)
         _lead_axes(ax, "skill" if ax is axes[0][0] else "", subset)
-    axes[0][0].legend()
+    _legend_below(figure, axes[0][0])
     return _save(figure, path)
+
+
+def _legend_below(figure: Figure, axes: Axes) -> None:
+    """Below the panels, so a dozen models don't cover the lines."""
+    figure.legend(
+        *axes.get_legend_handles_labels(),
+        loc="upper center",
+        ncols=4,
+        bbox_to_anchor=(0.5, 0.0),
+        fontsize="small",
+    )
 
 
 def fold_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
@@ -127,7 +142,7 @@ def fold_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
     # After plotting: on shared axes an earlier set_ylim would freeze the top too.
     for ax in axes.flat:
         ax.set_ylim(bottom=0)
-    axes[0][0].legend(fontsize="small")
+    _legend_below(figure, axes[0][0])
     return _save(figure, path)
 
 
