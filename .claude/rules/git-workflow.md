@@ -40,6 +40,7 @@ Use Conventional Commits:
 - Description: what changed, why, how it was tested, and what reviewers should look at closely.
 - Keep PRs small and focused. Tests and linters must pass before merging.
 - Review your own diff before opening the PR: no debug code, stray files or secrets.
+- **After opening a PR, start a review subagent** that first loads the skill `ponytail:ponytail` (exact name). It reviews the PR diff read-only and reports findings only, with file:line, a failure scenario and the smallest fix. Fix or answer each finding before asking for a merge.
 - **Always squash merge.** Delete the branch after merging.
 
 ## Cleanup after merge
