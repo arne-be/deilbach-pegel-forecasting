@@ -8,8 +8,12 @@ dependencies = [
     "boto3==1.43.111",
     "fastapi==0.143.0",
     "httpx==0.28.1",
+    "lightgbm==4.7.0",
+    "numpy==2.5.4",
+    "pandas==3.0.6",
     "psycopg[binary]==3.3.6",
     "pydantic==2.14.0",
+    "scikit-learn==1.9.1",
     "uvicorn==0.54.0",
 ]
 
@@ -17,8 +21,13 @@ dependencies = [
 pegel = "pegel.jobs.cli:main"
 
 [dependency-groups]
+analysis = [
+    "matplotlib==3.11.2",
+    "pyarrow==26.0.0",
+]
 dev = [
     "mypy==2.4.0",
+    "pandas-stubs==3.0.5.260914",
     "pytest==9.1.1",
     "ruff==0.17.0",
     "testcontainers[postgres]==4.15.0",

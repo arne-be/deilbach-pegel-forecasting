@@ -113,6 +113,21 @@ class RainSettings(_Frozen):
     forecast: RainForecastSettings
 
 
+class EvaluationSettings(_Frozen):
+    """The frozen setup for scoring forecast models (docs/decisions/0008)."""
+
+    # Issue times from the start of the first day to the end of the last day, both inclusive.
+    window_first_day: date
+    window_last_day: date
+    leads_hours: int = Field(gt=0)
+    # High water: the level is above this at the issue time or at the target.
+    high_water_cm: float = Field(gt=0)
+    # A flood event is a peak above this.
+    flood_cm: float = Field(gt=0)
+    # A target is the reading closest to its time, at most this far off; otherwise missing.
+    target_tolerance_minutes: int = Field(ge=0)
+
+
 class PegelConfig(_Frozen):
     stations: tuple[Station, ...]
     forecast: ForecastSettings
@@ -120,6 +135,7 @@ class PegelConfig(_Frozen):
     cleaning: CleaningSettings
     freshness: Freshness
     api: ApiSettings
+    evaluation: EvaluationSettings
     rain: RainSettings
 
     @model_validator(mode="after")
@@ -138,6 +154,13 @@ class PegelConfig(_Frozen):
             raise ValueError("category bounds must be set and ascending after the first one")
         if self.api.history_default_days > self.api.history_max_days:
             raise ValueError("the default history range must not exceed the maximum")
+        evaluation = self.evaluation
+        if evaluation.window_first_day > evaluation.window_last_day:
+            raise ValueError("the evaluation window must not end before it starts")
+        if evaluation.leads_hours > horizon:
+            raise ValueError("evaluation leads must not exceed the forecast horizon")
+        if evaluation.high_water_cm >= evaluation.flood_cm:
+            raise ValueError("the high water level must be below the flood level")
         return self
 
     def station(self, station_id: str) -> Station:

@@ -66,6 +66,14 @@
     "history_default_days": 7,
     "history_max_days": 31
   },
+  "evaluation": {
+    "window_first_day": "2024-02-01",
+    "window_last_day": "2026-04-12",
+    "leads_hours": 24,
+    "high_water_cm": 75,
+    "flood_cm": 95,
+    "target_tolerance_minutes": 10
+  },
   "rain": {
     "radar": {
       "source": "radolan_rw",
