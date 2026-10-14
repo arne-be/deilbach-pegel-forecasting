@@ -6,6 +6,7 @@ Creates what `infra/prod` and CI need before they can run:
 - the GitHub OIDC provider,
 - the role `deilbach-pegel-github-plan` for `tofu plan` in pull requests (read only, no secret values except the Grafana token),
 - the role `deilbach-pegel-github-deploy` for deploys from `main` (only resources named `deilbach-pegel*`; it also reads the secret `deilbach-pegel/migrate-database-url` to migrate the prod database),
+- the permissions boundary `deilbach-pegel-workload-boundary` (`boundary.tf`): the deploy role may only create or change `deilbach-pegel*` roles that carry it, so it can't create an admin role for itself,
 - the empty secret `deilbach-pegel/grafana-token`, which both roles can read ([docs/setup-grafana.md](../docs/setup-grafana.md)).
 
 You apply it by hand once, with admin credentials. CI never touches it. The state of this folder stays local, because it creates the bucket a remote backend would need.
@@ -39,6 +40,8 @@ aws s3 cp terraform.tfstate "s3://$(tofu output -raw tf_state_bucket)/bootstrap/
 ## Changing it
 
 When a deploy fails on a missing permission, widen the deploy role in `roles.tf`, open a PR, and after the merge run `tofu apply` here again by hand. The deploy role cannot change the CI roles itself.
+
+Every role in `infra/prod` needs `permissions_boundary = local.workload_boundary_arn`; without it the deploy fails with AccessDenied. When a workload needs more than the boundary allows, widen it in `boundary.tf` and apply here before merging the `infra/prod` change. The same goes for anything `infra/prod` needs to exist first: apply here from the branch, then merge.
 
 The state is local and gitignored, so it lives only in the main checkout (and the S3 copy). To apply from a worktree, copy `infra/bootstrap/terraform.tfstate` from the main checkout first and back afterwards. Without it, tofu starts from an empty state and tries to create everything again.
 
