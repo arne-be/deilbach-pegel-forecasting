@@ -59,7 +59,6 @@ def build_dataset(
         issued_at,
         station_id,
         cleaned=cleaned,
-        raw=observed(level_series_id(station_id)),
         upstream={gauge: observed(level_series_id(gauge)) for gauge in upstream},
         radar={area: observed(series.id) for area, series in radar.items()},
         icon_mean=pd.concat([forecast(catchment_series_id(source)) for source in sources]),

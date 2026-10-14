@@ -135,7 +135,6 @@ def test_rows_have_the_contract_columns_and_the_30_day_base() -> None:
         at(T),
         "kupferdreh",
         cleaned,
-        empty,
         {"langenberg": empty, "nierenhof": empty},
         dict.fromkeys(areas, empty),
         no_forecasts,
@@ -146,5 +145,4 @@ def test_rows_have_the_contract_columns_and_the_30_day_base() -> None:
     assert list(rows.columns) == contract.dataset_columns(areas, 24)
     assert rows[contract.KD_BASE_30D_CM][0] == 2.0
     assert rows[contract.KD_LAST_CM][0] == 0.0
-    assert math.isnan(rows[contract.KD_LAST_RAW_CM][0])
     assert rows["kd_lag_1"][0] == 1.0
