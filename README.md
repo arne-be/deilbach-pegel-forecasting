@@ -25,6 +25,21 @@ Hourly water level forecast for the **Deilbach at Kupferdreh** (Essen), 48 hours
 - If data is late or missing, the page says so clearly instead of showing an old forecast as current.
 - A paid login (annual fee) may be added later.
 
+## Data delays
+
+How old the newest stored value of each source is when the hourly run starts at hh:30 UTC. Measured on the prod database over 42 runs (2026-10-12 17:30 to 2026-10-14 10:30 UTC), all at low water. `available_after_minutes` in `config/pegel.json` is the delay backfills assume (see [docs/architecture.md](docs/architecture.md)).
+
+| Source | Delay at hh:30 | Pattern | `available_after_minutes` |
+|---|---|---|---|
+| Kupferdreh (Influx) | 8 min, every run | one reading per hour, at about :22 | 5 |
+| Langenberg (LANUV) | 25 min, every run | an hourly batch of 12 five-minute values, hh-1:10 to hh:05, arrives between hh:05 and hh:30 | 25 |
+| Nierenhof (LANUV) | median 10 min, p90 25 min | usually up to hh:20, sometimes only hh:05 | 15 (sometimes optimistic) |
+| Neviges (LANUV) | 5 to 20 min, median 15 | five-minute values | 15 |
+| DWD RADOLAN RW | 40 min, every run | our own cutoff: the run only takes products before the issue time, the newest is hh-1:50. DWD's own delay is about 26 min ([docs/catchment.md](docs/catchment.md)) | 35 |
+| ICON-D2 (Open-Meteo) | newest run 90, 150 or 210 min old (sometimes 270) | a run every 3 hours, served about 90 min after it starts | 120 |
+
+The delay is the run time minus the newest `valid_at` that had `ingested_at` before the run (`ingested_at` only changes when a value is new or changed), so the same query works for any source and period. Two days at low water are a small sample, and since we only look at hh:30, we only know that Langenberg's batch arrives sometime between hh:05 and hh:30.
+
 ## Flood categories
 
 Levels are relative to the local zero point: the concrete ledge of the sewer outlet. The water can be up to 25 cm below it. All levels are in centimetres.
