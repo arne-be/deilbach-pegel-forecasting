@@ -19,8 +19,8 @@ TargetKind = Literal["level", "change", "step"]
 Array = npt.NDArray[np.float64]
 
 
-def to_target(dataset: pd.DataFrame, kind: TargetKind) -> Array:
-    leads = sum(1 for c in dataset.columns if c.removeprefix(f"{contract.TARGET}_").isdigit())
+def to_target(dataset: pd.DataFrame, kind: TargetKind, leads: int) -> Array:
+    """Leads 1 to `leads`; the dataset may hold more than the settings it is scored with."""
     levels = dataset[contract.lead_columns(contract.TARGET, leads)].to_numpy(dtype=float)
     last = _last_level(dataset)
     if kind == "level":
