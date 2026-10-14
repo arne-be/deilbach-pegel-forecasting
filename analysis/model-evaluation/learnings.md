@@ -75,7 +75,7 @@ The ridge and simple-model numbers come from PRs #68 and #70 before merge. Score
 
 ## 2026-10-14 · The data
 
-A descriptive look at the target and the inputs in the frozen dataset. **It covers the whole window, test folds included**, so nothing here is a clean hold-out result. Where a number is a design choice (a threshold, a window, a coefficient), the pre-F1 value (before 2024-10-01) is given next to it, or the text says it wasn't checked there. Hourly series are built from the dataset: Kupferdreh at hh:22 (`target_1`), Langenberg and Nierenhof as lag 0 at hh:30 (valid about hh:00), radar as lag 0 (catchment mean = cell-weighted zone mean). All times UTC. Scripts stayed in a scratch folder.
+A descriptive look at the target and the inputs in the frozen dataset. **It covers the whole window, test folds included**, so nothing here is a clean hold-out result. Where a number is a design choice (a threshold, a window, a coefficient), the pre-F1 value (before 2024-10-01) is given next to it, or the text says it wasn't checked there. Hourly series are built from the dataset: Kupferdreh at hh:22 (`target_1`), Langenberg and Nierenhof as lag 0 at hh:30 (valid about hh:00), radar as lag 0. "Catchment mean" here is the cell-weighted mean of the five zones; the dataset's `radar_catchment` column is the cell maximum, not a mean. All times UTC. Scripts stayed in a scratch folder.
 
 ### The level
 
@@ -96,7 +96,7 @@ A descriptive look at the target and the inputs in the frozen dataset. **It cove
 ### Recession
 
 - **Two speeds.** Normalised to the event's rise, 32 single-peak events of at least 30 cm keep 77 % of the rise after 6 h, 65 % after 12 h, 52 % after 24 h and 39 % after 48 h. Two exponentials fit the median: 0.29 · exp(−t/6 h) + 0.71 · exp(−t/71 h). Pre-F1 alone (13 events): 0.40 · exp(−t/8.5 h) + 0.60 · exp(−t/83 h), 48 % left after 24 h.
-- **The 30-day base is not where the recession ends.** On dry hours from October to March the fall rate hardly depends on the distance to the base: 0.10 cm/h at 2–5 cm above it and 0.28 cm/h at 40–60 cm above. A linear reservoir towards the base fits badly. Its half-life is 83 h on the whole window and 46 h pre-F1. This fits the earlier recession factor of 0.8 at +24 h: the pull towards the base is weak.
+- **The 30-day base is not where the recession ends.** On dry hours from October to March the fall rate hardly depends on the distance to the base: 0.10 cm/h at 2–5 cm above it and 0.28 cm/h at 40–60 cm above. A linear reservoir towards the base fits badly. Its half-life is 83 h on the whole window and 46 h pre-F1. Qualifies the earlier "high levels fall back towards the 30-day base": they do, but slowly and not in proportion to the distance, which fits the fitted factor of 0.8 at +24 h.
 
 ![Normalised event shapes and the fall rate on dry hours](plots/data-2026-10-14/04-event-shape-recession.png)
 
@@ -116,7 +116,7 @@ A descriptive look at the target and the inputs in the frozen dataset. **It cove
 
 - **Raw and cleaned are the same at every target hour** (18,687 hours with both). Cleaning removed 5 hourly readings and changed none: three spikes of 256–317 cm on 2025-02-01, and single readings on 2024-09-04 and 2026-01-11 (130 cm). So `target_raw` adds nothing, and `kd_last_raw_cm` contains the 317 cm spike, so don't use it to label high water.
 - **Gaps are short, apart from two.** Kupferdreh misses 561 hours (2.9 %) in 214 gaps; 90 % of them are single hours. Two long ones: 170 h from 2024-05-08 and 160 h from 2026-01-26. Only one gap falls in high water (3 h on 2025-01-09 at 85 cm). Langenberg misses 13 hours; Nierenhof misses 139, mostly 2025-09-21 to 09-25.
-- **Correction to the earlier "38 %": lag 0 comes in two regimes.** Until late November 2024 Kupferdreh read at :27, so lag 0 was never known at hh:30: 100 % missing from February to September 2024. From about 2024-11-23 it reads at :19–:22, and lag 0 is known in 98–99 % of issue times, except for a short dip in early February 2026. Training for F1 never saw lag 0, and the test data mostly have it. The newest known reading is 10 minutes old in the median (90th percentile 63 minutes).
+- **Lag 0 comes in two regimes.** This corrects the earlier "the current hour's reading is missing in 38 % of cases": 38 % is the average of two regimes. It also corrects "Live behaves the same": live, lag 0 is now known in 98–99 % of issue times. Until 2024-11-19 Kupferdreh read at :26–:27, so lag 0 was never known at hh:30 (100 % missing until 2024-11-18, 75 % on 11-19). From 2024-11-20 it reads at :17–:18 (until January 2025), then at :19–:22, and lag 0 is missing in 0–4 % of issue times per day. The one dip, from 2026-01-26 to 02-02, is the 160-hour gap, not a timing change. Training for F1 never saw lag 0, and the test data mostly have it. The newest known reading is 10 minutes old in the median (90th percentile 63 minutes).
 
 ![Gaps and the lag-0 regime switch](plots/data-2026-10-14/05-data-quality.png)
 
@@ -137,7 +137,7 @@ A descriptive look at the target and the inputs in the frozen dataset. **It cove
 
 ![Rain intensity by zone and the zone-wise lag correlation](plots/data-2026-10-14/07-radar-zones.png)
 
-- **About 1.5 cm of rise per mm of rain, after a threshold of about 5 mm.** The sample is 159 isolated rain episodes: at least 1 mm, ended by 6 dry hours, and no rain in the 24 h after. Below 5 mm the level rises 1–3 cm in the median, and never by 10 cm. At 5–10 mm, 31 % rise by 10 cm or more; above 10 mm almost all do. Fit: rise ≈ 1.47 cm/mm × rain − 1.2 cm (R² 0.75); pre-F1 1.72 cm/mm − 1.8 (R² 0.76). Peak intensity adds a little on the whole window (R² 0.81), but its pre-F1 coefficient has the opposite sign, so it isn't robust. (The episode definition and the 5 mm threshold were not checked pre-F1.)
+- **Roughly linear, about 1.5 cm of rise per mm of rain; below 5 mm rises stay under 10 cm.** The sample is 159 isolated rain episodes: at least 1 mm, ended by 6 dry hours, and no rain in the 24 h after. Below 5 mm the level rises 1–3 cm in the median, and never by 10 cm. At 5–10 mm the median rise is 6.4 cm, and 31 % rise by 10 cm or more; above 10 mm almost all do. Fit: rise ≈ 1.47 cm/mm × rain − 1.2 cm (R² 0.75), which breaks even near 1 mm, so the data show no clear threshold; pre-F1 1.72 cm/mm − 1.8 (R² 0.76). Peak intensity adds a little on the whole window (R² 0.81), but its pre-F1 coefficient has the opposite sign, so it isn't robust. (The episode definition was not checked pre-F1.)
 - **A wet start does not mean a bigger rise in cm, rather the opposite.** For 1–10 mm, starting above the 30-day base gives median rises of 1.2–4.9 cm against 2.3–10.1 cm from below it. Rise correlates with the start level at −0.25 (pre-F1 −0.33), and with the 7-day radar sum at −0.13. A likely reason is the flatter rating at high levels (see the upstream curve): the same extra water gives fewer cm.
 - **Rain peak to level peak: 6 hours in the median** (quartiles 4 and 8, 90th percentile 11; 54 isolated episodes rising at least 10 cm; pre-F1 5.5).
 
@@ -155,7 +155,7 @@ A descriptive look at the target and the inputs in the frozen dataset. **It cove
 
 ### What this suggests for models
 
-1. **Build future rain as ICON sums with a threshold.** Use 6-hour and 24-hour sums of the ICON mean, not hourly values. Add a hinge such as max(sum − 5 mm, 0), since rain below about 5 mm barely moves the level and above it the rise is about 1.5 cm/mm. Leave out p90.
+1. **Build future rain as ICON sums.** Use 6-hour and 24-hour sums of the ICON mean, not hourly values; the response is roughly linear at about 1.5 cm/mm. A hinge such as max(sum − 5 mm, 0) is one candidate to test, not something the data demand. Leave out p90.
 2. **Model the recession from the recent trough or peak, not the 30-day base.** Two time scales: about 6–8 h for the fast part (about a third of the rise) and 70–80 h for the rest. Hours since the last peak and the height above the 72-hour minimum should beat "distance to the 30-day base".
 3. **Use the newest known reading and its age, never lag 0 directly.** Lag 0 was always missing before late November 2024 and is almost always there since. A feature built on lag 0 trains on one regime and tests on another.
 4. **Upstream gauges are for +1 to +3 h only.** They explain about a quarter of wet-weather changes in the first hours and nothing after 6 h, and they don't warn of onsets. Use the 3-hour changes; skip routing and travel times. If a level mapping is used, make it nonlinear and expect it to drift a few cm between folds.
