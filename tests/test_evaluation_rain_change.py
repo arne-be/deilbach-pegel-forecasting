@@ -146,9 +146,7 @@ def test_predict_needs_no_target_columns_and_gives_one_value_per_lead() -> None:
     model.fit(train)
     rows = eval_dataset(first_issue="2024-03-01T00:30Z", hours=50)
     expected = rows[[contract.KD_LAST_CM]].to_numpy() + _inputs(rows) @ KNOWN
-    inputs_only = rows.drop(
-        columns=TARGET_COLUMNS + contract.lead_columns(contract.TARGET_RAW, LEADS)
-    )
+    inputs_only = rows.loc[:, ~rows.columns.str.startswith(f"{contract.TARGET}_")]
     forecast = model.predict(inputs_only)
     assert forecast.shape == (50, LEADS)
     np.testing.assert_allclose(forecast, expected, atol=1e-6)
