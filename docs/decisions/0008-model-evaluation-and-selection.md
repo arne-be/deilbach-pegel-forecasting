@@ -33,9 +33,9 @@ Find the best point forecast for Kupferdreh for leads 1 to 24 hours. Every model
 
 ### ICON-D2 input
 
-**Every issue time gets the next 24 hours of rain forecast.** For each valid hour we take the value from the newest run that was available at the issue time. Features are the 24 hourly sums from hh:00 to hh+23:00, for the catchment mean and the ring p90, plus the age of the run.
+**Every issue time gets the next 24 hours of rain forecast.** For each valid hour we take the value from the newest run that was available at the issue time. Features are the 24 hourly sums from hh:00 to hh+23:00, for the catchment mean and the ring p90, plus the forecast lead of each value.
 
-**The archive forces a stitch.** ICON-D2 runs every 3 hours and forecasts 48 hours ahead. Live, the newest run is 1.5 to 3.5 hours old, so it always covers 24 hours and more. But the Open-Meteo archive does not keep whole runs before 2026-04. For each valid hour it keeps only two values: one from a run 1 to 3 hours earlier, one from a run 25 to 27 hours earlier. At an issue time, only the older one is known for most of the next 24 hours. So in the archive the rain forecast is 22 to 27 hours old, while live it is 1.5 to 24 hours old. Starting in 2024 does not avoid this; it is how the archive is stored.
+**The archive forces a stitch.** ICON-D2 runs every 3 hours and forecasts 48 hours ahead. Live, the newest run is 2.5 to 5.5 hours old, so it always covers 24 hours and more. But the Open-Meteo archive does not keep whole runs before 2026-04. For each valid hour it keeps only two values: one from a run 1 to 3 hours earlier, one from a run 25 to 27 hours earlier. At an issue time the fresh one is never known yet, so only the day-old one is used. So in the archive every hour ahead gets a forecast with a lead of 25 to 27 hours. Live, the lead grows with the hour ahead, from about 4 hours at +1 to about 27 hours at +24. Coverage is fine: the archive always has a known value up to 22.5 to 24.5 hours ahead, so the 24 sums are always complete. Starting in 2024 does not avoid this; it is how the archive is stored.
 
 **We accept the stitch and measure its effect.** A model trained on old forecasts will trust short-lead rain less than it could. We check the size of this with the full runs from Open-Meteo Single Runs (2026-04 to 2026-10) and with a live shadow run from 2026-10-12.
 
@@ -114,7 +114,7 @@ A uv dependency group `analysis` with pandas, pyarrow, scikit-learn and lightgbm
 
 ## Accepted
 
-- Training sees rain forecasts 22 to 27 hours old; live sees fresher ones. The archive scores are likely a bit pessimistic for rain-driven leads.
+- Training sees only rain forecasts with a 25 to 27 hour lead; live, short hours get much shorter leads. The archive scores are likely a bit pessimistic for rain-driven leads.
 - Only 6 floods fall in the test folds, all in winter. There is no summer thunderstorm event to test on.
 - LANUV is sometimes later than the 25 minutes we assume (for example 2026-10-14 12:30). The backtest assumes 25 minutes; live may have one hour less upstream data now and then.
 - Picking the best of six models on the same folds is mild overfitting to those folds.
