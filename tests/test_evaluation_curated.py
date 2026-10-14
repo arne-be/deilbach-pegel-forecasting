@@ -19,7 +19,6 @@ from pegel.evaluation.predict import selected_models
 SETTINGS = load_config().evaluation
 LEADS = SETTINGS.leads_hours
 TARGET_COLUMNS = contract.lead_columns(contract.TARGET, LEADS)
-RAW_TARGET_COLUMNS = contract.lead_columns(contract.TARGET_RAW, LEADS)
 
 
 def _model(inputs: tuple[str, ...] = RAIN_CHANGE_V2, **options: object) -> CuratedChange:
@@ -100,7 +99,7 @@ def test_predict_needs_no_targets_and_ignores_them() -> None:
     known = np.random.default_rng(4).normal(size=len(RIDGE_V2))
     model.fit(_with_targets(_training_rows("2024-06-01T00:30Z", 600), model, known))
     rows = eval_dataset(first_issue="2024-07-01T00:30Z", hours=30)
-    inputs_only = rows.drop(columns=TARGET_COLUMNS + RAW_TARGET_COLUMNS)
+    inputs_only = rows.drop(columns=[c for c in rows if str(c).startswith("target_")])
     forecast = model.predict(inputs_only)
     assert forecast.shape == (30, LEADS)
     assert np.isfinite(forecast).all()

@@ -14,7 +14,7 @@ All inputs of `rain_change:v2:split` (constant, distance to the 30-day base, Lan
 - **ICON-D2 sums over hours 1 to 6 and 1 to 24**, the same for every lead: how much rain is coming soon and in the next day.
 - **ICON-D2 sum 1..k times the last level / 10.** The data showed the same rain gives fewer cm from a high start. Its fitted coefficient is close to 0, so it adds little.
 
-Not used, after the inner splits: Kupferdreh level lags, upstream levels, ICON p90, the radar zones (one catchment mean is enough), the catchment radar maximum, radar beyond 24 hours, time of year, and upstream changes cut off after 6 hours.
+Not used, after the inner splits: Kupferdreh level lags, upstream levels, ICON p90, the radar zones (one catchment mean is enough), the catchment radar maximum, radar beyond 24 hours, the seasonal sine/cosine of `ridge:change` (the summer hour terms are used instead), and upstream changes cut off after 6 hours.
 
 The rising split of `rain_change:split` is used here too: one coefficient set for rising rows, one for the rest.
 
@@ -41,10 +41,10 @@ Per fold, mean MAE over leads 1 to 24, all issue times:
 
 | Fold | ridge:change | rain_change:split | ridge:change:v2 |
 |---|---|---|---|
-| F1 | 3.73 | 2.51 | 2.28 |
-| F2 | 1.72 | 1.80 | 1.68 |
-| F3 | 2.73 | 2.73 | 2.47 |
-| F4 | 1.93 | 2.03 | 1.77 |
+| F1 | 3.730 | 2.506 | 2.283 |
+| F2 | 1.716 | 1.799 | 1.682 |
+| F3 | 2.727 | 2.730 | 2.467 |
+| F4 | 1.932 | 2.034 | 1.770 |
 
 It beats both `ridge:change` and `rain_change:split` in all four folds and has the lowest pooled high-water MAE of all models so far. At +24 h it is 1.15 cm better than persistence (90 % bootstrap interval −1.43 to −0.87 cm). Against `rain_change:v2:split` it is level over all issue times (2.07 both) and better at high water (4.83 against 5.10).
 
@@ -56,4 +56,4 @@ It beats both `ridge:change` and `rain_change:split` in all four folds and has t
 - **Too low at high water.** Bias −1.73 cm at +6 h and −3.82 cm at +24 h.
 - **More false alarms** than version 1, and one warning fewer than `ridge:change` at 3 hours.
 - **Harder to read than `rain_change:v2:split`.** 20 inputs in two groups, some of them overlapping (two ICON windows and the sum to the lead), so single coefficients mean less.
-- **Chosen from about 70 candidates on inner splits**, see `analysis/model-evaluation/models-v2-candidates.csv`. The live shadow run is the clean test.
+- **Chosen from 68 candidates on inner splits** (plus 4 reference models, 72 rows in the CSV), see `analysis/model-evaluation/models-v2-candidates.csv`. The live shadow run is the clean test.

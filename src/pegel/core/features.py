@@ -96,8 +96,9 @@ def kupferdreh_change(dataset: pd.DataFrame, hours: int) -> Array:
     """The last level minus the hourly lag `hours` older than the lag the last level falls in.
 
     Counted from the newest reading, not from lag 0: lag 0 was never known at hh:30 before
-    2024-11-20 and nearly always since. Lag k covers ages in [k h, (k+1) h), so a last level
-    40 minutes old pairs with lag `hours` and one 70 minutes old with lag `hours + 1`.
+    2024-11-20 and known at 98-99 % of issue times since. Lag k covers ages in [k h, (k+1) h),
+    so a last level 40 minutes old pairs with lag `hours` and one 70 minutes old with lag
+    `hours + 1`.
     """
     lag = np.floor(last_level_age_hours(dataset)) + hours
     lags = dataset[contract.level_lag_columns("kupferdreh")].to_numpy(dtype=np.float64)
@@ -113,7 +114,9 @@ def recent_rise(dataset: pd.DataFrame, time_constant_hours: float) -> Array:
 
     Peak and trough are the highest and lowest of the last level and the 24 hourly lags, t the
     hours since the peak. A rise still going on counts in full; a rise long past fades the way
-    the fast part of a recession does. NaN when no level of the day is known.
+    the fast part of a recession does. NaN when no level of the day is known. Lag k is
+    counted as k + 1 hours old, though it is about k h old, so t is about an hour too long;
+    the fitted coefficients absorb that, and changing it needs a refit.
     """
     last = dataset[[contract.KD_LAST_CM]].to_numpy(dtype=np.float64)
     lags = dataset[contract.level_lag_columns("kupferdreh")].to_numpy(dtype=np.float64)

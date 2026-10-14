@@ -43,7 +43,7 @@ def test_change_is_nan_when_the_older_lag_is_missing_or_beyond_the_window() -> N
 
 def test_recent_rise_fades_with_the_hours_since_the_peak() -> None:
     rows = _flat_kupferdreh(eval_dataset(hours=3), 40.0)
-    # Peak 70 at lag 5 (column 6: about 6 hours ago), trough 30 at lag 20.
+    # Peak 70 at lag 5 (column 6, counted as 6 hours), trough 30 at lag 20.
     rows.loc[0, "kd_lag_5"] = 70.0
     rows.loc[0, "kd_lag_20"] = 30.0
     # Still rising: the last level is the peak.
