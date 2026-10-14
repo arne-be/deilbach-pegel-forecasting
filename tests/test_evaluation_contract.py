@@ -34,7 +34,7 @@ def test_training_starts_on_the_window_start(fold: contract.Fold) -> None:
 
 def test_test_period_includes_its_first_and_last_day() -> None:
     fold = contract.FOLDS[0]
-    test = contract.test_rows(_window_issue_times(), fold)
+    test = contract.holdout_rows(_window_issue_times(), fold)
     days = (test[contract.ISSUED_AT].min().date(), test[contract.ISSUED_AT].max().date())
     assert days == (fold.test_start, fold.test_end)
 

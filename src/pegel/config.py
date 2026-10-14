@@ -126,8 +126,6 @@ class EvaluationSettings(_Frozen):
     flood_cm: float = Field(gt=0)
     # A target is the reading closest to its time, at most this far off; otherwise missing.
     target_tolerance_minutes: int = Field(ge=0)
-    # Training issue times stop this long before the test starts, so no target reaches into it.
-    embargo_hours: int = Field(ge=0)
 
 
 class PegelConfig(_Frozen):

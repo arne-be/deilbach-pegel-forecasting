@@ -72,8 +72,7 @@
     "leads_hours": 24,
     "high_water_cm": 75,
     "flood_cm": 95,
-    "target_tolerance_minutes": 10,
-    "embargo_hours": 24
+    "target_tolerance_minutes": 10
   },
   "rain": {
     "radar": {

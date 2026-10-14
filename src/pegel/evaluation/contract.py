@@ -100,7 +100,7 @@ def _midnight_utc(day: date) -> pd.Timestamp:
     return pd.Timestamp(day, tz="UTC")
 
 
-def test_rows(dataset: pd.DataFrame, fold: Fold) -> pd.DataFrame:
+def holdout_rows(dataset: pd.DataFrame, fold: Fold) -> pd.DataFrame:
     """The rows issued in the fold's test period."""
     issued_at = dataset[ISSUED_AT]
     start = _midnight_utc(fold.test_start)
@@ -111,11 +111,12 @@ def test_rows(dataset: pd.DataFrame, fold: Fold) -> pd.DataFrame:
 def train_rows(dataset: pd.DataFrame, fold: Fold, settings: EvaluationSettings) -> pd.DataFrame:
     """The rows from the window start up to the embargo before the fold's test period.
 
-    Expanding window: training always starts on the window's first day.
+    Expanding window: training always starts on the window's first day. The embargo is the
+    longest lead, so no training target reaches into the test period.
     """
     issued_at = dataset[ISSUED_AT]
     start = _midnight_utc(settings.window_first_day)
-    end = _midnight_utc(fold.test_start) - pd.Timedelta(hours=settings.embargo_hours)
+    end = _midnight_utc(fold.test_start) - pd.Timedelta(hours=settings.leads_hours)
     return dataset[(issued_at >= start) & (issued_at < end)]
 
 
