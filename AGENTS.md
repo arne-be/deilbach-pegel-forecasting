@@ -29,7 +29,11 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - `scripts/influx-query.sh` and the docs
 - Grafana Cloud dashboards as code (read-only role `pegel_grafana`): `grafana/dashboards/`, `infra/prod/grafana.tf`, `docs/setup-grafana.md`
 - Live outlier filter exploration (three methods compared, plots, recommendation): `analysis/outliers/`
+- Evaluation dataset as known at each issue time (`pegel build-eval-set`): `src/pegel/core/issue_inputs.py`, `src/pegel/jobs/eval_set.py`
 - Model evaluation contracts (`evaluation` config, folds, dataset and file schemas, model interface): `src/pegel/evaluation/contract.py`, `tests/eval_factory.py`
+- Evaluation harness, persistence model, model registry and runner (`python -m pegel.evaluation.predict <dataset> --out <dir>`, writes `predictions.parquet`): `src/pegel/evaluation/harness.py`, `registry.py`, `predict.py`, `models/`
+- Model features shared by training and the live job, and the three target forms (level, change, hourly step): `src/pegel/core/features.py`, `src/pegel/evaluation/targets.py`
+- Evaluation metrics, flood events and the scoring runner (`python -m pegel.evaluation.score`): `src/pegel/evaluation/metrics.py`, `events.py`, `score.py`
 
 ## Layout
 
@@ -175,6 +179,14 @@ uv run pegel backfill --source lanuv-files --path <folder> --from 2000-01-01 [--
 Radar rain loads from DWD's archives: monthly tars (about 180 MB each) before 2025, single hourly files from 2025 on. Downloads stay in the cache folder, so reruns are quick; delete it when done.
 ```
 uv run pegel backfill-radar --from 2023-01-01 [--to 2026-10-01] [--cache-dir ~/.cache/deilbach-pegel/radolan]
+```
+
+### Evaluation dataset
+
+The frozen dataset for model evaluation (docs/decisions/0008) is built by a person from prod. It only reads: every transaction is read-only. It needs the `analysis` group (`uv sync --group analysis`) and writes `eval.parquet` and `eval.manifest.json` to a folder outside the repo; it never overwrites them. `--to` is inclusive.
+```
+JOBS_DATABASE_URL="$(pbpaste)" uv run pegel build-eval-set --from 2024-02-01 --to 2026-04-12 --out ~/data/deilbach-pegel/eval/2026-10-14/
+pbcopy </dev/null
 ```
 
 ### Deploy
