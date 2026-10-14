@@ -78,12 +78,14 @@ def episodes(levels: pd.Series, threshold_cm: float) -> pd.DataFrame:
 
 
 def peak_errors(predictions: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
-    """Peak height and timing error of the forecasts issued `lead` hours before each peak.
+    """Peak errors of the forecasts issued `lead` hours before each peak.
 
     The rule: for lead k, take the whole forecast issued k hours before the observed peak. Its
-    highest value minus the observed peak is the height error; the target time of that value
-    minus the peak time is the timing error in hours (positive is late). The first of equal
-    highest values counts, so a flat forecast peaks at its first lead.
+    highest value minus the observed peak is the height error; its value at the peak (lead k)
+    minus the observed peak is `at_peak_error_cm`. The target time of the highest value minus
+    the peak time is the timing error in hours (positive is late). A forecast whose highest
+    value is not above its first value has no peak to time, so its timing error is NaN; that
+    keeps persistence and other flat or falling forecasts out of the timing.
     """
     rows: list[dict[str, object]] = []
     known = predictions.dropna(subset=["prediction"]).sort_values("lead")
@@ -94,6 +96,8 @@ def peak_errors(predictions: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame
             forecast = known[known[contract.ISSUED_AT] == issued_at]
             for model, trajectory in forecast.groupby("model"):
                 best = trajectory.iloc[trajectory["prediction"].argmax()]
+                at_peak = trajectory.loc[trajectory["lead"] == lead, "prediction"]
+                has_peak = best["prediction"] > trajectory["prediction"].iloc[0]
                 rows.append(
                     {
                         "event": event_number,
@@ -101,7 +105,10 @@ def peak_errors(predictions: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame
                         "model": model,
                         "lead": lead,
                         "height_error_cm": best["prediction"] - peak_cm,
-                        "timing_error_hours": int(best["lead"]) - lead,
+                        "at_peak_error_cm": (
+                            at_peak.iloc[0] - peak_cm if not at_peak.empty else np.nan
+                        ),
+                        "timing_error_hours": int(best["lead"]) - lead if has_peak else np.nan,
                     }
                 )
     return pd.DataFrame(rows)
@@ -156,6 +163,7 @@ def warning_lead_times(
     A crossing is the start of an observed episode above the threshold. A forecast shows it
     when it was issued before the crossing and any of its values is above the threshold, so a
     forecast that has the rise a few hours early or late still counts as a warning.
+    The first such forecast counts even if later forecasts drop the crossing again.
     `warning_hours` is NaN when no forecast showed the crossing. Crossings without any forecast
     issued in the hours before them are left out.
     """

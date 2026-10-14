@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from pegel.config import PegelConfig, load_config
-from pegel.evaluation import events, metrics
+from pegel.evaluation import contract, events, metrics
 
 # Category 2 ("kritisch") is the second alarm level next to the flood threshold.
 ALARM_CATEGORY = 2
@@ -33,8 +33,8 @@ def score_tables(
     thresholds = alarm_thresholds(config)
     observed = events.observed_levels(dataset, leads)
     # Only events the predictions cover; the dataset also spans the training periods.
-    first = predictions["issued_at"].min()
-    last = predictions["issued_at"].max() + pd.Timedelta(hours=leads)
+    first = predictions[contract.ISSUED_AT].min()
+    last = predictions[contract.ISSUED_AT].max() + pd.Timedelta(hours=leads)
     floods = events.episodes(observed[first:last], settings.flood_cm)
     return {
         "scores": metrics.scores(predictions, dataset, settings),

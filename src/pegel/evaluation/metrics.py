@@ -55,8 +55,12 @@ def _with_persistence(rows: pd.DataFrame) -> pd.DataFrame:
 
 
 def _errors(rows: pd.DataFrame, target: str) -> pd.DataFrame:
-    """Signed errors against `target`, with the persistence error on rows where it exists."""
-    rows = rows[rows[target].notna()]
+    """Signed errors against `target`, with the persistence error on rows where it exists.
+
+    Rows without a prediction or a target are left out, so skill compares on rows where both
+    the model and persistence have a prediction and a target.
+    """
+    rows = rows[rows[target].notna() & rows["prediction"].notna()]
     error = rows["prediction"] - rows[target]
     persistence_error = (rows["persistence"] - rows[target]).abs()
     paired = persistence_error.notna()
@@ -118,10 +122,11 @@ def bootstrap_skill(
 
     Whole UTC days of issue times are drawn with replacement, the same draws for every model
     and lead, so neighbouring hours with correlated errors stay together. Negative is better
-    than persistence. Rows without a target or without a persistence forecast are left out.
+    than persistence. Rows without a target, a prediction or a persistence forecast are left out.
     """
     rows = _with_persistence(predictions)
-    rows = rows[rows[contract.TARGET].notna() & rows["persistence"].notna()]
+    known = rows[contract.TARGET].notna() & rows["prediction"].notna()
+    rows = rows[known & rows["persistence"].notna()]
     rows = rows[rows["model"] != PERSISTENCE]
     difference = (rows["prediction"] - rows[contract.TARGET]).abs() - (
         rows["persistence"] - rows[contract.TARGET]

@@ -144,3 +144,32 @@ def test_bootstrap_is_seeded() -> None:
     assert noisy["low"] < noisy["mae_difference"] < noisy["high"]
     other = _bootstrap_row(bootstrap_skill(predictions, resamples=200, seed=4), "noisy")
     assert other["low"] != noisy["low"]
+
+
+def test_a_missing_prediction_is_left_out_for_the_model_and_persistence() -> None:
+    issued = pd.date_range("2024-10-01T00:30Z", periods=2, freq="h")
+    dataset = pd.DataFrame(
+        {
+            contract.ISSUED_AT: issued,
+            contract.KD_LAST_CM: [50.0, 50.0],
+            contract.KD_LAST_RAW_CM: [50.0, 50.0],
+            "target_1": [50.0, 50.0],
+            "target_raw_1": [50.0, 50.0],
+        }
+    )
+    predictions = pd.DataFrame(
+        {
+            contract.ISSUED_AT: list(issued) * 2,
+            "lead": 1,
+            "model": [PERSISTENCE, PERSISTENCE, "m", "m"],
+            "fold": "F1",
+            "prediction": [54.0, 52.0, np.nan, 51.0],
+            "target": 50.0,
+        }
+    )
+    table = scores(predictions, dataset, SETTINGS)
+    selected = (table["model"] == "m") & (table["fold"] == "F1") & (table["subset"] == SUBSET_ALL)
+    row = table[selected].iloc[0]
+    assert row["n"] == 1
+    assert row["skill"] == pytest.approx(1 - 1 / 2)
+    assert _bootstrap_row(bootstrap_skill(predictions), "m")["mae_difference"] == -1

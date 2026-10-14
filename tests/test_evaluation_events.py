@@ -140,11 +140,13 @@ def test_peak_errors_by_hours_before_the_peak() -> None:
 
     def errors(model: str, lead: int) -> list[float]:
         row = table[(table["model"] == model) & (table["lead"] == lead)]
-        return row[["height_error_cm", "timing_error_hours"]].iloc[0].tolist()
+        return row[["height_error_cm", "at_peak_error_cm", "timing_error_hours"]].iloc[0].tolist()
 
-    assert errors("perfect", 4) == [0, 0]
-    # Issued 2 hours before the 120 cm peak, persistence holds 100 cm and peaks at its lead 1.
-    assert errors(PERSISTENCE, 2) == [-20, -1]
+    assert errors("perfect", 4) == [0, 0, 0]
+    # Issued 2 hours before the 120 cm peak, persistence holds 100 cm: flat, so no timing.
+    height, at_peak, timing = errors(PERSISTENCE, 2)
+    assert (height, at_peak) == (-20, -20)
+    assert np.isnan(timing)
 
 
 def test_lag_check_finds_a_known_shift() -> None:
