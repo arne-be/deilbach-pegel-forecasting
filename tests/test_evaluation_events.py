@@ -178,5 +178,15 @@ def test_runner_writes_every_table(tmp_path: Path) -> None:
         ]
     )
     written = sorted(path.stem for path in (tmp_path / "out").glob("*.csv"))
-    assert written == ["alarms", "bootstrap", "events", "lag", "peaks", "scores", "warnings"]
+    assert written == [
+        "alarms",
+        "bootstrap",
+        "crossings",
+        "events",
+        "false_alarms",
+        "lag",
+        "peaks",
+        "scores",
+        "warnings",
+    ]
     assert len(pd.read_csv(tmp_path / "out" / "events.csv")) == 1
