@@ -16,34 +16,19 @@ ALL_FOLDS = "all"
 SUBSET_ALL = "all"
 # Cleaned level above high_water_cm at the issue time or at the target.
 SUBSET_HIGH_WATER = "high_water"
-# The same judged by the raw level, and scored against the raw target.
-SUBSET_HIGH_WATER_RAW = "high_water_raw"
 
 _KEYS = [contract.ISSUED_AT, "lead"]
 
 
-def with_truth(predictions: pd.DataFrame, dataset: pd.DataFrame, leads: int) -> pd.DataFrame:
-    """Predictions joined with the last levels at the issue time and the raw target."""
-    raw = dataset.melt(
-        id_vars=[contract.ISSUED_AT],
-        value_vars=contract.lead_columns(contract.TARGET_RAW, leads),
-        var_name="lead",
-        value_name=contract.TARGET_RAW,
-    )
-    raw["lead"] = raw["lead"].str.rsplit("_", n=1).str[1].astype(int)
-    last = dataset[[contract.ISSUED_AT, contract.KD_LAST_CM, contract.KD_LAST_RAW_CM]]
-    truth = raw.merge(last, on=contract.ISSUED_AT)
-    return predictions.merge(truth, on=_KEYS, how="left", validate="many_to_one")
+def with_truth(predictions: pd.DataFrame, dataset: pd.DataFrame) -> pd.DataFrame:
+    """Predictions joined with the last cleaned level at the issue time."""
+    last = dataset[[contract.ISSUED_AT, contract.KD_LAST_CM]]
+    return predictions.merge(last, on=contract.ISSUED_AT, how="left", validate="many_to_one")
 
 
-def high_water(rows: pd.DataFrame, threshold_cm: float, *, raw: bool = False) -> pd.Series:
-    """Rows whose level is above the threshold at the issue time or at the target."""
-    last, target = (
-        (contract.KD_LAST_RAW_CM, contract.TARGET_RAW)
-        if raw
-        else (contract.KD_LAST_CM, contract.TARGET)
-    )
-    return (rows[last] > threshold_cm) | (rows[target] > threshold_cm)
+def high_water(rows: pd.DataFrame, threshold_cm: float) -> pd.Series:
+    """Rows whose cleaned level is above the threshold at the issue time or at the target."""
+    return (rows[contract.KD_LAST_CM] > threshold_cm) | (rows[contract.TARGET] > threshold_cm)
 
 
 def _with_persistence(rows: pd.DataFrame) -> pd.DataFrame:
@@ -102,14 +87,11 @@ def scores(
     One row per model, fold (each fold and "all" pooled over folds), subset and lead. Missing
     targets are left out. Skill is 1 - MAE / MAE of persistence on the rows both have.
     """
-    rows = _with_persistence(with_truth(predictions, dataset, settings.leads_hours))
+    rows = _with_persistence(with_truth(predictions, dataset))
     threshold = settings.high_water_cm
     subsets = {
         SUBSET_ALL: _errors(rows, contract.TARGET),
         SUBSET_HIGH_WATER: _errors(rows[high_water(rows, threshold)], contract.TARGET),
-        SUBSET_HIGH_WATER_RAW: _errors(
-            rows[high_water(rows, threshold, raw=True)], contract.TARGET_RAW
-        ),
     }
     frames = [_aggregate(errors).assign(subset=name) for name, errors in subsets.items()]
     return pd.concat(frames, ignore_index=True)[list(contract.SCORE_COLUMNS)]

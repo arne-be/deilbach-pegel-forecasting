@@ -209,7 +209,7 @@ def lag_check(
 
     A shift equal to the lead means the model is a delayed persistence.
     """
-    rows = with_truth(predictions, dataset, leads)
+    rows = with_truth(predictions, dataset)
     rows = rows[high_water(rows, high_water_cm)]
     observed = observed_levels(dataset, leads)
     at = _target_time(rows)

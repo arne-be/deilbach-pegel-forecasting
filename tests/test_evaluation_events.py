@@ -31,11 +31,9 @@ def _dataset(observed: pd.Series) -> pd.DataFrame:
     dataset = pd.DataFrame({contract.ISSUED_AT: observed.index})
     dataset[contract.KD_LAST_CM] = observed.to_numpy()
     dataset[contract.KD_LAST_AT] = observed.index
-    dataset[contract.KD_LAST_RAW_CM] = observed.to_numpy()
     for lead in range(1, LEADS + 1):
         later = observed.shift(-lead).to_numpy()
         dataset[f"target_{lead}"] = later
-        dataset[f"target_raw_{lead}"] = later
     return dataset
 
 
@@ -167,7 +165,6 @@ def test_runner_writes_every_table(tmp_path: Path) -> None:
     dataset = _dataset(observed)
     for lead in range(LEADS + 1, load_config().evaluation.leads_hours + 1):
         dataset[f"target_{lead}"] = np.nan
-        dataset[f"target_raw_{lead}"] = np.nan
     predictions.to_parquet(tmp_path / "predictions.parquet")
     dataset.to_parquet(tmp_path / "dataset.parquet")
     main(
