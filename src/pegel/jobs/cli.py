@@ -1,4 +1,5 @@
-"""Command line entry point for local runs: `backfill`, `backfill-*`, `clean`, `run-hourly`."""
+"""Command line entry point for local runs: `backfill`, `backfill-*`, `clean`, `run-hourly`,
+`build-eval-set`."""
 
 import argparse
 import os
@@ -58,6 +59,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         with sources_from_env() as (fetch, conn):
             changed = backfill(fetch, conn, station, start, end, config.forecast.issue_minute)
         print(f"Backfill {start:%Y-%m-%d} to {end:%Y-%m-%d %H:%M} UTC: {changed} rows stored")
+        return 0
+    if arguments.command == "build-eval-set":
+        # Lazy: the Lambda imports this module, and the dataset build isn't part of it.
+        from pegel.jobs import eval_set
+
+        database_url = _required_env("JOBS_DATABASE_URL")
+        eval_set.run(config, database_url, arguments.start, arguments.end, arguments.out)
         return 0
     if arguments.command == "clean":
         _clean_history(config, arguments.start, arguments.end)
@@ -223,6 +231,14 @@ def _parser() -> argparse.ArgumentParser:
     clean_parser.add_argument(
         "--to", dest="end", type=date.fromisoformat, help="UTC date, exclusive (default: now)"
     )
+    eval_parser = commands.add_parser(
+        "build-eval-set", help="build the evaluation dataset, reading the database read-only"
+    )
+    eval_parser.add_argument("--from", dest="start", type=date.fromisoformat, required=True)
+    eval_parser.add_argument(
+        "--to", dest="end", type=date.fromisoformat, required=True, help="UTC date, inclusive"
+    )
+    eval_parser.add_argument("--out", type=Path, required=True, help="folder outside the repo")
     hourly_parser = commands.add_parser("run-hourly", help="ingest recent hours and forecast")
     hourly_parser.add_argument(
         "--issued-at",
