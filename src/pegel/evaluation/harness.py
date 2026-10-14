@@ -26,10 +26,9 @@ def run(
         train = contract.train_rows(dataset, fold, settings)
         target_columns = contract.lead_columns(contract.TARGET, leads)
         targets = holdout[target_columns].to_numpy(np.float64)
-        # Models only see what is known at the issue time when they predict.
-        inputs = holdout.drop(
-            columns=target_columns + contract.lead_columns(contract.TARGET_RAW, leads)
-        )
+        # Models only see what is known at the issue time when they predict. The prefix also
+        # drops the target_raw_k columns of datasets built before the raw series was left out.
+        inputs = holdout.loc[:, ~holdout.columns.str.startswith(f"{contract.TARGET}_")]
         for factory in models:
             model = factory(settings)
             model.fit(train)

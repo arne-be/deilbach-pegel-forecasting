@@ -10,7 +10,6 @@ from pegel.evaluation.metrics import (
     PERSISTENCE,
     SUBSET_ALL,
     SUBSET_HIGH_WATER,
-    SUBSET_HIGH_WATER_RAW,
     bootstrap_skill,
     scores,
 )
@@ -24,9 +23,7 @@ def _dataset() -> pd.DataFrame:
         {
             contract.ISSUED_AT: ISSUED,
             contract.KD_LAST_CM: [50.0, 80.0, 50.0],
-            contract.KD_LAST_RAW_CM: [50.0, 80.0, 50.0],
             "target_1": [52.0, 70.0, np.nan],
-            "target_raw_1": [52.0, 90.0, 80.0],
         }
     )
 
@@ -74,15 +71,6 @@ def test_high_water_takes_rows_above_the_threshold_at_issue_or_target() -> None:
     assert row["n"] == 1
     assert row["mae"] == pytest.approx(4)
     assert row["skill"] == pytest.approx(0.6)
-
-
-def test_high_water_raw_scores_against_the_raw_target() -> None:
-    row = _score(SUBSET_HIGH_WATER_RAW)
-    # Issue 2 by its raw level 80, issue 3 by its raw target 80 although the cleaned one is NaN.
-    assert row["n"] == 2
-    assert row["mae"] == pytest.approx((16 + 40) / 2)
-    assert row["bias"] == pytest.approx(-28)
-    assert row["skill"] == pytest.approx(1 - 28 / 20)
 
 
 def test_persistence_has_skill_zero() -> None:
@@ -152,9 +140,7 @@ def test_a_missing_prediction_is_left_out_for_the_model_and_persistence() -> Non
         {
             contract.ISSUED_AT: issued,
             contract.KD_LAST_CM: [50.0, 50.0],
-            contract.KD_LAST_RAW_CM: [50.0, 50.0],
             "target_1": [50.0, 50.0],
-            "target_raw_1": [50.0, 50.0],
         }
     )
     predictions = pd.DataFrame(
