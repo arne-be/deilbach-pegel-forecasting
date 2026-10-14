@@ -30,11 +30,10 @@ def _dataset(observed: pd.Series) -> pd.DataFrame:
     """One issue time per observed hour; the target for lead k is the level k hours later."""
     dataset = pd.DataFrame({contract.ISSUED_AT: observed.index})
     dataset[contract.KD_LAST_CM] = observed.to_numpy()
-    dataset[contract.KD_LAST_RAW_CM] = observed.to_numpy()
+    dataset[contract.KD_LAST_AT] = observed.index
     for lead in range(1, LEADS + 1):
         later = observed.shift(-lead).to_numpy()
         dataset[f"target_{lead}"] = later
-        dataset[f"target_raw_{lead}"] = later
     return dataset
 
 
@@ -166,7 +165,6 @@ def test_runner_writes_every_table(tmp_path: Path) -> None:
     dataset = _dataset(observed)
     for lead in range(LEADS + 1, load_config().evaluation.leads_hours + 1):
         dataset[f"target_{lead}"] = np.nan
-        dataset[f"target_raw_{lead}"] = np.nan
     predictions.to_parquet(tmp_path / "predictions.parquet")
     dataset.to_parquet(tmp_path / "dataset.parquet")
     main(
@@ -178,5 +176,15 @@ def test_runner_writes_every_table(tmp_path: Path) -> None:
         ]
     )
     written = sorted(path.stem for path in (tmp_path / "out").glob("*.csv"))
-    assert written == ["alarms", "bootstrap", "events", "lag", "peaks", "scores", "warnings"]
+    assert written == [
+        "alarms",
+        "bootstrap",
+        "crossings",
+        "events",
+        "false_alarms",
+        "lag",
+        "peaks",
+        "scores",
+        "warnings",
+    ]
     assert len(pd.read_csv(tmp_path / "out" / "events.csv")) == 1

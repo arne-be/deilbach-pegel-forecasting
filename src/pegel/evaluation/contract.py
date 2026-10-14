@@ -1,7 +1,7 @@
 """What every part of the model evaluation agrees on: folds, file schemas and the model interface.
 
 The dataset has one row per issue time (hh:30 UTC) and a column `issued_at` (tz-aware UTC). It
-holds raw history windows, not features. Every input is as known at the issue time; a missing
+holds history windows, not features. Every input is as known at the issue time; a missing
 value is NaN and is never filled in the dataset.
 """
 
@@ -21,8 +21,6 @@ ISSUED_AT = "issued_at"
 # The newest cleaned Kupferdreh reading known at the issue time, and its valid time.
 KD_LAST_CM = "kd_last_cm"
 KD_LAST_AT = "kd_last_at"
-# The same from the raw series, to tell high water by the raw level.
-KD_LAST_RAW_CM = "kd_last_raw_cm"
 # Median of the cleaned hourly levels of the 30 days before the issue time.
 KD_BASE_30D_CM = "kd_base_30d_cm"
 
@@ -55,19 +53,18 @@ def lead_columns(prefix: str, leads: int) -> list[str]:
 ICON_MEAN = "icon_mean"
 ICON_P90 = "icon_p90"
 ICON_LEAD = "icon_lead"
-# Cleaned and raw Kupferdreh level for each lead; NaN when no reading is close enough.
+# Cleaned Kupferdreh level for each lead; NaN when no reading is close enough.
 TARGET = "target"
-TARGET_RAW = "target_raw"
 
 
 def dataset_columns(radar_areas: Sequence[str], leads: int) -> list[str]:
     """Every column of the dataset, in order. `radar_areas` are the areas of the cells file."""
-    columns = [ISSUED_AT, KD_LAST_CM, KD_LAST_AT, KD_LAST_RAW_CM, KD_BASE_30D_CM]
+    columns = [ISSUED_AT, KD_LAST_CM, KD_LAST_AT, KD_BASE_30D_CM]
     for station_id in GAUGE_PREFIXES:
         columns += level_lag_columns(station_id)
     for area in radar_areas:
         columns += radar_lag_columns(area)
-    for prefix in (ICON_MEAN, ICON_P90, ICON_LEAD, TARGET, TARGET_RAW):
+    for prefix in (ICON_MEAN, ICON_P90, ICON_LEAD, TARGET):
         columns += lead_columns(prefix, leads)
     return columns
 

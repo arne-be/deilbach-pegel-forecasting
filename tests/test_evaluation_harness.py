@@ -79,8 +79,11 @@ def test_training_rows_end_an_embargo_before_the_test_period() -> None:
 
 
 def test_predict_never_sees_a_target() -> None:
+    dataset = _dataset()
+    # Datasets built before the raw series was left out still carry raw target columns.
+    dataset["target_raw_1"] = dataset["target_1"]
     _Spy.instances = []
-    harness.run(_dataset(), [_Spy], SETTINGS)
+    harness.run(dataset, [_Spy], SETTINGS)
     columns = _Spy.instances[0].predict_columns
     assert contract.KD_LAST_CM in columns
     assert not [column for column in columns if column.startswith(contract.TARGET)]
