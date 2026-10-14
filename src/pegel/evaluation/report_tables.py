@@ -16,6 +16,8 @@ ALARM_LEADS = (1, 6, 12, 24)
 PEAK_LEADS = (6, 12)
 # A warning this many hours ahead leaves time to act.
 WARNED_HOURS = 3
+# A warning this many hours ahead is early enough to prepare.
+EARLY_HOURS = 6
 # A crossing with the level above the threshold this long before it continues a flood.
 RE_CROSSING_WINDOW = pd.Timedelta(hours=24)
 
@@ -112,14 +114,19 @@ def first_crossings(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def crossing_table(crossings: pd.DataFrame) -> pd.DataFrame:
-    """Per model and threshold: first crossings, how many were warned 3 and 6 hours ahead,
+    """Per model and threshold: first crossings, how many were warned WARNED_HOURS and
+    EARLY_HOURS ahead,
     and the median hours ahead of the warned ones."""
     grouped = crossings.groupby(["model", "threshold_cm"])["warning_hours"]
     table = pd.DataFrame(
         {
             "crossings": grouped.size(),
-            "warned >= 3 h": grouped.agg(lambda hours: int((hours >= 3).sum())),
-            "warned >= 6 h": grouped.agg(lambda hours: int((hours >= 6).sum())),
+            f"warned >= {WARNED_HOURS} h": grouped.agg(
+                lambda hours: int((hours >= WARNED_HOURS).sum())
+            ),
+            f"warned >= {EARLY_HOURS} h": grouped.agg(
+                lambda hours: int((hours >= EARLY_HOURS).sum())
+            ),
             "median hours ahead": grouped.median(),
         }
     )
@@ -238,10 +245,15 @@ def summary(
             versus = "" if pd.isna(baseline) else f"; persistence {baseline:.1f} cm"
             parts.append(f"{best} {where} ({values.min():.1f} cm{versus})")
         lines = [f"Lowest mean MAE over leads 1-{last_lead} h: {parts[0]}, {parts[1]}."]
-    if "warned" in numbers:
+    scored = numbers.dropna(subset=["crossings"]) if "warned" in numbers else numbers.iloc[:0]
+    if not scored.empty:
+        warned, total = scored["warned"], scored["crossings"]
+        # Only the best model and persistence; the table has every model.
+        named = dict.fromkeys([str(warned.idxmax()), PERSISTENCE])
         counts = ", ".join(
-            f"{model} {row.warned:.0f} of {row.crossings:.0f}"
-            for model, row in numbers.dropna(subset=["crossings"]).iterrows()
+            f"{model} {warned[model]:.0f} of {total[model]:.0f}"
+            for model in named
+            if model in warned.index
         )
         lines.append(
             f"First crossings of {flood_cm:g} cm warned at least {WARNED_HOURS} h ahead: {counts}."
@@ -264,6 +276,8 @@ def _cell(value: Any) -> str:
 def markdown_table(table: pd.DataFrame) -> str:
     """A GitHub Markdown table; the index levels become the first columns."""
     frame = table.reset_index()
+    if "threshold_cm" in frame:
+        frame["threshold_cm"] = [f"{threshold:g}" for threshold in frame["threshold_cm"]]
     header = "| " + " | ".join(str(column) for column in frame.columns) + " |"
     rule = "|" + "---|" * len(frame.columns)
     body = [

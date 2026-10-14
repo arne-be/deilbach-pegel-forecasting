@@ -233,9 +233,15 @@ def test_summary_names_the_best_model_and_the_warnings() -> None:
     assert lines == [
         "Lowest mean MAE over leads 1-24 h: ridge over all issue times (6.2 cm; persistence"
         " 12.5 cm), ridge at high water (6.2 cm; persistence 12.5 cm).",
-        "First crossings of 95 cm warned at least 3 h ahead: persistence 0 of 2, ridge 1 of 2.",
+        "First crossings of 95 cm warned at least 3 h ahead: ridge 1 of 2, persistence 0 of 2.",
         "False alarms at 95 cm: 0.00 to 0.50 per month.",
     ]
+    zeta_scores = _scores().query("model == 'ridge'").assign(model="zeta")
+    zeta_crossings = _crossings().query("model == 'ridge'").assign(model="zeta", warning_hours=0.0)
+    scores = pd.concat([_scores(), zeta_scores])
+    crossings = pd.concat([_crossings(), zeta_crossings])
+    three = report_tables.summary(scores, crossings, _false_alarms(), 95.0)
+    assert three[1] == lines[1]
     alone = _scores()[_scores()["model"] == PERSISTENCE]
     assert report_tables.summary(alone, pd.DataFrame(), pd.DataFrame(), 95.0) == [
         "Mean MAE of persistence over leads 1-24 h: 12.5 cm over all issue times, 12.5 cm at"
@@ -282,7 +288,7 @@ def test_section_puts_summary_and_headline_first_and_folds_the_details() -> None
     assert "<summary>Flood events: observed level and forecasts (1 plots)</summary>" in text
     assert "Subset `high_water`" in text
     assert "<summary>Alarms per lead (diagnostic)</summary>" in text
-    assert "| ridge | 95.00 | 2 | 1 | 1 | 3.50 |" in text
+    assert "| ridge | 95 | 2 | 1 | 1 | 3.50 |" in text
     assert "commit `0123456789ab` (dirty)" in text
     assert "Models: persistence, ridge" in text
     assert text.count("<details>") == text.count("</details>")

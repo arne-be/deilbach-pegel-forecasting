@@ -15,6 +15,7 @@ from matplotlib.patches import Patch
 from pegel.evaluation.events import forecast_levels
 from pegel.evaluation.metrics import ALL_FOLDS, PERSISTENCE, SUBSET_ALL
 from pegel.evaluation.report_tables import (
+    EARLY_HOURS,
     WARNED_HOURS,
     first_crossings,
     model_order,
@@ -200,7 +201,7 @@ def warning_plot(crossings: pd.DataFrame, palette: Palette, path: Path, note: st
         ax = axes[row][column]
         ax.set_visible(True)
         ax.axvspan(-WARNED_HOURS, 0.5, color="tab:red", alpha=0.12, linewidth=0)
-        ax.axvspan(-earliest, -6, color="tab:green", alpha=0.10, linewidth=0)
+        ax.axvspan(-earliest, -EARLY_HOURS, color="tab:green", alpha=0.10, linewidth=0)
         same = (crossings["threshold_cm"] == threshold) & (crossings["crossing_at"] == at)
         hours = crossings[same].set_index("model")["warning_hours"]
         for y, model in enumerate(models):
@@ -213,7 +214,7 @@ def warning_plot(crossings: pd.DataFrame, palette: Palette, path: Path, note: st
         ax.set_xlabel("hours before the crossing", fontsize="small")
     zones = [
         Patch(color="tab:red", alpha=0.25, label=f"< {WARNED_HOURS} h: too late to act"),
-        Patch(color="tab:green", alpha=0.2, label=">= 6 h ahead"),
+        Patch(color="tab:green", alpha=0.2, label=f">= {EARLY_HOURS} h ahead"),
     ]
     title = "First warning before each first crossing (no dot: missed)"
     figure.suptitle(f"{title}\n{note}" if note else title)

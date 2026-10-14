@@ -147,7 +147,9 @@ def section(
         lines += _table_details(
             "Alarms per lead (diagnostic)",
             "Flood episodes per threshold: hits / misses / false alarms of the lead-k"
-            " forecasts. A forecast issued during a flood scores a hit by staying high.",
+            " forecasts, counted as overlapping episodes per lead. A different rule from the"
+            " crossings and false alarms in the headline: a forecast issued during a flood"
+            " scores a hit by staying high. A diagnostic only.",
             report_tables.alarm_table(alarms),
         )
     if not peaks.empty:
