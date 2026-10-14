@@ -15,8 +15,8 @@ plots follow; the detail tables and the plot per flood are folded below them. Pl
 - **Skill:** 1 - MAE / MAE of persistence on the same rows. Persistence is 0; above 0 is
   better than holding the last level.
 - **High water:** issue times where the cleaned level is above `evaluation.high_water_cm`
-  (75 cm) at the issue time or at the target. `high_water_raw` is the same by the raw level,
-  scored against the raw target.
+  (75 cm) at the issue time or at the target. Every score uses only the cleaned Kupferdreh
+  series, never the raw one.
 - **Crossing:** the observed level goes above a threshold (95 cm and each category bound).
   Only first crossings count, with no hour above the threshold in the 24 hours before. A model
   warned when a forecast issued before the crossing showed it; less than 3 hours ahead is too
@@ -43,7 +43,7 @@ Mean MAE of persistence over leads 1-24 h: 2.8 cm over all issue times, 8.3 cm a
 First crossings of 95 cm warned at least 3 h ahead: persistence 0 of 6.
 False alarms at 95 cm: 0.00 per month.
 
-**Notes:** Persistence MAE 0.66 cm at +1 h and 4.01 cm at +24 h over all issue times; 1.36 cm at +1 h and 12.99 cm at +24 h at high water. At 95 cm its per-lead alarms (a diagnostic) hit 7 of 8 flood episodes at +1 h and 5 of 8 at +24 h; the one episode above 145 cm (2024-11-19) is hit at +1 h to +5 h and missed from +6 h on. It warns ahead of none of the 6 first crossings of 95 cm; its two warnings are re-crossings (2025-01-08, 2025-01-27). Peaks are underforecast by 27.6 cm at +6 h and 36.9 cm at +12 h on average; the lag check gives a shift equal to the lead. All 8 flood episodes fall in F1 and F2. No bootstrap band and no skill plot: the run has only persistence. The files `crossings.csv` and `false_alarms.csv` were written by the crossing scorer of PR #73 (not yet merged) after the rest of the run.
+**Notes:** Persistence MAE 0.66 cm at +1 h and 4.01 cm at +24 h over all issue times; 1.36 cm at +1 h and 12.99 cm at +24 h at high water. At 95 cm its per-lead alarms (a diagnostic) hit 7 of 8 flood episodes at +1 h and 5 of 8 at +24 h; the one episode above 145 cm (2024-11-19) is hit at +1 h to +5 h and missed from +6 h on. It warns ahead of none of the 6 first crossings of 95 cm; its two warnings are re-crossings (2025-01-08, 2025-01-27). Peaks are underforecast by 27.6 cm at +6 h and 36.9 cm at +12 h on average; the lag check gives a shift equal to the lead. All 8 flood episodes fall in F1 and F2. No bootstrap band and no skill plot: the run has only persistence. Scored with PRs #67, #73 and #74 combined (none merged yet): #73 writes `crossings.csv` and `false_alarms.csv`, #74 scores only the cleaned series and drops the `high_water_raw` subset.
 
 | model | mean MAE all (cm) | mean MAE high water (cm) | MAE +24 h high water (cm) | skill +24 h high water | 95 cm crossings warned >= 3 h | false alarms per month at 95 cm |
 |---|---|---|---|---|---|---|
@@ -90,12 +90,6 @@ Subset `high_water`:
 | model | +1 h | +3 h | +6 h | +12 h | +24 h | mean 1-24 h | mean skill |
 |---|---|---|---|---|---|---|---|
 | persistence | 1.36 | 3.15 | 5.39 | 8.57 | 12.99 | 8.25 | 0.00 |
-
-Subset `high_water_raw`:
-
-| model | +1 h | +3 h | +6 h | +12 h | +24 h | mean 1-24 h | mean skill |
-|---|---|---|---|---|---|---|---|
-| persistence | 2.10 | 3.85 | 6.04 | 9.14 | 13.48 | 8.83 | 0.00 |
 
 </details>
 
