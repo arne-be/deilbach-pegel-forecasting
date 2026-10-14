@@ -214,6 +214,8 @@ def test_kind_migration_down_restores_the_tables(before_kind: Conn) -> None:
 
 
 AVAILABLE_AT_MIGRATION = "20261013180000"
+LANGENBERG_MIGRATION = "20261014130000"
+LATER_DELAYS = {"langenberg:level": timedelta(minutes=25)}  # LANGENBERG_MIGRATION
 # The issue minute in config/pegel.json when the migration was written; it's fixed in its SQL.
 MIGRATION_ISSUE_MINUTE = 30
 
@@ -236,7 +238,8 @@ def test_available_at_migration_delays_match_the_config() -> None:
     expected[config.rain.forecast.archive_source] = timedelta(
         minutes=config.rain.forecast.available_after_minutes
     )
-    assert migration_delays() == expected
+    # Delays changed later move stored rows in their own migration.
+    assert migration_delays() | LATER_DELAYS == expected
 
 
 @pytest.fixture
@@ -428,3 +431,45 @@ def test_shift_migration_down_restores_the_levels(before_shift: Conn) -> None:
     up(before_shift, migration(SHIFT_MIGRATION))
     down(before_shift, migration(SHIFT_MIGRATION))
     assert shifted_rows(before_shift) == before
+
+
+def test_langenberg_migration_moves_only_rows_on_the_old_schedule(
+    before_available_at: Conn,
+) -> None:
+    up(before_available_at, migration(AVAILABLE_AT_MIGRATION))
+    before_available_at.execute("DELETE FROM observations")
+    backfilled_at = datetime(2026, 10, 14, 8, 0, tzinfo=UTC)
+    # valid_at, available_at, ingested_at, expected available_at
+    rows = [
+        # Backfilled on the old 75-minute schedule: moves to the 25-minute one.
+        (AT, AT.replace(hour=10, minute=30), backfilled_at, AT.replace(minute=30)),
+        # Live run first saw it in the old slot: keeps it.
+        (
+            AT.replace(minute=5),
+            AT.replace(hour=10, minute=30),
+            AT.replace(hour=10, minute=30, second=5),
+            AT.replace(hour=10, minute=30),
+        ),
+        # Live run saw it in time, and a revision seen later: both stay.
+        (AT.replace(minute=10), AT.replace(minute=30), AT.replace(minute=30, second=5), None),
+        (AT.replace(minute=15), AT.replace(hour=12, minute=30), backfilled_at, None),
+    ]
+    with before_available_at.cursor() as cursor:
+        for valid_at, available_at, ingested_at, _ in rows:
+            for series_id in ("langenberg:level", "nierenhof:level"):
+                cursor.execute(
+                    "INSERT INTO observations (series_id, valid_at, value, available_at,"
+                    " ingested_at) VALUES (%s, %s, 1, %s, %s)",
+                    (series_id, valid_at, available_at, ingested_at),
+                )
+    for _ in range(2):
+        up(before_available_at, migration(LANGENBERG_MIGRATION))
+    stored = before_available_at.execute(
+        "SELECT series_id, available_at FROM observations ORDER BY series_id, valid_at"
+    ).fetchall()
+    assert stored == [
+        ("langenberg:level", expected or available_at) for _, available_at, _, expected in rows
+    ] + [("nierenhof:level", available_at) for _, available_at, _, _ in rows]
+    assert rows[0][3] == scheduled_available_at(
+        AT, LATER_DELAYS["langenberg:level"], MIGRATION_ISSUE_MINUTE
+    )
