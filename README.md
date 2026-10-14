@@ -96,7 +96,7 @@ On AWS, credentials and the client key come from AWS Secrets Manager, not from e
 
 ## Known limitations
 
-- **Few floods in the data.** Records start in March 2023. The highest level so far was 165 cm on 19.11.2024; there are no examples of category 3 or higher. The model will be reliable in normal conditions and much less certain in the situations that matter most.
+- **Few floods in the data.** Records start in March 2023. The highest level so far was 168 cm on 19.11.2024, just over the category 3 threshold for two 10-minute readings; there are no examples of category 4 or higher. The model will be reliable in normal conditions and much less certain in the situations that matter most.
 - **Short lead time from gauges.** Langenberg leads Kupferdreh by about one hour. Beyond a few hours the forecast depends almost entirely on the rain forecast, which is often off for a small catchment.
 - **Data access.** Still to confirm: automatic access to the public gauge data, how far back it goes, and whether we may show it on the website.
 - **Historical rain forecasts** may be hard to find, which limits how well the model can learn from them.
