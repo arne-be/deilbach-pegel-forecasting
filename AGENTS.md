@@ -34,6 +34,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Evaluation harness, persistence model, model registry and runner (`python -m pegel.evaluation.predict <dataset> --out <dir>`, writes `predictions.parquet`): `src/pegel/evaluation/harness.py`, `registry.py`, `predict.py`, `models/`
 - Model features shared by training and the live job, and the three target forms (level, change, hourly step): `src/pegel/core/features.py`, `src/pegel/evaluation/targets.py`
 - Evaluation metrics, flood events and the scoring runner (`python -m pegel.evaluation.score`): `src/pegel/evaluation/metrics.py`, `events.py`, `score.py`
+- Crossing warnings at every threshold and false alarms (`crossings.csv`, `false_alarms.csv`): `src/pegel/evaluation/crossings.py`
 - Simple models 2 to 4 of the ladder (`recession`, `damped_trend`, `upstream`), fitted per lead on the change: `src/pegel/evaluation/models/simple.py`
 
 ## Layout
@@ -186,7 +187,7 @@ uv run pegel backfill-radar --from 2023-01-01 [--to 2026-10-01] [--cache-dir ~/.
 
 The frozen dataset for model evaluation (docs/decisions/0008) is built by a person from prod. It only reads: every transaction is read-only. It needs the `analysis` group (`uv sync --group analysis`) and writes `eval.parquet` and `eval.manifest.json` to a folder outside the repo; it never overwrites them. `--to` is inclusive.
 ```
-JOBS_DATABASE_URL="$(pbpaste)" uv run pegel build-eval-set --from 2024-02-01 --to 2026-04-12 --out ~/data/deilbach-pegel/eval/2026-10-14/
+JOBS_DATABASE_URL="$(pbpaste)" uv run --group analysis pegel build-eval-set --from 2024-02-01 --to 2026-04-12 --out ~/data/deilbach-pegel/eval/2026-10-14/
 pbcopy </dev/null
 ```
 

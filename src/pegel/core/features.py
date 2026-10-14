@@ -1,4 +1,4 @@
-"""Model features from the raw history windows of one dataset row per issue time.
+"""Model features from the history windows of one dataset row per issue time.
 
 Shared by training and the live job, so the two can't drift apart (docs/decisions/0008).
 Gaps stay NaN: LightGBM handles them, ridge fills them itself. Target columns are never read.
