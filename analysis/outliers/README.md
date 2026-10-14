@@ -175,7 +175,7 @@ pulled in for this run; they are not project dependencies.
 
 ```
 cd analysis/outliers
-DATABASE_URL="$(neon cs prod --project-id mute-mountain-04871366 --role-name pegel_owner --database-name pegel </dev/null)" \
+DATABASE_URL="$(neon cs prod --project-id <project-id> --role-name pegel_owner --database-name pegel </dev/null)" \
   uv run -q --no-project --with 'psycopg[binary]==3.3.6' python export.py data/kupferdreh.csv
 uv run -q --no-project --with pandas --with matplotlib --with tabulate python outliers.py data/kupferdreh.csv
 ```
