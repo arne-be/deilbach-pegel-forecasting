@@ -75,7 +75,7 @@ The ridge and simple-model numbers come from PRs #68 and #70 before merge. Score
 
 ## 2026-10-14 · The data
 
-A descriptive look at the target and the inputs in the frozen dataset. **It covers the whole window, test folds included**, so nothing here is a clean hold-out result. Where a number is a design choice (a threshold, a window, a coefficient), the pre-F1 value (before 2024-10-01) is given next to it, or the text says it wasn't checked there. Hourly series are built from the dataset: Kupferdreh at hh:22 (`target_1`), Langenberg and Nierenhof as lag 0 at hh:30 (valid about hh:00), radar as lag 0. "Catchment mean" here is the cell-weighted mean of the five zones; the dataset's `radar_catchment` column is the cell maximum, not a mean. All times UTC. Scripts stayed in a scratch folder.
+A descriptive look at the target and the inputs in the frozen dataset. **It covers the whole window, test folds included**, so nothing here is a clean hold-out result. Where a number is a design choice (a threshold, a window, a coefficient), the pre-F1 value (before 2024-10-01) is given next to it, or the text says it wasn't checked there. Hourly series are built from the dataset: Kupferdreh as the cleaned series at hh:22 (`target_1`), never the raw one, Langenberg and Nierenhof as lag 0 at hh:30 (valid about hh:00), radar as lag 0. "Catchment mean" here is the cell-weighted mean of the five zones; the dataset's `radar_catchment` column is the cell maximum, not a mean. All times UTC. Scripts stayed in a scratch folder.
 
 ### The level
 
@@ -114,7 +114,6 @@ A descriptive look at the target and the inputs in the frozen dataset. **It cove
 
 ### Data quality
 
-- **Raw and cleaned are the same at every target hour** (18,687 hours with both). Cleaning removed 5 hourly readings and changed none: three spikes of 256–317 cm on 2025-02-01, and single readings on 2024-09-04 and 2026-01-11 (130 cm). So `target_raw` adds nothing, and `kd_last_raw_cm` contains the 317 cm spike, so don't use it to label high water.
 - **Gaps are short, apart from two.** Kupferdreh misses 561 hours (2.9 %) in 214 gaps; 90 % of them are single hours. Two long ones: 170 h from 2024-05-08 and 160 h from 2026-01-26. Only one gap falls in high water (3 h on 2025-01-09 at 85 cm). Langenberg misses 13 hours; Nierenhof misses 139, mostly 2025-09-21 to 09-25.
 - **Lag 0 comes in two regimes.** This corrects the earlier "the current hour's reading is missing in 38 % of cases": 38 % is the average of two regimes. It also corrects "Live behaves the same": live, lag 0 is now known in 98–99 % of issue times. Until 2024-11-19 Kupferdreh read at :26–:27, so lag 0 was never known at hh:30 (100 % missing until 2024-11-18, 75 % on 11-19). From 2024-11-20 it reads at :17–:18 (until January 2025), then at :19–:22, and lag 0 is missing in 0–4 % of issue times per day. The one dip, from 2026-01-26 to 02-02, is the 160-hour gap, not a timing change. Training for F1 never saw lag 0, and the test data mostly have it. The newest known reading is 10 minutes old in the median (90th percentile 63 minutes).
 
@@ -163,7 +162,6 @@ A descriptive look at the target and the inputs in the frozen dataset. **It cove
 6. **Let the response depend on the level, but don't assume wet antecedents amplify it.** In cm, the same rain gives smaller rises from a high start. An interaction of rain with the start level should have a negative sign (pre-F1 −0.28 cm per mm per 10 cm).
 7. **Add hour of day for April to September.** The summer daily cycle (6–8 cm) is larger than persistence's calm-hour error at +6 to +12 h.
 8. **Expect the floods to decide the ranking.** By peak, there are 8 flood events above 95 cm: 2 pre-F1, 4 in F1 and 2 in F2. (The earlier section counts 8 crossing episodes in F1 and F2; the peak count merges re-crossings.) F3 has one event above 75 cm. The biggest flood had ICON at 41 % of the real rain, so no ICON-based model can get it right a day ahead. Judge high-water skill per event and report F1 separately: it trains on 8 months without autumn and without lag 0.
-9. **Drop `target_raw` from scoring,** since it equals `target`. Use `kd_last_cm`, not `kd_last_raw_cm`, to label high water at the issue time.
 
 ## 2026-10-14 · Warnings, counted per crossing
 
