@@ -27,10 +27,10 @@ After every change, run in this order:
 
 ## Project rules
 - **Source systems are read only.** Never write to the client's database or any upstream API.
-- **Negative levels are real.** The level is relative to the staff gauge zero, so values below 0 are valid. Don't clip or drop them.
+- **Kupferdreh levels are not negative.** Ingest adds `level_offset_cm` (config) to the Influx reading. The raw series keeps every value as converted; only the cleaned series floors values below 0 to 0.
 - **Never present stale data as current.** Every forecast carries its issue time and the time of the newest observation it used.
 - **Time:** store and compute in UTC; display in Europe/Berlin.
-- **Units:** levels in centimetres relative to the local zero point. German formatting (`68,5 cm`) only in the UI.
+- **Units:** levels in centimetres relative to each gauge's zero (Kupferdreh: Influx zero + 45 cm). German formatting (`68,5 cm`) only in the UI.
 - **Language:** website in German; code, comments, docs and commits in English.
 - Category thresholds, horizons and station IDs live in one config place, never hard-coded in several files.
 

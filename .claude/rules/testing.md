@@ -16,6 +16,6 @@ paths:
 - Prefer fast unit tests on pure functions; keep a few integration tests for the pipeline end to end.
 - Prefer real dependencies over mocks. Only mock external services (APIs, databases).
 - Tests must never hit live external systems. Use fixtures or recorded samples.
-- Cover edge cases of the domain: negative levels, gaps, spikes, DST transitions, category boundaries.
+- Cover edge cases of the domain: levels at or below zero (raw kept, cleaned floored), gaps, spikes, DST transitions, category boundaries.
 - Every bug fix must include a regression test that fails without the fix.
 - Run the full test suite before marking any task complete.

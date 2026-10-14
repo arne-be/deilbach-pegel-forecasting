@@ -11,7 +11,7 @@ description: Branching, commit message and pull request rules
   git fetch origin
   git worktree add -b <type>/<short-description> ../deilbach-pegel-prediction.worktrees/<short-description> origin/main
   ```
-  e.g. `feat/hourly-ingest`, `fix/negative-level-cleaning`, `chore/ci-setup`.
+  e.g. `feat/hourly-ingest`, `fix/spike-cleaning`, `chore/ci-setup`.
 - Before starting work, check `git branch --show-current`. If it says `main`, stop and create a worktree.
 - One topic per branch and worktree. Keep branches short-lived.
 - Before opening or updating a PR, rebase onto the newest main: `git fetch origin && git rebase origin/main`.
@@ -29,7 +29,7 @@ Use Conventional Commits:
 - Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`, `style`.
 - Examples:
   - `feat(ingest): fetch hourly levels from upstream gauges`
-  - `fix(cleaning): keep negative levels`
+  - `fix(cleaning): reject single-reading spikes`
   - `chore(deps): pin pandas to 2.2.3`
 - The summary says what the commit does; the body says why.
 - Small, logical commits; each one leaves the repo in a working state.
