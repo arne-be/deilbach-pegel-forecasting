@@ -93,7 +93,7 @@ A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](
 
 **Hits, misses and false alarms per lead stay as a diagnostic only.** They count overlaps of forecast and observed episodes, so a forecast issued during a flood scores a hit by staying high. Persistence gets all its hits that way.
 
-**Few crossings.** With 6 crossings at 95 cm and 1 at 145 cm in the test folds, warning counts can veto a model, but they can't rank models on differences of one or two.
+**Few crossings.** With 6 crossings at 95 cm and 1 at 145 cm in the test folds, warning counts can't rank models on differences of one or two.
 
 **Lag check.** On high water, the time shift that best fits the forecast to the observed level. If that shift equals the lead, the model is only a delayed persistence.
 
@@ -152,7 +152,7 @@ Anything beyond that (other boosting setups, neural networks) only if LightGBM l
 
 **A model wins over a simpler one** when its mean MAE over leads 1 to 24 is lower in at least 3 of 4 folds, and its high-water MAE, pooled over all folds, is not worse. Otherwise the simpler model stays.
 
-**A model that warns worse can't win.** If it misses more crossings with at least 3 hours of warning, or raises more false alarms per month, at any threshold, it loses to the simpler model, whatever its MAE. Per-lead hit counts don't decide, because they credit forecasts issued during a flood.
+**Warnings are reported, not used to select yet.** For every model and threshold we report the crossings warned at least 3 and 6 hours ahead and the false alarms per month. They don't decide between models until we have analysed them and agreed on how many false alarms are acceptable. Per-lead hit counts never decide, because they credit forecasts issued during a flood.
 
 **Ties go to the simpler model.**
 
