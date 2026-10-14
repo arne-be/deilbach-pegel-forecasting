@@ -4,7 +4,11 @@ import psycopg
 import pytest
 from psycopg.rows import TupleRow
 
-from pegel.adapters.storage.input_forecasts import stored_runs_since, upsert_input_forecasts
+from pegel.adapters.storage.input_forecasts import (
+    fetch_input_forecasts,
+    stored_runs_since,
+    upsert_input_forecasts,
+)
 from pegel.adapters.storage.series import ensure_series
 from pegel.core.series import InputForecastValue, Series
 
@@ -106,3 +110,17 @@ def test_forecast_value_for_an_observation_series_is_rejected(conn: Conn) -> Non
     value = InputForecastValue(RADAR.id, RUN_AT, RUN_AT + HOUR, 0.1, RUN_AT)
     with pytest.raises(psycopg.errors.ForeignKeyViolation, match="forecast"):
         upsert_input_forecasts(conn, [value], RUN_AT)
+
+
+def test_fetch_input_forecasts_returns_every_run_in_the_valid_at_range(conn: Conn) -> None:
+    later = RUN_AT + 3 * HOUR
+    upsert_input_forecasts(conn, run(RUN_AT, [0.1, 0.2, 0.3, 0.4, 0.5]), RUN_AT)
+    upsert_input_forecasts(conn, run(later, [0.6, 0.7], later + HOUR), later)
+    values = fetch_input_forecasts(conn, RAIN.id, RUN_AT + 4 * HOUR, RUN_AT + 6 * HOUR)
+    assert [(v.run_at, v.valid_at, v.value) for v in values] == [
+        (RUN_AT, RUN_AT + 4 * HOUR, 0.4),
+        (later, RUN_AT + 4 * HOUR, 0.6),
+        (RUN_AT, RUN_AT + 5 * HOUR, 0.5),
+        (later, RUN_AT + 5 * HOUR, 0.7),
+    ]
+    assert values[1].available_at == later + HOUR

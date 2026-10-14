@@ -4,8 +4,10 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import psycopg
-from psycopg.rows import TupleRow
+from psycopg.rows import TupleRow, class_row
 
+from pegel.adapters.storage.records import InputForecastRecord
+from pegel.core.observations import require_utc
 from pegel.core.series import InputForecastValue
 
 # Unchanged rows are skipped, so the returned count says what actually changed, and an
@@ -20,6 +22,13 @@ UPSERT_SQL = """
     SET value = excluded.value, available_at = greatest(excluded.available_at, %s::timestamptz),
         fetched_at = now()
     WHERE input_forecasts.value IS DISTINCT FROM excluded.value
+"""
+
+FETCH_SQL = """
+    SELECT series_id, run_at, valid_at, value, fetched_at, kind, available_at
+    FROM input_forecasts
+    WHERE series_id = %s AND valid_at >= %s AND valid_at < %s
+    ORDER BY valid_at, run_at
 """
 
 RUNS_SINCE_SQL = "SELECT DISTINCT run_at FROM input_forecasts WHERE series_id = %s AND run_at >= %s"
@@ -54,3 +63,24 @@ def stored_runs_since(
     rows = conn.execute(RUNS_SINCE_SQL, (series_id, since)).fetchall()
     # Timestamps come back in the session time zone; the core types require UTC.
     return {row[0].astimezone(UTC) for row in rows}
+
+
+def fetch_input_forecasts(
+    conn: psycopg.Connection[TupleRow], series_id: str, start: datetime, end: datetime
+) -> list[InputForecastValue]:
+    """Values of every stored run with start <= valid_at < end, by valid_at, then run_at."""
+    require_utc(start, "start")
+    require_utc(end, "end")
+    with conn.cursor(row_factory=class_row(InputForecastRecord)) as cursor:
+        cursor.execute(FETCH_SQL, (series_id, start, end))
+        # Timestamps come back in the session time zone; the core types require UTC.
+        return [
+            InputForecastValue(
+                record.series_id,
+                record.run_at.astimezone(UTC),
+                record.valid_at.astimezone(UTC),
+                record.value,
+                record.available_at.astimezone(UTC),
+            )
+            for record in cursor
+        ]
