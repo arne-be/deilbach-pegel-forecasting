@@ -111,7 +111,18 @@ def peak_errors(predictions: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame
                         "timing_error_hours": int(best["lead"]) - lead if has_peak else np.nan,
                     }
                 )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "event",
+            "peak_at",
+            "model",
+            "lead",
+            "height_error_cm",
+            "at_peak_error_cm",
+            "timing_error_hours",
+        ],
+    )
 
 
 def _overlap_count(episodes_a: pd.DataFrame, episodes_b: pd.DataFrame) -> int:
@@ -185,7 +196,9 @@ def warning_lead_times(
                         "warning_hours": (crossing_at - first) / _HOUR,
                     }
                 )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows, columns=["model", "threshold_cm", "crossing_at", "first_warning_at", "warning_hours"]
+    )
 
 
 def lag_check(
@@ -196,7 +209,7 @@ def lag_check(
 
     A shift equal to the lead means the model is a delayed persistence.
     """
-    rows = with_truth(predictions, dataset, leads)
+    rows = with_truth(predictions, dataset)
     rows = rows[high_water(rows, high_water_cm)]
     observed = observed_levels(dataset, leads)
     at = _target_time(rows)
@@ -218,4 +231,4 @@ def lag_check(
         result.append(
             {"model": model, "lead": lead, "n": len(group), "shift_hours": best, "mae": mae[best]}
         )
-    return pd.DataFrame(result)
+    return pd.DataFrame(result, columns=["model", "lead", "n", "shift_hours", "mae"])

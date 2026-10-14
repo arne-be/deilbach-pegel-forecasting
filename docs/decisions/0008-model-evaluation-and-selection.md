@@ -38,7 +38,7 @@ A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](
 
 **Gaps stay gaps.** A missing target is NaN and is left out of the scores. Missing inputs are never filled in the dataset. LightGBM handles them itself. Ridge fills them with the last known value and gets a flag that the value was missing.
 
-**One frozen dataset.** `pegel build-eval-set` writes one Parquet file, one row per issue time, with a manifest: window, config, code commit, row count and checksum. It holds raw history windows, not features: 24 hours of hourly levels per gauge, 7 days of radar, and all 24 ICON-D2 hours. Features are computed from these when a model is fitted.
+**One frozen dataset.** `pegel build-eval-set` writes one Parquet file, one row per issue time, with a manifest: window, config, code commit, row count and checksum. It holds history windows, not features: 24 hours of hourly levels per gauge, 7 days of radar, and all 24 ICON-D2 hours. Features are computed from these when a model is fitted.
 
 **The dataset lives outside the repo**, for example in `~/data/deilbach-pegel/eval/<date>/`, and may be copied to S3 by hand. It is never committed. The checksum in the manifest ties every result to the file.
 
@@ -79,7 +79,7 @@ A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](
 
 **Two subsets.** All issue times is the headline. High water (level above 75 cm at the issue time or at the target) is shown next to it, because calm days dominate the average.
 
-**High water is also scored against the raw series.** The Kalman filter can flatten a real fast rise, and peaks are where that matters.
+**Only the cleaned series.** Targets, the high water subset, events and warnings all use the cleaned Kupferdreh level (`kupferdreh:cleaned_kalman`). The raw series is only the input that cleaning is derived from.
 
 **Events.** A flood event is a peak above 95 cm. Two peaks less than 24 hours apart are one event. For each event: error in peak height and peak timing, from the forecasts issued before the peak.
 
