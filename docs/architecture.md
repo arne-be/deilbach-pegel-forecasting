@@ -38,7 +38,7 @@ One Python codebase and one Dockerfile with two build targets: a jobs image and 
 
 The Deilbach gauge reports at about :22, so the run at :30 normally has the newest reading. If it's missing, the job still publishes a forecast. It carries the older observation time, so the page shows it as delayed. The next run catches up.
 
-**Clean** removes outliers from the forecast station's level with a live Kalman filter (`core/cleaning.py`, settings in the `cleaning` section of `config/pegel.json`). It tracks level and trend and rejects a reading that is too far from its prediction, deciding each reading from earlier accepted readings only. Each run replays the filter from 48 hours before its window, so no filter state is stored. Accepted readings go to the series `kupferdreh:cleaned_kalman`; a reading rejected on a rerun is deleted from it. The raw `kupferdreh:level` stays as received. The history API, the forecast and future training read the cleaned series, so the forecast's `newest_observation_at` is the newest accepted reading. Why this filter: `analysis/outliers/README.md` on the `docs/outlier-exploration` branch (PR #34).
+**Clean** removes outliers from the forecast station's level with a live Kalman filter (`core/cleaning.py`, settings in the `cleaning` section of `config/pegel.json`). It tracks level and trend and rejects a reading that is too far from its prediction, deciding each reading from earlier accepted readings only. Each run replays the filter from 48 hours before its window, so no filter state is stored. Accepted readings go to the series `kupferdreh:cleaned_kalman`; a reading rejected on a rerun is deleted from it. Cleaned levels below 0 are stored as 0. The raw `kupferdreh:level` stays as received, plus the station's `level_offset_cm`, and keeps values below 0. The history API, the forecast and future training read the cleaned series, so the forecast's `newest_observation_at` is the newest accepted reading. Why this filter: `analysis/outliers/README.md` on the `docs/outlier-exploration` branch (PR #34).
 
 Ingest, clean and forecast stay separate modules and can each run alone, for example for backfills. Every step takes its time window as a parameter and upserts on natural keys, so reruns are safe.
 
@@ -54,7 +54,7 @@ If training ever takes longer than Lambda's 15 minutes, the jobs image runs as a
 
 Measured and forecast inputs live in three generic tables, so a new input needs a new row, not a new table or migration:
 - `series`: what a series is (variable, unit, source, location, area aggregation, period), with a readable id such as `kupferdreh:level` or `radolan_rw:zone:neviges`. Each series has a `kind`, `observation` or `forecast`, and the database rejects a value written to a series of the other kind; `ensure_series` refuses to change the kind, variable or unit of a stored series, since that would relabel its values without converting them; such a change needs a migration. Each job ensures its own series rows before it writes values.
-- `observations`: measured values per series and time, e.g. gauge levels (in cm relative to the local zero point), radar rain, soil moisture.
+- `observations`: measured values per series and time, e.g. gauge levels (in cm relative to each gauge's zero point; Kupferdreh's is 45 cm below the Influx zero, set by `level_offset_cm`), radar rain, soil moisture.
 - `input_forecasts`: forecasts made by others per series, model run and valid time, e.g. ICON-D2 rain.
 
 Cleaned levels are their own series in `observations`, e.g. `kupferdreh:cleaned_kalman` next to the raw `kupferdreh:level`.
@@ -118,7 +118,7 @@ The browser checks freshness itself, because a cached response may be old. It co
 
 ## Configuration
 
-`config/pegel.json` holds category thresholds, horizons, stations and the freshness thresholds. Python reads it and validates it with Pydantic; Astro imports it at build time. Secrets and environment-specific values (URLs, connection strings) are not in it. They come from environment variables locally and from Secrets Manager on AWS.
+`config/pegel.json` holds category thresholds, horizons, stations (with their datum offsets) and the freshness thresholds. Python reads it and validates it with Pydantic; Astro imports it at build time. Secrets and environment-specific values (URLs, connection strings) are not in it. They come from environment variables locally and from Secrets Manager on AWS.
 
 ## Code
 

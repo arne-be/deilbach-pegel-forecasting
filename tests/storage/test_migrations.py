@@ -343,3 +343,88 @@ def test_available_at_migration_rejects_values_available_before_their_time(
         before_available_at.execute(
             "UPDATE observations SET available_at = valid_at - interval '1 second'"
         )
+
+
+SHIFT_MIGRATION = "20261014120000"
+SHIFT_AT = datetime(2026, 10, 13, 9, 22, tzinfo=UTC)
+SHIFT_STAMP = datetime(2026, 10, 13, 9, 30, tzinfo=UTC)
+
+
+def migration_offset() -> float:
+    """The offset the shift migration adds, read from its SQL."""
+    sql = migration(SHIFT_MIGRATION).read_text(encoding="utf-8")
+    up_sql = migrate_up_section(sql)
+    [offset] = set(re.findall(r"::numeric \+ (\d+), 3\)", up_sql))
+    return float(offset)
+
+
+def test_shift_migration_offset_matches_the_config() -> None:
+    assert migration_offset() == load_config().station("kupferdreh").level_offset_cm
+
+
+@pytest.fixture
+def before_shift(before_available_at: Conn) -> Conn:
+    """Every migration before the shift, with Kupferdreh raw, cleaned and LANUV levels."""
+    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        if AVAILABLE_AT_MIGRATION <= path.name < SHIFT_MIGRATION:
+            up(before_available_at, path)
+    before_available_at.execute("DELETE FROM observations")
+    before_available_at.execute(
+        "INSERT INTO series (id, variable, unit, source, location, kind) VALUES"
+        " ('kupferdreh:cleaned_kalman', 'level', 'cm', 'pegel', 'kupferdreh', 'observation')"
+    )
+    with before_available_at.cursor() as cursor:
+        cursor.executemany(
+            "INSERT INTO observations (series_id, valid_at, value, available_at)"
+            " VALUES (%s, %s, %s, %s)",
+            [
+                ("kupferdreh:level", SHIFT_AT, -39.2, SHIFT_STAMP),
+                ("kupferdreh:level", SHIFT_AT - timedelta(hours=1), 12.345, SHIFT_STAMP),
+                ("kupferdreh:cleaned_kalman", SHIFT_AT, -39.2, SHIFT_STAMP),
+                ("langenberg:level", SHIFT_AT, -3.5, SHIFT_STAMP),
+            ],
+        )
+    return before_available_at
+
+
+def shifted_rows(conn: Conn) -> list[tuple[object, ...]]:
+    return conn.execute(
+        "SELECT series_id, valid_at, value, available_at, ingested_at FROM observations"
+        " UNION ALL SELECT 'forecast', valid_at, level_cm, NULL, NULL FROM forecast_points"
+        " ORDER BY 1, 2"
+    ).fetchall()
+
+
+def test_shift_migration_moves_kupferdreh_levels_only(before_shift: Conn) -> None:
+    before = shifted_rows(before_shift)
+    up(before_shift, migration(SHIFT_MIGRATION))
+    after = shifted_rows(before_shift)
+    assert [row[2] for row in after] == [67.9, 5.8, 57.345, 5.8, -3.5]
+    assert [row[:2] + row[3:] for row in after] == [row[:2] + row[3:] for row in before]
+
+
+def test_shift_migration_matches_the_ingest_rounding(empty_conn: Conn) -> None:
+    # The ingest must store the very same double, or the next run revises every row.
+    levels = [round(i * 0.1 - 60, 1) for i in range(2000)] + [
+        round(i * 0.007 - 40, 3) for i in range(2000)
+    ]
+    shifted = empty_conn.execute(
+        "SELECT array_agg(round(level::numeric + 45, 3)::double precision ORDER BY n)"
+        " FROM unnest(%s::double precision[]) WITH ORDINALITY AS t (level, n)",
+        (levels,),
+    ).fetchone()
+    assert shifted is not None
+    assert shifted[0] == [round(level + 45, 3) for level in levels]
+
+
+def test_shift_migration_stops_when_already_shifted(before_shift: Conn) -> None:
+    up(before_shift, migration(SHIFT_MIGRATION))
+    with pytest.raises(psycopg.errors.RaiseException, match="already shifted"):
+        up(before_shift, migration(SHIFT_MIGRATION))
+
+
+def test_shift_migration_down_restores_the_levels(before_shift: Conn) -> None:
+    before = shifted_rows(before_shift)
+    up(before_shift, migration(SHIFT_MIGRATION))
+    down(before_shift, migration(SHIFT_MIGRATION))
+    assert shifted_rows(before_shift) == before
