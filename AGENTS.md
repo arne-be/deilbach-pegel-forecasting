@@ -35,6 +35,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Model features shared by training and the live job, and the three target forms (level, change, hourly step): `src/pegel/core/features.py`, `src/pegel/evaluation/targets.py`
 - Evaluation metrics, flood events and the scoring runner (`python -m pegel.evaluation.score`): `src/pegel/evaluation/metrics.py`, `events.py`, `score.py`
 - Crossing warnings at every threshold and false alarms (`crossings.csv`, `false_alarms.csv`): `src/pegel/evaluation/crossings.py`
+- Simple models 2 to 4 of the ladder (`recession`, `damped_trend`, `upstream`), fitted per lead on the change: `src/pegel/evaluation/models/simple.py`
 
 ## Layout
 
