@@ -34,3 +34,6 @@ __pycache__/
 *.tfstate
 *.tfstate.*
 *.tfplan
+
+# Evaluation datasets and predictions live outside the repo
+*.parquet

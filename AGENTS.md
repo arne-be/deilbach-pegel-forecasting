@@ -29,6 +29,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - `scripts/influx-query.sh` and the docs
 - Grafana Cloud dashboards as code (read-only role `pegel_grafana`): `grafana/dashboards/`, `infra/prod/grafana.tf`, `docs/setup-grafana.md`
 - Live outlier filter exploration (three methods compared, plots, recommendation): `analysis/outliers/`
+- Model evaluation contracts (`evaluation` config, folds, dataset and file schemas, model interface): `src/pegel/evaluation/contract.py`, `tests/eval_factory.py`
 
 ## Layout
 
@@ -72,7 +73,9 @@ Already there today:
 
 ```
 mise install                 # tools in the pinned versions
+brew install libomp          # macOS only: lightgbm needs OpenMP
 uv sync                      # Python and its dependencies
+uv sync --group analysis     # plus pyarrow and matplotlib for model evaluation
 cd web && pnpm install       # website dependencies
 git config core.hooksPath .githooks
 ```
