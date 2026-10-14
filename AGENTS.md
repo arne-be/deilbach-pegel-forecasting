@@ -31,6 +31,9 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Live outlier filter exploration (three methods compared, plots, recommendation): `analysis/outliers/`
 - Evaluation dataset as known at each issue time (`pegel build-eval-set`): `src/pegel/core/issue_inputs.py`, `src/pegel/jobs/eval_set.py`
 - Model evaluation contracts (`evaluation` config, folds, dataset and file schemas, model interface): `src/pegel/evaluation/contract.py`, `tests/eval_factory.py`
+- Evaluation harness, persistence model, model registry and runner (`python -m pegel.evaluation.predict <dataset> --out <dir>`, writes `predictions.parquet`): `src/pegel/evaluation/harness.py`, `registry.py`, `predict.py`, `models/`
+- Model features shared by training and the live job, and the three target forms (level, change, hourly step): `src/pegel/core/features.py`, `src/pegel/evaluation/targets.py`
+- Evaluation metrics, flood events and the scoring runner (`python -m pegel.evaluation.score`): `src/pegel/evaluation/metrics.py`, `events.py`, `score.py`
 
 ## Layout
 
