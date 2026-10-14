@@ -27,15 +27,15 @@ jobs:
       # AWS steps are skipped before infra/bootstrap is applied, and for pull requests from forks.
       USE_AWS: ${{ vars.AWS_PLAN_ROLE_ARN != '' && github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: opentofu/setup-opentofu@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
           tofu_wrapper: false
       - run: tofu fmt -check -recursive
       - run: tofu init -backend=false -input=false && tofu validate
       - if: env.USE_AWS == 'true'
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -55,12 +55,12 @@ jobs:
       run:
         working-directory: infra/prod
     steps:
-      - uses: actions/checkout@v4
-      - uses: opentofu/setup-opentofu@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
           tofu_wrapper: false
-      - uses: aws-actions/configure-aws-credentials@v6
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -68,7 +68,7 @@ jobs:
       # The image needs its repository before the Lambda can point at it.
       - run: tofu apply -input=false -auto-approve -target=aws_ecr_repository.jobs
       - id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
       - name: Build and push the jobs image
         run: |
           image="${{ steps.ecr.outputs.registry }}/deilbach-pegel-jobs:${GITHUB_SHA}"
@@ -80,5 +80,5 @@ jobs:
           DATABASE_URL="$(aws secretsmanager get-secret-value --secret-id deilbach-pegel/migrate-database-url --query SecretString --output text)"
           echo "::add-mask::$DATABASE_URL"
           export DATABASE_URL
-          docker run --rm -v "$GITHUB_WORKSPACE/db:/db" -e DATABASE_URL ghcr.io/amacneil/dbmate:2.36.0 --wait --no-dump-schema migrate
+          docker run --rm -v "$GITHUB_WORKSPACE/db:/db" -e DATABASE_URL ghcr.io/amacneil/dbmate:2.36.0@sha256:520c740c6e0ad73fde2cd1ea7e2b779aaf789d22aca8858f87a478e7094535fb --wait --no-dump-schema migrate
       - run: tofu apply -input=false -auto-approve

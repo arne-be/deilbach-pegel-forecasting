@@ -10,7 +10,9 @@ from testcontainers.community.postgres import PostgresContainer
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "db" / "migrations"
 # Same image as scripts/refresh-schema.sh.
-POSTGRES_IMAGE = "postgres:17-alpine"
+POSTGRES_IMAGE = (
+    "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+)
 
 
 def migrate_up_section(migration: str) -> str:

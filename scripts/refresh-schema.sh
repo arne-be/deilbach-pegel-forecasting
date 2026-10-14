@@ -6,8 +6,8 @@
 # Needs Docker and uv.
 set -euo pipefail
 
-POSTGRES_IMAGE="postgres:17-alpine"
-DBMATE_IMAGE="ghcr.io/amacneil/dbmate:2.36.0"  # same version as mise.toml and .github/workflows/infra.yml
+POSTGRES_IMAGE="postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+DBMATE_IMAGE="ghcr.io/amacneil/dbmate:2.36.0@sha256:520c740c6e0ad73fde2cd1ea7e2b779aaf789d22aca8858f87a478e7094535fb"  # same version as mise.toml and .github/workflows/infra.yml
 NAME="pegel-schema-$$"
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
