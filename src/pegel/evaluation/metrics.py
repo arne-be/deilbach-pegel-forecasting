@@ -128,6 +128,9 @@ def bootstrap_skill(
     known = rows[contract.TARGET].notna() & rows["prediction"].notna()
     rows = rows[known & rows["persistence"].notna()]
     rows = rows[rows["model"] != PERSISTENCE]
+    if rows.empty:
+        # A run of persistence alone has nothing to compare.
+        return pd.DataFrame(columns=["model", "lead", "n", "mae_difference", "low", "high"])
     difference = (rows["prediction"] - rows[contract.TARGET]).abs() - (
         rows["persistence"] - rows[contract.TARGET]
     ).abs()

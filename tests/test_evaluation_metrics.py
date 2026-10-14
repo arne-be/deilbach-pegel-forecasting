@@ -136,6 +136,11 @@ def test_bootstrap_of_a_constant_offset_is_exact() -> None:
     assert row[["mae_difference", "low", "high"]].tolist() == pytest.approx([1, 1, 1])
 
 
+def test_bootstrap_of_persistence_alone_is_empty() -> None:
+    predictions = _bootstrap_predictions()
+    assert bootstrap_skill(predictions[predictions["model"] == PERSISTENCE]).empty
+
+
 def test_bootstrap_is_seeded() -> None:
     predictions = _bootstrap_predictions()
     first = bootstrap_skill(predictions, resamples=200, seed=3)
