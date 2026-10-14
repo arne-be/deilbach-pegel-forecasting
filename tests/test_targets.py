@@ -16,7 +16,7 @@ def _levels(dataset: pd.DataFrame) -> np.ndarray:
 @pytest.mark.parametrize("kind", KINDS)
 def test_round_trip_gives_back_the_levels(kind: TargetKind) -> None:
     dataset = eval_dataset()
-    target = to_target(dataset, kind)
+    target = to_target(dataset, kind, 24)
     assert target.shape == (len(dataset), 24)
     np.testing.assert_allclose(from_target(target, dataset, kind), _levels(dataset))
 
@@ -24,8 +24,8 @@ def test_round_trip_gives_back_the_levels(kind: TargetKind) -> None:
 def test_forms_match_a_hand_computation() -> None:
     dataset = eval_dataset(hours=1)
     row = dataset.iloc[0]
-    change = to_target(dataset, "change")[0]
-    step = to_target(dataset, "step")[0]
+    change = to_target(dataset, "change", 24)[0]
+    step = to_target(dataset, "step", 24)[0]
     assert change[4] == pytest.approx(row["target_5"] - row["kd_last_cm"])
     assert step[0] == pytest.approx(row["target_1"] - row["kd_last_cm"])
     assert step[4] == pytest.approx(row["target_5"] - row["target_4"])
@@ -34,9 +34,14 @@ def test_forms_match_a_hand_computation() -> None:
 def test_a_missing_level_makes_the_steps_around_it_nan() -> None:
     dataset = eval_dataset(hours=1)
     dataset.loc[0, "target_5"] = np.nan
-    step = to_target(dataset, "step")[0]
+    step = to_target(dataset, "step", 24)[0]
     assert np.isnan(step[[4, 5]]).all()
     assert not np.isnan(np.delete(step, [4, 5])).any()
-    restored = from_target(to_target(dataset, "step"), dataset, "step")[0]
+    restored = from_target(to_target(dataset, "step", 24), dataset, "step")[0]
     np.testing.assert_allclose(restored[:4], _levels(dataset)[0, :4])
     assert np.isnan(restored[4:]).all()
+
+
+def test_only_the_requested_leads_are_returned() -> None:
+    dataset = eval_dataset(hours=2)
+    np.testing.assert_array_equal(to_target(dataset, "level", 5), _levels(dataset)[:, :5])
