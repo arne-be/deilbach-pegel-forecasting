@@ -65,3 +65,7 @@ Blue: training. Orange: test.
 Training and test both use the archive, so the backtest is fair between models: every model gets the same day-old rain forecasts.
 
 Live is different. The same feature code runs on fresh runs, where rain in the next few hours is forecast much better. A model trained on day-old forecasts learned to trust them little, so live it may underuse good short-range rain. That is why every model also runs without ICON-D2, and why the live shadow run from 12 Oct 2026 has the final say.
+
+## Models
+
+- [Rain change](models/rain-change.md): the last level plus a change from upstream gauges, radar and ICON-D2, fitted per lead.
