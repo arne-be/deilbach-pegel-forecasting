@@ -164,3 +164,22 @@ A descriptive look at the target and the inputs in the frozen dataset. **It cove
 7. **Add hour of day for April to September.** The summer daily cycle (6–8 cm) is larger than persistence's calm-hour error at +6 to +12 h.
 8. **Expect the floods to decide the ranking.** By peak, there are 8 flood events above 95 cm: 2 pre-F1, 4 in F1 and 2 in F2. (The earlier section counts 8 crossing episodes in F1 and F2; the peak count merges re-crossings.) F3 has one event above 75 cm. The biggest flood had ICON at 41 % of the real rain, so no ICON-based model can get it right a day ahead. Judge high-water skill per event and report F1 separately: it trains on 8 months without autumn and without lag 0.
 9. **Drop `target_raw` from scoring,** since it equals `target`. Use `kd_last_cm`, not `kd_last_raw_cm`, to label high water at the issue time.
+
+## 2026-10-14 · Warnings, counted per crossing
+
+Counted with the crossing metric from PR #73: a crossing is warned if a forecast issued before it showed a crossing within 6 hours of it; re-crossings within 24 hours of an earlier flood are left out; a false alarm is a forecast crossing with no observed crossing within ±6 hours. The test folds hold 6 first crossings of 95 cm and 1 of 145 cm, and none above.
+
+| Model | 95 cm warned ≥ 3 h | ≥ 6 h | False alarms per month (95 cm) | 145 cm warned ≥ 3 h |
+|---|---|---|---|---|
+| persistence | 0 of 6 | 0 | 0.00 | 0 of 1 |
+| recession | 0 | 0 | 0.00 | 0 |
+| damped trend | 0 | 0 | 0.27 | 0 |
+| upstream | 1 | 0 | 0.38 | 1 |
+| ridge, level | 2 | 2 | 0.49 | 1 |
+| ridge, change | 3 | 1 | 0.38 | 1 |
+| rain_change, both variants | 2 | 2 | 0.54 | 0 |
+
+- **Corrects the first section's warning claim.** "7 of 8 crossings warned, 13 hours ahead in the median" for `rain_change` counted re-crossings, 1–2 hour warnings and forecasts that flickered. Per first crossing with at least 3 hours lead it is 2 of 6.
+- **No model warns reliably yet.** The best, ridge on the change target, warns half the crossings at least 3 hours ahead. No model warns the 165 cm flood of 2024-11-19 at 145 cm more than 3 hours ahead.
+- **Warning earlier costs false alarms.** Every model that warns at all raises about 0.3–0.5 false alarms a month at 95 cm. Persistence never warns, so it never raises one.
+- **Too few crossings to rank models.** One flood more or less changes the order. Warnings are reported, not used to select, until we have analysed them and agreed how many false alarms are acceptable.
