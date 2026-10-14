@@ -1,4 +1,5 @@
-"""The plots of the run report: MAE and skill per lead, MAE per fold, and one plot per flood.
+"""The plots of the run report: MAE and skill per lead, warnings and false alarms, MAE per
+fold, and one plot per flood.
 
 Analysis only: matplotlib is in the `analysis` group, not in the Lambda image.
 """
@@ -9,16 +10,23 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.patches import Patch
 
 from pegel.evaluation.events import forecast_levels
 from pegel.evaluation.metrics import ALL_FOLDS, PERSISTENCE, SUBSET_ALL
-from pegel.evaluation.report import model_order, observed_from_predictions
+from pegel.evaluation.report_tables import (
+    WARNED_HOURS,
+    first_crossings,
+    model_order,
+    observed_from_predictions,
+)
 
 PERSISTENCE_COLOUR = "#808080"
 # tab10 without its grey, which is reserved for persistence.
 MODEL_COLOURS = [c for i, c in enumerate(plt.get_cmap("tab10").colors) if i != 7]  # type: ignore[attr-defined]
 EVENT_LEADS = {6: "-", 12: "--"}
 EVENT_MARGIN = pd.Timedelta(hours=24)
+WARNING_COLUMNS = 4
 DPI = 100
 
 
@@ -150,6 +158,102 @@ def event_plot(
     return _save(figure, path)
 
 
+def _model_rows(ax: Axes, models: list[str], labels: bool) -> None:
+    """Models as rows from the top, with a faint line per row to follow."""
+    ax.set_yticks(range(len(models)), models if labels else [])
+    ax.set_ylim(len(models) - 0.5, -0.5)
+    ax.grid(axis="y", alpha=0.3)
+
+
+def _panel_places(panels: pd.DataFrame) -> tuple[list[tuple[int, int]], int]:
+    """Grid places for the panels, each threshold starting a new row, and the row count."""
+    places: list[tuple[int, int]] = []
+    rows = 0
+    for _, group in panels.groupby("threshold_cm"):
+        places += [(rows + i // WARNING_COLUMNS, i % WARNING_COLUMNS) for i in range(len(group))]
+        rows += -(-len(group) // WARNING_COLUMNS)
+    return places, rows
+
+
+def warning_plot(crossings: pd.DataFrame, palette: Palette, path: Path, note: str = "") -> Path:
+    """A small panel per first crossing, grouped by threshold: a dot per model at its first
+    warning, in hours before the crossing. No dot is a miss."""
+    crossings = crossings.assign(crossing_at=pd.to_datetime(crossings["crossing_at"], utc=True))
+    panels = (
+        crossings[["threshold_cm", "crossing_at"]]
+        .drop_duplicates()
+        .sort_values(["threshold_cm", "crossing_at"])
+    )
+    places, rows = _panel_places(panels)
+    models = model_order(list(crossings["model"]))
+    longest = crossings["warning_hours"].max()
+    earliest = max(24.0, 0.0 if pd.isna(longest) else float(longest)) + 1
+    figure, axes = plt.subplots(
+        rows,
+        WARNING_COLUMNS,
+        figsize=(3.2 * WARNING_COLUMNS, rows * (1.0 + 0.25 * len(models))),
+        squeeze=False,
+    )
+    for ax in axes.flat:
+        ax.set_visible(False)
+    for (threshold, at), (row, column) in zip(panels.itertuples(index=False), places, strict=True):
+        ax = axes[row][column]
+        ax.set_visible(True)
+        ax.axvspan(-WARNED_HOURS, 0.5, color="tab:red", alpha=0.12, linewidth=0)
+        ax.axvspan(-earliest, -6, color="tab:green", alpha=0.10, linewidth=0)
+        same = (crossings["threshold_cm"] == threshold) & (crossings["crossing_at"] == at)
+        hours = crossings[same].set_index("model")["warning_hours"]
+        for y, model in enumerate(models):
+            if pd.notna(hours.get(model)):
+                ax.plot(-hours[model], y, "o", color=palette[model], markersize=7)
+        _model_rows(ax, models, labels=column == 0)
+        ax.set_xlim(-earliest, 0.5)
+        ax.set_title(f"{threshold:g} cm, {at:%Y-%m-%d %H:%M} UTC", fontsize="small")
+        ax.tick_params(labelsize="small")
+        ax.set_xlabel("hours before the crossing", fontsize="small")
+    zones = [
+        Patch(color="tab:red", alpha=0.25, label=f"< {WARNED_HOURS} h: too late to act"),
+        Patch(color="tab:green", alpha=0.2, label=">= 6 h ahead"),
+    ]
+    title = "First warning before each first crossing (no dot: missed)"
+    figure.suptitle(f"{title}\n{note}" if note else title)
+    figure.tight_layout()
+    figure.legend(handles=zones, loc="upper center", ncols=2, bbox_to_anchor=(0.5, 0.0))
+    return _save(figure, path)
+
+
+def false_alarm_plot(false_alarms: pd.DataFrame, palette: Palette, path: Path) -> Path | None:
+    """False alarms per month per model, a panel per threshold that has any; None if none."""
+    counted = false_alarms.groupby("threshold_cm")["count"].sum()
+    thresholds = list(counted[counted > 0].index)
+    if not thresholds:
+        return None
+    models = model_order(list(false_alarms["model"]))
+    figure, axes = plt.subplots(
+        1,
+        len(thresholds),
+        figsize=(3.2 * len(thresholds) + 1, 1.2 + 0.3 * len(models)),
+        squeeze=False,
+        sharex=True,
+    )
+    for column, (ax, threshold) in enumerate(zip(axes[0], thresholds, strict=True)):
+        rows = false_alarms[false_alarms["threshold_cm"] == threshold].set_index("model")
+        rates, counts = rows["per_month"].reindex(models), rows["count"].reindex(models)
+        ax.barh(range(len(models)), rates.fillna(0), color=[palette[model] for model in models])
+        for y, (rate, count) in enumerate(zip(rates, counts, strict=True)):
+            if pd.notna(count):
+                ax.text(rate, y, f" {count:.0f}", va="center", fontsize="small")
+        _model_rows(ax, models, labels=column == 0)
+        ax.grid(axis="x", alpha=0.3)
+        ax.set_title(f"{threshold:g} cm", fontsize="small")
+        ax.set_xlabel("false alarms per month", fontsize="small")
+    # Room for the count right of the longest bar.
+    axes[0][0].set_xlim(right=1.15 * float(false_alarms["per_month"].max()))
+    figure.suptitle("False alarms per month (count at the bar end)")
+    figure.tight_layout()
+    return _save(figure, path)
+
+
 def write_plots(
     predictions: pd.DataFrame,
     tables: dict[str, pd.DataFrame],
@@ -166,6 +270,14 @@ def write_plots(
         # Skill is 0 by definition for persistence, so a run of it alone has nothing to show.
         if set(scores["model"]) != {PERSISTENCE}:
             plots.append(skill_plot(scores, palette, plot_dir / "skill.png"))
+    crossings = first_crossings(tables)
+    if not crossings.empty:
+        note = "" if not tables["crossings"].empty else "old rule: warnings.csv, no crossings.csv"
+        plots.append(warning_plot(crossings, palette, plot_dir / "warnings.png", note))
+    if not tables["false_alarms"].empty:
+        path = false_alarm_plot(tables["false_alarms"], palette, plot_dir / "false_alarms.png")
+        plots += [path] if path else []
+    if not scores.empty:
         plots.append(fold_plot(scores, palette, plot_dir / "mae-folds.png"))
     if events.empty:
         return plots
