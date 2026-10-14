@@ -88,9 +88,11 @@ Then:
 
 - **Level:** the level at hh+k:22.
 - **Change:** the level at hh+k:22 minus the last level at the issue time. The model's prediction is added to the last level.
-- **Hourly step:** the level at hh+k:22 minus the level one hour earlier. Each lead gets its own model. The steps are summed onto the last level. A training row needs both readings of its step.
+- **Hourly step:** the level at hh+k:22 minus the level one hour earlier. One model for all 24 steps, with the lead as a feature and the ICON-D2 rain of the hours just before that step. Each issue time gives 24 training rows. The steps are summed onto the last level. A training row needs both readings of its step.
 
-Models 2 to 4 already predict a change from the last level, so they get no variants. For the ridge model, the hourly step gives the same forecast as the change, because the sum of linear models is a linear model. So ridge is tried with level and change, and LightGBM with all three.
+Models 2 to 4 already predict a change from the last level, so they get no variants. Ridge is tried with level and change only: a linear model can't use the lead feature the way the step model needs. LightGBM is tried with all three.
+
+**Not recursive.** A one-hour model fed its own output would need future upstream levels and radar, which aren't known at the issue time, and its errors would add up.
 
 Anything beyond that (other boosting setups, neural networks) only if LightGBM leaves a clear gap, for example on rising limbs.
 
