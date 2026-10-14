@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from pegel.config import EvaluationSettings, load_config
+from pegel.config import EvaluationSettings
 from pegel.evaluation import harness
 from pegel.evaluation.contract import Manifest
 from pegel.evaluation.registry import MODELS
@@ -42,6 +42,11 @@ def verified_manifest(dataset: Path) -> Manifest:
     return manifest
 
 
+def frozen_settings(manifest: Manifest) -> EvaluationSettings:
+    """The settings the dataset was built with, so a later config change can't alter a run."""
+    return EvaluationSettings.model_validate(manifest.config["evaluation"])
+
+
 def selected_models(
     names: Sequence[str] | None, settings: EvaluationSettings
 ) -> list[harness.ModelFactory]:
@@ -54,9 +59,9 @@ def selected_models(
     return [by_name[name] for name in names]
 
 
-def _git_commit() -> str:
+def _git(*arguments: str) -> str:
     return subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ["git", *arguments], capture_output=True, text=True, check=True
     ).stdout.strip()
 
 
@@ -67,17 +72,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--models", help="comma-separated model names; default: all")
     arguments = parser.parse_args(argv)
 
-    settings = load_config().evaluation
     manifest = verified_manifest(arguments.dataset)
+    settings = frozen_settings(manifest)
+    dataset = pd.read_parquet(arguments.dataset)
+    if len(dataset) != manifest.row_count:
+        raise ValueError(
+            f"{arguments.dataset} has {len(dataset)} rows, manifest says {manifest.row_count}"
+        )
     names = arguments.models.split(",") if arguments.models else None
     factories = selected_models(names, settings)
-    predictions = harness.run(pd.read_parquet(arguments.dataset), factories, settings)
+    predictions = harness.run(dataset, factories, settings)
 
     arguments.out.mkdir(parents=True, exist_ok=True)
     predictions.to_parquet(arguments.out / "predictions.parquet", index=False)
     run_manifest = {
         "dataset_sha256": manifest.sha256,
-        "git_commit": _git_commit(),
+        "git_commit": _git("rev-parse", "HEAD"),
+        # Uncommitted changes mean the commit alone doesn't reproduce the run.
+        "dirty": _git("status", "--porcelain") != "",
+        "settings": settings.model_dump(mode="json"),
         "models": sorted(predictions["model"].unique().tolist()),
         "created_at": datetime.now(UTC).isoformat(),
     }

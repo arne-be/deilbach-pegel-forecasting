@@ -30,12 +30,14 @@ class _Spy:
     def __init__(self, settings: EvaluationSettings) -> None:
         self.leads = settings.leads_hours
         self.fits: list[pd.DataFrame] = []
+        self.predict_columns: list[str] = []
         _Spy.instances.append(self)
 
     def fit(self, train: pd.DataFrame) -> None:
         self.fits.append(train)
 
     def predict(self, rows: pd.DataFrame) -> npt.NDArray[np.float64]:
+        self.predict_columns += list(rows.columns)
         return np.zeros((len(rows), self.leads))
 
 
@@ -76,6 +78,14 @@ def test_training_rows_end_an_embargo_before_the_test_period() -> None:
     assert train[contract.ISSUED_AT].max() < embargo_start
 
 
+def test_predict_never_sees_a_target() -> None:
+    _Spy.instances = []
+    harness.run(_dataset(), [_Spy], SETTINGS)
+    columns = _Spy.instances[0].predict_columns
+    assert contract.KD_LAST_CM in columns
+    assert not [column for column in columns if column.startswith(contract.TARGET)]
+
+
 def test_each_fold_gets_a_fresh_model() -> None:
     # Two days in each of the first two folds.
     dataset = pd.concat(
@@ -104,15 +114,15 @@ def test_a_dataset_outside_every_fold_is_rejected() -> None:
         harness.run(eval_dataset(), [Persistence], SETTINGS)
 
 
-def _write_dataset(folder: Path) -> Path:
+def _write_dataset(folder: Path, row_count: int = 7 * 24) -> Path:
     dataset = folder / "eval.parquet"
     _dataset().to_parquet(dataset, index=False)
     manifest = contract.Manifest(
         window_first_day=date(2024, 9, 26),
         window_last_day=date(2024, 10, 2),
-        config={},
+        config=load_config().model_dump(mode="json"),
         git_commit="abc",
-        row_count=7 * 24,
+        row_count=row_count,
         sha256=hashlib.sha256(dataset.read_bytes()).hexdigest(),
         created_at=pd.Timestamp("2026-10-14T12:00Z").to_pydatetime(),
         database="test",
@@ -132,6 +142,24 @@ def test_runner_writes_predictions_and_run_manifest(tmp_path: Path) -> None:
     assert run["dataset_sha256"] == hashlib.sha256(dataset.read_bytes()).hexdigest()
     assert run["models"] == ["persistence"]
     assert len(run["git_commit"]) == 40
+    assert isinstance(run["dirty"], bool)
+    assert run["settings"]["leads_hours"] == SETTINGS.leads_hours
+
+
+def test_runner_uses_the_settings_frozen_in_the_manifest(tmp_path: Path) -> None:
+    dataset = _write_dataset(tmp_path)
+    manifest = json.loads(predict.manifest_path(dataset).read_text())
+    manifest["config"]["evaluation"]["leads_hours"] = SETTINGS.leads_hours - 1
+    predict.manifest_path(dataset).write_text(json.dumps(manifest))
+    predict.main([str(dataset), "--out", str(tmp_path / "run")])
+    predictions = pd.read_parquet(tmp_path / "run" / "predictions.parquet")
+    assert predictions["lead"].max() == SETTINGS.leads_hours - 1
+
+
+def test_runner_rejects_a_row_count_mismatch(tmp_path: Path) -> None:
+    dataset = _write_dataset(tmp_path, row_count=7 * 24 + 1)
+    with pytest.raises(ValueError, match="rows"):
+        predict.main([str(dataset), "--out", str(tmp_path / "run")])
 
 
 def test_runner_rejects_a_modified_dataset(tmp_path: Path) -> None:

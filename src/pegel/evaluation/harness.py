@@ -24,11 +24,16 @@ def run(
         if holdout.empty:
             continue
         train = contract.train_rows(dataset, fold, settings)
-        targets = holdout[contract.lead_columns(contract.TARGET, leads)].to_numpy(np.float64)
+        target_columns = contract.lead_columns(contract.TARGET, leads)
+        targets = holdout[target_columns].to_numpy(np.float64)
+        # Models only see what is known at the issue time when they predict.
+        inputs = holdout.drop(
+            columns=target_columns + contract.lead_columns(contract.TARGET_RAW, leads)
+        )
         for factory in models:
             model = factory(settings)
             model.fit(train)
-            predictions = model.predict(holdout)
+            predictions = model.predict(inputs)
             if predictions.shape != targets.shape:
                 raise ValueError(
                     f"{model.name} predicted shape {predictions.shape} on fold {fold.name}, "
