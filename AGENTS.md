@@ -36,6 +36,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Evaluation metrics, flood events and the scoring runner (`python -m pegel.evaluation.score`): `src/pegel/evaluation/metrics.py`, `events.py`, `score.py`
 - Crossing warnings at every threshold and false alarms (`crossings.csv`, `false_alarms.csv`): `src/pegel/evaluation/crossings.py`
 - Simple models 2 to 4 of the ladder (`recession`, `damped_trend`, `upstream`), fitted per lead on the change: `src/pegel/evaluation/models/simple.py`
+- Ridge model per lead, level or change target, with or without ICON-D2 (`ridge:level`, `ridge:change`, `…:no_icon`): `src/pegel/evaluation/models/ridge.py`
 
 ## Layout
 

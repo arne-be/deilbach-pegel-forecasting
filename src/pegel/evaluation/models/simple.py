@@ -38,7 +38,7 @@ class _LinearChange:
 
     def fit(self, train: pd.DataFrame) -> None:
         inputs = self.inputs(train)
-        change = to_target(train, "change")
+        change = to_target(train, "change", self._leads)
         complete = np.isfinite(inputs).all(axis=1)
         factors = []
         for lead in range(self._leads):
