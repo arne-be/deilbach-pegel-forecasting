@@ -79,17 +79,20 @@ At +24 h `rain_change:split` is 1.04 cm better than persistence (90 % bootstrap 
 | Fold | persistence | ridge, change | rain_change:split |
 |---|---|---|---|
 | F1 | 3.75 | 3.73 | 2.51 |
-| F2 | 2.16 | 1.72 | 1.80 |
+| F2 | 2.15 | 1.72 | 1.80 |
 | F3 | 3.00 | 2.73 | 2.73 |
 | F4 | 2.57 | 1.93 | 2.03 |
 
-**Warnings at 95 cm.** It warns 7 of the 8 crossings, 13 hours ahead in the median. That median hides two different folds: the four F1 crossings get 1 to 2 hours of warning (one, 2024-11-19, is missed), the four F2 crossings 13 to 24 hours. Upstream warns all 8, but only 2 hours ahead in the median. Persistence warns none of the real rises. The one crossing of 145 cm (2024-11-19) gets 2 hours of warning.
+**Warnings at 95 cm.** It warns 7 of the 8 crossings, 13 hours ahead in the median. That median hides two different folds: the four F1 crossings get 1 to 2 hours of warning (one, 2024-11-19, is missed), the four F2 crossings 13 to 24 hours. Upstream warns all 8, but only 2 hours ahead in the median. Persistence "warns" 2 of the 8 crossings (2025-01-08 and 2025-01-27), 24 hours ahead, only because the level was already above 95 cm a day earlier: both are re-crossings of a flood still running. It warns none of the first crossings. The 24-hour warnings of `rain_change:split` for those two are the same re-crossings. The one crossing of 145 cm (2024-11-19) gets 2 hours of warning.
+
+These warning numbers will be redone with the new crossing-based metric (PR coming, minimum lead 3 hours).
 
 ## Known weaknesses
 
 - **No gain at +1 h.** 0.66 cm, the same as persistence. Upstream is better there (0.60 cm).
 - **More missed lead-hours at 95 cm than persistence at long leads.** Summed over leads 13 to 24 it misses 45 lead-hours against persistence's 34, over all leads 72 against 58. Persistence scores "hits" by staying high through a long flood; the selection rule in decision 0008 counts this.
 - **It forecasts the fall a bit early.** Mean bias −0.49 cm at +24 h (plain `rain_change`: −0.61 cm).
+- **At high water it under-forecasts more than persistence.** Mean bias −1.82 cm against −0.80 cm at +6 h, and −3.92 cm against −3.03 cm at +24 h.
 - **Trained on day-old ICON-D2.** The archive only has 25 to 27 hour old rain forecasts. Live, the short leads get much fresher ones. How the fitted ICON-D2 coefficients behave on those is unknown until the live shadow run.
 - **Few floods.** All 8 episodes above 95 cm are in F1 and F2, only one passes 145 cm.
 - **Chosen from about 20 candidates.** That is selection, even on inner splits (below).

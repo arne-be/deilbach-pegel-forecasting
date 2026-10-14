@@ -87,6 +87,8 @@ class RainChange:
         """Row masks, one per coefficient set."""
         if not self._split:
             return [np.ones(len(rows), dtype=bool)]
+        # shortcut: kd_last - kd_lag_3 spans only about 2 h when lag 0 is missing (38 % of rows);
+        # switch to #68's age-aligned kupferdreh_change_3h once it is merged.
         kupferdreh_rise = rows[contract.KD_LAST_CM] - rows[f"{KUPFERDREH}_lag_{CHANGE_HOURS}"]
         langenberg_rise = pd.Series(level_change(rows, LANGENBERG), index=rows.index)
         rising = (
@@ -107,6 +109,11 @@ class RainChange:
                 usable = (
                     group & np.isfinite(change_cm[:, lead]) & np.isfinite(lead_inputs).all(axis=1)
                 )
+                if usable.sum() < lead_inputs.shape[1]:
+                    raise ValueError(
+                        f"{self.name}: {usable.sum()} usable training rows for lead {lead + 1}, "
+                        f"need at least {lead_inputs.shape[1]}"
+                    )
                 solution, *_ = np.linalg.lstsq(
                     lead_inputs[usable], change_cm[usable, lead], rcond=None
                 )

@@ -152,3 +152,12 @@ def test_predict_needs_no_target_columns_and_gives_one_value_per_lead() -> None:
     forecast = model.predict(inputs_only)
     assert forecast.shape == (50, LEADS)
     np.testing.assert_allclose(forecast, expected, atol=1e-6)
+
+
+def test_fit_rejects_a_group_with_too_few_rows() -> None:
+    train = _with_targets(eval_dataset(hours=300), KNOWN)
+    # No row rises, so the rising set would have nothing to fit.
+    train["kd_lag_3"] = train[contract.KD_LAST_CM]
+    train["lb_lag_3"] = train["lb_lag_0"]
+    with pytest.raises(ValueError, match="usable training rows"):
+        RainChange(SETTINGS, split=True).fit(train)
