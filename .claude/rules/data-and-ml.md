@@ -20,7 +20,7 @@ description: Standards for data pipelines, jobs and forecasting models
 - Report errors per lead time and separately for high water (rising limbs, peak height and timing), not just overall RMSE.
 - Uncertainty ranges come from empirical errors of past forecasts, per lead time.
 - Version every trained model with its data window, config, code commit and metrics.
-- Weekly retraining only promotes a new model if it beats the current one on the same evaluation. Keep the previous model so rollback is a config change.
+- Retraining is manual for now ([0008](../../docs/decisions/0008-model-evaluation-and-selection.md)). A new model only goes live if it beats the current one on the same evaluation. Keep the previous model so rollback is a config change.
 - Share feature code between training and inference so they cannot drift apart.
 - Seed randomness in training.
 - Notebooks are for exploration only; move anything reused into tested modules.
