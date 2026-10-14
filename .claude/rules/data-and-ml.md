@@ -7,7 +7,7 @@ description: Standards for data pipelines, jobs and forecasting models
 ## Pipelines and jobs
 - **Idempotent jobs.** Rerunning a job for the same time window gives the same result and no duplicates (upsert on natural keys such as station + timestamp).
 - **Backfill-friendly.** Every job takes its time window as a parameter, so past periods can be reprocessed.
-- Keep raw data as received; derive cleaned data from it so cleaning can be redone.
+- Keep raw data as received, apart from unit and datum conversion at the ingest boundary (configured per station); derive cleaned data from it so cleaning can be redone.
 - Check schemas, units, value ranges and timestamps when data enters the system.
 - External calls use timeouts and retries with backoff. After retries fail, fail visibly instead of producing partial output.
 - Schema changes go through versioned migrations, never by hand.
