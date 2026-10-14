@@ -24,7 +24,7 @@ Orange: known at 12:30. Grey: not known yet.
 
 ### What that means per hour ahead
 
-How far ahead each rain value was forecast, by hours ahead of the issue time. Live, short hours get short, sharp forecasts. In the archive every hour gets a 25–27 hour forecast. The two only meet around 22–24 hours ahead.
+How far ahead each rain value was forecast, by hours ahead of the issue time. Live, short hours get short, sharp forecasts. In the archive, at 12:30, every hour gets a 25–27 hour forecast. The two only meet around 22–24 hours ahead.
 
 ![Live forecast lead rises from 4 to 27 hours; the archive lead stays between 25 and 27 hours](images/icon-d2-forecast-lead.svg)
 
@@ -32,13 +32,13 @@ Blue: live. Orange: archive.
 
 **Coverage is fine.** The archive always has a known value up to 22½ to 24½ hours ahead, so the 24 hourly rain sums are complete for every issue time.
 
-**Quality is the issue.** A model trained on the archive only sees day-old rain forecasts. Starting in 2024 doesn't change that; it is how the archive is stored. Before April 2026 Open-Meteo has whole runs only for ECMWF IFS.
+**Quality is the issue.** A model trained on the archive only sees day-old rain forecasts. Starting in 2024 doesn't change that; it is how the archive is stored. Before April 2026 Open-Meteo has whole runs only for ECMWF IFS ([Single Runs API](https://open-meteo.com/en/docs/single-runs-api)).
 
 ## Part 2 · From one issue time to a score
 
 ### One row of the dataset
 
-The dataset has one row per issue time. Left of the red line is everything the model may use: what was known at 12:30. Right of it, the ICON-D2 forecast for the next 24 hours. The first column, the hour that just ended, sometimes gets a fresh value (here with a 3-hour lead); all others are day-old values. The targets are the measured levels 1 to 24 hours later. Training sees them as the answers; prediction never does.
+The dataset has one row per issue time. Left of the red line is everything the model may use: what was known at 12:30. Right of it, the ICON-D2 forecast for the next 24 hours. The first two columns sometimes get a fresh value (here only the first, with a 3-hour lead); all others are day-old values. The targets are the measured levels 1 to 24 hours later. Training sees them as the answers; prediction never does.
 
 ![One dataset row: 24 hourly lags of levels and radar before the issue time, 24 ICON-D2 hours after it, and 24 targets](images/evaluation-dataset-row.svg)
 
