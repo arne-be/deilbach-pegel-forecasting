@@ -168,7 +168,7 @@ Shift in hours that best matches the forecast to the observed level on high wate
 
 ## 2026-10-15-models-v2
 
-Lowest mean MAE over leads 1-24 h: rain_change:v2:split over all issue times (2.1 cm; persistence 2.8 cm), ridge:change:v2 at high water (4.8 cm; persistence 8.3 cm).
+Lowest mean MAE over leads 1-24 h: rain_change:v2:split and ridge:change:v2 over all issue times (2.1 cm; persistence 2.8 cm), ridge:change:v2 at high water (4.8 cm; persistence 8.3 cm).
 First crossings of 95 cm warned at least 3 h ahead: ridge:change 3 of 6, persistence 0 of 6.
 False alarms at 95 cm: 0.00 to 0.60 per month.
 
