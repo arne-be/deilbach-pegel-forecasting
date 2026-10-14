@@ -215,7 +215,12 @@ def test_kind_migration_down_restores_the_tables(before_kind: Conn) -> None:
 
 AVAILABLE_AT_MIGRATION = "20261013180000"
 LANGENBERG_MIGRATION = "20261014120000"
-LATER_DELAYS = {"langenberg:level": timedelta(minutes=25)}  # LANGENBERG_MIGRATION
+LANUV_MIGRATION = "20261014150000"
+LATER_DELAYS = {
+    "langenberg:level": timedelta(minutes=25),  # LANGENBERG_MIGRATION
+    "nierenhof:level": timedelta(minutes=25),  # LANUV_MIGRATION
+    "neviges:level": timedelta(minutes=25),  # LANUV_MIGRATION
+}
 # The issue minute in config/pegel.json when the migration was written; it's fixed in its SQL.
 MIGRATION_ISSUE_MINUTE = 30
 
@@ -387,4 +392,61 @@ def test_langenberg_migration_moves_only_rows_on_the_old_schedule(
     ] + [("nierenhof:level", available_at) for _, available_at, _, _ in rows]
     assert rows[0][3] == scheduled_available_at(
         AT, LATER_DELAYS["langenberg:level"], MIGRATION_ISSUE_MINUTE
+    )
+
+
+def test_lanuv_migration_moves_only_rows_on_the_old_schedule(
+    before_available_at: Conn,
+) -> None:
+    up(before_available_at, migration(AVAILABLE_AT_MIGRATION))
+    before_available_at.execute("DELETE FROM observations")
+    before_available_at.execute(
+        "INSERT INTO series (id, variable, unit, source, location, kind) VALUES"
+        " ('neviges:level', 'level', 'cm', 'lanuv', 'neviges', 'observation')"
+    )
+    backfilled_at = datetime(2026, 10, 14, 8, 0, tzinfo=UTC)
+    # valid_at, available_at, ingested_at, expected available_at
+    rows = [
+        # Backfilled on the old 15-minute schedule: moves to the 25-minute one.
+        (
+            AT.replace(minute=10),
+            AT.replace(minute=30),
+            backfilled_at,
+            AT.replace(hour=10, minute=30),
+        ),
+        # Live run first saw it in the old slot: keeps it.
+        (
+            AT.replace(minute=15),
+            AT.replace(minute=30),
+            AT.replace(minute=30, second=5),
+            None,
+        ),
+        # Same slot on both schedules, and a revision seen later: both stay.
+        (AT, AT.replace(minute=30), backfilled_at, None),
+        (AT.replace(minute=12), AT.replace(hour=11, minute=30), backfilled_at, None),
+    ]
+    moved_series = ("neviges:level", "nierenhof:level")
+    with before_available_at.cursor() as cursor:
+        for valid_at, available_at, ingested_at, _ in rows:
+            for series_id in ("langenberg:level", *moved_series):
+                cursor.execute(
+                    "INSERT INTO observations (series_id, valid_at, value, available_at,"
+                    " ingested_at) VALUES (%s, %s, 1, %s, %s)",
+                    (series_id, valid_at, available_at, ingested_at),
+                )
+    for _ in range(2):
+        up(before_available_at, migration(LANUV_MIGRATION))
+    stored = before_available_at.execute(
+        "SELECT series_id, available_at FROM observations ORDER BY series_id, valid_at"
+    ).fetchall()
+    by_valid_at = sorted(rows)
+    assert stored == [
+        ("langenberg:level", available_at) for _, available_at, _, _ in by_valid_at
+    ] + [
+        (series_id, expected or available_at)
+        for series_id in moved_series
+        for _, available_at, _, expected in by_valid_at
+    ]
+    assert rows[0][3] == scheduled_available_at(
+        rows[0][0], LATER_DELAYS["nierenhof:level"], MIGRATION_ISSUE_MINUTE
     )

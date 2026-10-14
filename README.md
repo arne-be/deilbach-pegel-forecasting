@@ -33,12 +33,14 @@ How old the newest stored value of each source is when the hourly run starts at 
 |---|---|---|---|
 | Kupferdreh (Influx) | 8 min, every run | one reading per hour, at about :22 | 5 |
 | Langenberg (LANUV) | 25 min, every run | an hourly batch of 12 five-minute values, hh-1:10 to hh:05, arrives between hh:05 and hh:30 | 25 |
-| Nierenhof (LANUV) | median 10 min, p90 25 min | usually up to hh:20, sometimes only hh:05 | 15 (sometimes optimistic) |
-| Neviges (LANUV) | 5 to 20 min, median 15 | five-minute values | 15 |
+| Nierenhof (LANUV) | median 10 min, p90 25 min | 15-minute batches, newest at :05, :20, :35 or :50; sometimes a batch is skipped, so at hh:30 only hh:05 is there (5 of 25 runs) | 25 |
+| Neviges (LANUV) | 5 to 20 min, median 15 | five-minute values | 25 |
 | DWD RADOLAN RW | 40 min, every run | our own cutoff: the run only takes products before the issue time, the newest is hh-1:50. DWD's own delay is about 26 min ([docs/catchment.md](docs/catchment.md)) | 35 |
 | ICON-D2 (Open-Meteo) | newest run 90, 150 or 210 min old (sometimes 270) | a run every 3 hours, served about 90 min after it starts | 120 |
 
 The delay is the run time minus the newest `valid_at` that had `ingested_at` before the run (`ingested_at` only changes when a value is new or changed), so the same query works for any source and period. Two days at low water are a small sample, and since we only look at hh:30, we only know that Langenberg's batch arrives sometime between hh:05 and hh:30.
+
+All LANUV gauges use 25 minutes, to keep it simple. A live probe on 2026-10-14 saw Langenberg's batch land between hh:13 and hh:18, so 25 matches what the hh:30 run sees. For Nierenhof, 15 would let backtests use hh:10 and hh:15 values that the live run didn't have when a batch was skipped. For Neviges, 25 only costs a few minutes of data in some hours.
 
 ## Flood categories
 
