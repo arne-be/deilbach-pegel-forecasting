@@ -17,6 +17,7 @@ from pegel.jobs.pipeline import (
     clean_history,
     fetch_by_source,
     forecast,
+    ingest,
     run_hourly,
 )
 
@@ -52,7 +53,7 @@ def readings_before(issued_at: datetime, levels: list[float]) -> dict[datetime, 
 def test_hourly_run_forecasts_the_newest_level(conn: Conn) -> None:
     source = FakeSource(readings_before(ISSUED_AT, [-10.0, -15.0, -21.0]))
     result = run_hourly(source, conn, CONFIG, ISSUED_AT)
-    assert {point.level_cm for point in result.points} == {-21.0}
+    assert {point.level_cm for point in result.points} == {24.0}
 
 
 def test_hourly_run_stores_the_forecast(conn: Conn) -> None:
@@ -136,6 +137,18 @@ def test_backfill_stores_every_month(conn: Conn) -> None:
     assert [o.observed_at for o in stored] == sorted(readings)
 
 
+def test_ingest_adds_the_station_offset(conn: Conn) -> None:
+    reading = ISSUED_AT.replace(minute=22)
+    backfill(FakeSource({reading: -39.2}), conn, STATION, LONG_AGO, ISSUED_AT, MINUTE)
+    assert [o.level_cm for o in fetch_observations(conn, STATION.id, LONG_AGO, ISSUED_AT)] == [5.8]
+
+
+def test_ingest_twice_changes_nothing(conn: Conn) -> None:
+    source = FakeSource(readings_before(ISSUED_AT, [-39.2, 0.123, 12.345, 98.7]))
+    run_hourly(source, conn, CONFIG, ISSUED_AT)
+    assert ingest(source, conn, STATION, LONG_AGO, ISSUED_AT, MINUTE, live=True) == 0
+
+
 def test_backfill_twice_adds_nothing(conn: Conn) -> None:
     start = datetime(2026, 9, 1, tzinfo=UTC)
     source = FakeSource(readings_before(ISSUED_AT, [10.0, 20.0, 30.0]))
@@ -199,6 +212,8 @@ def test_backfill_stamps_the_first_scheduled_run_after_the_delay(conn: Conn) -> 
 
 
 STEADY = [-26.0] * 4
+# STEADY as stored, after the station offset.
+STORED_STEADY = [19.0] * 4
 CLEANED_ID = cleaned_level_series_id(STATION.id)
 
 
@@ -209,14 +224,14 @@ def cleaned_levels(conn: Conn) -> list[float]:
 def test_hourly_run_stores_cleaned_levels_without_the_spike(conn: Conn) -> None:
     source = FakeSource(readings_before(ISSUED_AT, [*STEADY, 298.0, -25.0]))
     run_hourly(source, conn, CONFIG, ISSUED_AT)
-    assert cleaned_levels(conn) == [*STEADY, -25.0]
+    assert cleaned_levels(conn) == [*STORED_STEADY, 20.0]
 
 
 def test_forecast_ignores_a_newest_spike(conn: Conn) -> None:
     source = FakeSource(readings_before(ISSUED_AT, [*STEADY, 298.0]))
     result = run_hourly(source, conn, CONFIG, ISSUED_AT)
     newest_accepted = ISSUED_AT.replace(minute=22) - timedelta(hours=1)
-    assert (result.newest_observation_at, result.points[0].level_cm) == (newest_accepted, -26.0)
+    assert (result.newest_observation_at, result.points[0].level_cm) == (newest_accepted, 19.0)
 
 
 def test_clean_rerun_changes_nothing(conn: Conn) -> None:
@@ -234,7 +249,20 @@ def test_reading_rejected_on_rerun_is_deleted(conn: Conn) -> None:
     raw_id = level_series_id(STATION.id)
     upsert_values(conn, [SeriesValue(raw_id, newest, 298.0, newest)], ISSUED_AT)
     clean(conn, CONFIG, STATION, LONG_AGO, ISSUED_AT)
-    assert cleaned_levels(conn) == STEADY
+    assert cleaned_levels(conn) == STORED_STEADY
+
+
+def test_cleaned_level_below_zero_is_stored_as_zero(conn: Conn) -> None:
+    source = FakeSource(readings_before(ISSUED_AT, [-50.0] * 4))
+    run_hourly(source, conn, CONFIG, ISSUED_AT)
+    assert cleaned_levels(conn) == [0.0] * 4
+
+
+def test_raw_level_below_zero_is_kept(conn: Conn) -> None:
+    source = FakeSource(readings_before(ISSUED_AT, [-50.0] * 4))
+    run_hourly(source, conn, CONFIG, ISSUED_AT)
+    raw = fetch_observations(conn, STATION.id, LONG_AGO, ISSUED_AT)
+    assert [o.level_cm for o in raw] == [-5.0] * 4
 
 
 def test_clean_history_covers_every_month(conn: Conn) -> None:

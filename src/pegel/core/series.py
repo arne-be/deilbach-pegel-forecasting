@@ -41,7 +41,7 @@ class Series:
 
 @dataclass(frozen=True)
 class SeriesValue:
-    """One observed value of a series. Negative values are real for levels."""
+    """One observed value of a series. Raw values may be negative; checks don't clip them."""
 
     series_id: str
     valid_at: datetime

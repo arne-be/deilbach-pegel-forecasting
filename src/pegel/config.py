@@ -21,6 +21,8 @@ class Station(_Frozen):
     source_label: str
     # How long after its time a reading is reliably at the source (measured, see the docs).
     available_after_minutes: int = Field(ge=0)
+    # Added at ingest to move the source's zero to ours; changing it needs a data migration.
+    level_offset_cm: float = 0.0
 
 
 class ForecastSettings(_Frozen):

@@ -67,7 +67,8 @@ def ingest(
         SeriesValue(
             series.id,
             observation.observed_at,
-            observation.level_cm,
+            # Rounded like the migration that shifted the stored values, so reruns change nothing.
+            round(observation.level_cm + station.level_offset_cm, 3),
             seen_at
             if live
             else scheduled_available_at(
@@ -128,8 +129,9 @@ def clean(conn: Conn, config: PegelConfig, station: Station, start: datetime, en
         (value, flag) for value, flag in zip(raw, flags, strict=True) if value.valid_at >= start
     ]
     cleaned_id = cleaned_level_series_id(station.id)
+    # Our zero is below the lowest level ever seen, so a reading under it is a sensor error.
     accepted = [
-        SeriesValue(cleaned_id, value.valid_at, value.value, value.available_at)
+        SeriesValue(cleaned_id, value.valid_at, max(value.value, 0.0), value.available_at)
         for value, flag in in_window
         if not flag
     ]

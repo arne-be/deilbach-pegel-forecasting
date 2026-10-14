@@ -11,7 +11,7 @@ def require_utc(value: datetime, field_name: str) -> None:
 
 @dataclass(frozen=True)
 class Observation:
-    """One level reading in cm relative to the local zero point. Negative values are real."""
+    """One level reading in cm relative to the gauge zero."""
 
     station_id: str
     observed_at: datetime

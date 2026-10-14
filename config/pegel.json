@@ -5,7 +5,8 @@
       "name": "Deilbach Kupferdreh",
       "source": "influx",
       "source_label": "Deilbach",
-      "available_after_minutes": 5
+      "available_after_minutes": 5,
+      "level_offset_cm": 45
     },
     {
       "id": "langenberg",
@@ -40,10 +41,10 @@
   },
   "categories": [
     { "number": 1, "name": "unkritisch", "above_cm": null },
-    { "number": 2, "name": "kritisch", "above_cm": 100 },
-    { "number": 3, "name": "sehr kritisch", "above_cm": 120 },
-    { "number": 4, "name": "extrem kritisch", "above_cm": 140 },
-    { "number": 5, "name": "Chaos", "above_cm": 180 }
+    { "number": 2, "name": "kritisch", "above_cm": 145 },
+    { "number": 3, "name": "sehr kritisch", "above_cm": 165 },
+    { "number": 4, "name": "extrem kritisch", "above_cm": 185 },
+    { "number": 5, "name": "Chaos", "above_cm": 225 }
   ],
   "cleaning": {
     "gate_sigmas": 4,
