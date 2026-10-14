@@ -23,12 +23,9 @@ from pegel.evaluation.report_tables import (
 )
 
 PERSISTENCE_COLOUR = "#808080"
-# tab20's dark shades, then its light ones, without the greys reserved for persistence: 18
-# distinct colours, so a run of all registered models doesn't reuse one.
-_TAB20 = plt.get_cmap("tab20").colors  # type: ignore[attr-defined]
-MODEL_COLOURS = [
-    c for i, c in [*enumerate(_TAB20)][0::2] + [*enumerate(_TAB20)][1::2] if i not in (14, 15)
-]
+# tab20 without the greys reserved for persistence: 9 dark and 9 light shades.
+_TAB20 = [c for i, c in enumerate(plt.get_cmap("tab20").colors) if i not in (14, 15)]  # type: ignore[attr-defined]
+MODEL_COLOURS = _TAB20[0::2] + _TAB20[1::2]
 EVENT_LEADS = {6: "-", 12: "--"}
 EVENT_MARGIN = pd.Timedelta(hours=24)
 WARNING_COLUMNS = 4
@@ -40,11 +37,14 @@ Palette = dict[str, str | tuple[float, float, float]]
 
 def colours(models: list[str], registered: list[str]) -> Palette:
     """A colour per model by its place in the registry, so a model keeps its colour across
-    runs; models not in the registry come after the registered ones."""
+    runs; models not in the registry come after the registered ones. Beyond 9 models the
+    oldest get the light shades, so the newest models are never the faintest lines."""
     unregistered = sorted(set(models) - set(registered))
     others = [model for model in [*registered, *unregistered] if model != PERSISTENCE]
+    dark, light = MODEL_COLOURS[:9], MODEL_COLOURS[9:]
+    order = light[: max(0, len(others) - len(dark))] + dark + light
     palette: Palette = {PERSISTENCE: PERSISTENCE_COLOUR}
-    palette.update({model: MODEL_COLOURS[i % len(MODEL_COLOURS)] for i, model in enumerate(others)})
+    palette.update({model: order[i % len(order)] for i, model in enumerate(others)})
     return palette
 
 
@@ -106,14 +106,8 @@ def skill_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
 
 
 def _legend_below(figure: Figure, axes: Axes) -> None:
-    """Below the panels, so a dozen models don't cover the lines."""
-    figure.legend(
-        *axes.get_legend_handles_labels(),
-        loc="upper center",
-        ncols=4,
-        bbox_to_anchor=(0.5, 0.0),
-        fontsize="small",
-    )
+    handles = axes.get_legend_handles_labels()
+    figure.legend(*handles, loc="upper center", ncols=4, bbox_to_anchor=(0.5, 0), fontsize="small")
 
 
 def fold_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
@@ -204,12 +198,8 @@ def warning_plot(crossings: pd.DataFrame, palette: Palette, path: Path, note: st
     models = model_order(list(crossings["model"]))
     longest = crossings["warning_hours"].max()
     earliest = max(24.0, 0.0 if pd.isna(longest) else float(longest)) + 1
-    figure, axes = plt.subplots(
-        rows,
-        WARNING_COLUMNS,
-        figsize=(3.2 * WARNING_COLUMNS, rows * (1.0 + 0.25 * len(models))),
-        squeeze=False,
-    )
+    size = (3.2 * WARNING_COLUMNS, rows * (1.0 + 0.25 * len(models)))
+    figure, axes = plt.subplots(rows, WARNING_COLUMNS, figsize=size, squeeze=False)
     for ax in axes.flat:
         ax.set_visible(False)
     for (threshold, at), (row, column) in zip(panels.itertuples(index=False), places, strict=True):
@@ -245,13 +235,8 @@ def false_alarm_plot(false_alarms: pd.DataFrame, palette: Palette, path: Path) -
     if not thresholds:
         return None
     models = model_order(list(false_alarms["model"]))
-    figure, axes = plt.subplots(
-        1,
-        len(thresholds),
-        figsize=(3.2 * len(thresholds) + 1, 1.2 + 0.3 * len(models)),
-        squeeze=False,
-        sharex=True,
-    )
+    size = (3.2 * len(thresholds) + 1, 1.2 + 0.3 * len(models))
+    figure, axes = plt.subplots(1, len(thresholds), figsize=size, squeeze=False, sharex=True)
     for column, (ax, threshold) in enumerate(zip(axes[0], thresholds, strict=True)):
         rows = false_alarms[false_alarms["threshold_cm"] == threshold].set_index("model")
         rates, counts = rows["per_month"].reindex(models), rows["count"].reindex(models)

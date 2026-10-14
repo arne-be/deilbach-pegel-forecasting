@@ -240,10 +240,12 @@ def summary(
         parts = []
         for column, where in (("mae_all", "over all issue times"), ("mae_high", "at high water")):
             values = numbers[column]
-            best = values.idxmin()
+            # Every model that prints the same as the best one, so a tie isn't hidden.
+            best = values[values.round(1) == round(values.min(), 1)].sort_values().index
+            names = " and ".join([", ".join(best[:-1]), best[-1]] if len(best) > 1 else best)
             baseline = values.get(PERSISTENCE)
             versus = "" if pd.isna(baseline) else f"; persistence {baseline:.1f} cm"
-            parts.append(f"{best} {where} ({values.min():.1f} cm{versus})")
+            parts.append(f"{names} {where} ({values.min():.1f} cm{versus})")
         lines = [f"Lowest mean MAE over leads 1-{last_lead} h: {parts[0]}, {parts[1]}."]
     scored = numbers.dropna(subset=["crossings"]) if "warned" in numbers else numbers.iloc[:0]
     if not scored.empty:

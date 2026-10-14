@@ -143,6 +143,18 @@ def test_colours_follow_the_registry_and_keep_persistence_grey() -> None:
     assert colours(["ridge"], ["persistence", "ridge"])["ridge"] == MODEL_COLOURS[0]
 
 
+def test_colours_give_the_newest_of_many_models_dark_shades() -> None:
+    from pegel.evaluation.report_plots import MODEL_COLOURS, colours
+
+    registered = [PERSISTENCE, *(f"model_{i}" for i in range(11))]
+    palette = colours(registered, registered)
+    dark, light = MODEL_COLOURS[:9], MODEL_COLOURS[9:]
+    # 11 models, 9 dark shades: the two oldest get light ones, the rest all dark in order.
+    assert [palette["model_0"], palette["model_1"]] == light[:2]
+    assert [palette[f"model_{i}"] for i in range(2, 11)] == dark
+    assert len(set(map(str, palette.values()))) == len(palette)
+
+
 def test_markdown_table_formats_floats_and_missing_values() -> None:
     table = pd.DataFrame({"mae": [1.234, float("nan")]}, index=pd.Index(["a", "b"], name="model"))
     assert report_tables.markdown_table(table).splitlines() == [
@@ -241,6 +253,10 @@ def test_summary_names_the_best_model_and_the_warnings() -> None:
     scores = pd.concat([_scores(), zeta_scores])
     crossings = pd.concat([_crossings(), zeta_crossings])
     three = report_tables.summary(scores, crossings, _false_alarms(), 95.0)
+    # zeta scores the same as ridge, so both are named.
+    assert three[0].startswith(
+        "Lowest mean MAE over leads 1-24 h: ridge and zeta over all issue times (6.2 cm;"
+    )
     assert three[1] == lines[1]
     alone = _scores()[_scores()["model"] == PERSISTENCE]
     assert report_tables.summary(alone, pd.DataFrame(), pd.DataFrame(), 95.0) == [
