@@ -2,6 +2,8 @@
 
 locals {
   hourly_name = "deilbach-pegel-run-hourly"
+  # Created in infra/bootstrap. Every role here needs it, or the deploy role may not create it.
+  workload_boundary_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/deilbach-pegel-workload-boundary"
   secrets = [
     aws_secretsmanager_secret.influx,
     aws_secretsmanager_secret.influx_client_cert,
@@ -16,7 +18,8 @@ resource "aws_cloudwatch_log_group" "hourly" {
 }
 
 resource "aws_iam_role" "hourly" {
-  name = local.hourly_name
+  name                 = local.hourly_name
+  permissions_boundary = local.workload_boundary_arn
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -86,7 +89,8 @@ resource "aws_lambda_function" "hourly" {
 }
 
 resource "aws_iam_role" "hourly_schedule" {
-  name = "${local.hourly_name}-schedule"
+  name                 = "${local.hourly_name}-schedule"
+  permissions_boundary = local.workload_boundary_arn
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{

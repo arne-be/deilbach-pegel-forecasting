@@ -197,6 +197,37 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = ["arn:aws:iam::${local.account_id}:role/deilbach-pegel-github-*"]
   }
 
+  # Without these, the deploy role could create an admin role and run a Lambda with it.
+  # For an existing role, iam:PermissionsBoundary is the boundary it already has; for
+  # CreateRole and PutRolePermissionsBoundary, the one in the request. Missing counts as not equal.
+  statement {
+    sid       = "RolesOnlyWithBoundary"
+    effect    = "Deny"
+    actions   = ["iam:CreateRole", "iam:PutRolePolicy", "iam:AttachRolePolicy", "iam:PutRolePermissionsBoundary"]
+    resources = ["arn:aws:iam::${local.account_id}:role/deilbach-pegel*"]
+
+    condition {
+      test     = "StringNotEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [aws_iam_policy.workload_boundary.arn]
+    }
+  }
+
+  statement {
+    sid       = "KeepRoleBoundaries"
+    effect    = "Deny"
+    actions   = ["iam:DeleteRolePermissionsBoundary"]
+    resources = ["arn:aws:iam::${local.account_id}:role/deilbach-pegel*"]
+  }
+
+  # The boundary policy matches the Iam allow above, so only reads stay open.
+  statement {
+    sid         = "KeepBoundaryPolicy"
+    effect      = "Deny"
+    not_actions = ["iam:Get*", "iam:List*"]
+    resources   = [aws_iam_policy.workload_boundary.arn]
+  }
+
   statement {
     sid       = "KeepStateBucket"
     effect    = "Deny"
