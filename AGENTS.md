@@ -30,6 +30,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Grafana Cloud dashboards as code (read-only role `pegel_grafana`): `grafana/dashboards/`, `infra/prod/grafana.tf`, `docs/setup-grafana.md`
 - Live outlier filter exploration (three methods compared, plots, recommendation): `analysis/outliers/`
 - Model evaluation contracts (`evaluation` config, folds, dataset and file schemas, model interface): `src/pegel/evaluation/contract.py`, `tests/eval_factory.py`
+- Evaluation metrics, flood events and the scoring runner (`python -m pegel.evaluation.score`): `src/pegel/evaluation/metrics.py`, `events.py`, `score.py`
 
 ## Layout
 
