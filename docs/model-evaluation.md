@@ -1,6 +1,6 @@
 # Model evaluation, explained
 
-How the backtest works, with pictures. The decisions and their reasons are in [decision 0008](decisions/0008-model-evaluation-and-selection.md). All figures use one real issue time, 19 Nov 2024 at 12:30 UTC, a flood day.
+How the backtest works, with pictures. The decisions and their reasons are in [decision 0008](decisions/0008-model-evaluation-and-selection.md). All figures use one real issue time, 19 Nov 2024 at 12:30 UTC, a flood day. The split, the flood events and the metrics are summed up in [Evaluation methodology](evaluation-methodology.md).
 
 ## Part 1 · The ICON-D2 archive
 

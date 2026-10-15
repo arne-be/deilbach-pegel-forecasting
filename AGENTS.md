@@ -41,6 +41,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Curated change models v2 `rain_change:v2:split` and `ridge:change:v2` (named physical inputs per lead, inner-split candidate list): `src/pegel/evaluation/models/curated.py`, `docs/models/rain-change-v2.md`, `docs/models/ridge-change-v2.md`, `analysis/model-evaluation/models-v2-candidates.csv`
 - Learnings about data, models and evaluation, append-only: `analysis/model-evaluation/learnings.md`
 - Run report and experiment log (`python -m pegel.evaluation.report <run dir>`, plots and one appended section per run): `src/pegel/evaluation/report.py`, `report_tables.py`, `report_plots.py`, `analysis/model-evaluation/`
+- Evaluation methodology with the fold split and every flood event plotted: `docs/evaluation-methodology.md`, `analysis/model-evaluation/methodology_plots.py`
 
 ## Layout
 
