@@ -1,4 +1,4 @@
-"""The plots of the run report: MAE and skill per lead, MAE per fold, and one plot per flood.
+"""The plots of the run report: MAE and skill per lead, MAE per fold, and a peak track per flood.
 
 Analysis only: matplotlib is in the `analysis` group, not in the Lambda image.
 """
@@ -10,16 +10,17 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from pegel.evaluation.events import forecast_levels
+from pegel.evaluation import contract
 from pegel.evaluation.metrics import ALL_FOLDS, PERSISTENCE, SUBSET_ALL
-from pegel.evaluation.report_tables import model_order, observed_from_predictions
+from pegel.evaluation.report_tables import model_order
 
 PERSISTENCE_COLOUR = "#808080"
 # tab20 without the greys reserved for persistence: 9 dark and 9 light shades.
 _TAB20 = [c for i, c in enumerate(plt.get_cmap("tab20").colors) if i not in (14, 15)]  # type: ignore[attr-defined]
 MODEL_COLOURS = _TAB20[0::2] + _TAB20[1::2]
-EVENT_LEADS = {6: "-", 12: "--"}
-EVENT_MARGIN = pd.Timedelta(hours=24)
+# The peak track shows the issue times from this many hours before the observed peak to it.
+TRACK_HOURS = 24
+_HOUR = pd.Timedelta(hours=1)
 DPI = 100
 
 
@@ -131,28 +132,61 @@ def fold_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
     return _save(figure, path)
 
 
-def event_plot(
+def forecast_peaks(predictions: pd.DataFrame, peak_at: pd.Timestamp) -> pd.DataFrame:
+    """Per model and issue time from TRACK_HOURS before `peak_at` to it: the forecast's highest
+    value and its time, both relative to the observed peak (hours, first of tied hours)."""
+    issued = predictions[contract.ISSUED_AT]
+    window = predictions[(issued >= peak_at - TRACK_HOURS * _HOUR) & (issued <= peak_at)]
+    window = window.dropna(subset=["prediction"])
+    highest = window.loc[window.groupby(["model", contract.ISSUED_AT])["prediction"].idxmax()]
+    issued_at = highest[contract.ISSUED_AT]
+    return pd.DataFrame(
+        {
+            "model": highest["model"],
+            "issued_hours": (issued_at - peak_at) / _HOUR,
+            "peak_cm": highest["prediction"],
+            "timing_hours": (issued_at - peak_at) / _HOUR + highest["lead"],
+        }
+    )
+
+
+def peak_track_plot(
     predictions: pd.DataFrame,
-    observed: pd.Series,
     event: pd.Series,
+    high_water_cm: float,
     palette: Palette,
     path: Path,
 ) -> Path:
-    """Observed level around one flood and each model's lead-6 and lead-12 forecasts."""
-    start = pd.Timestamp(event["start"]) - EVENT_MARGIN
-    end = pd.Timestamp(event["end"]) + EVENT_MARGIN
-    figure, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(observed[start:end], color="black", linewidth=2, label="observed")
-    for model in model_order(list(predictions["model"])):
-        for lead, style in EVENT_LEADS.items():
-            forecast = forecast_levels(predictions, model, lead)[start:end]
-            ax.plot(forecast, color=palette[model], linestyle=style, label=f"{model} +{lead} h")
-    ax.set_xlabel("time (UTC)")
-    ax.set_ylabel("level (cm)")
-    ax.set_title(f"Flood peaking {pd.Timestamp(event['peak_at']):%Y-%m-%d %H:%M} UTC")
-    ax.grid(alpha=0.3)
-    ax.legend(fontsize="small")
-    figure.autofmt_xdate()
+    """Each model's forecast peak height (top) and time (bottom) against its issue time, over
+    the TRACK_HOURS before the observed peak: when a model saw the flood and if it held on."""
+    peak_at = pd.Timestamp(event["peak_at"])
+    tracks = forecast_peaks(predictions, peak_at)
+    figure, (height, timing) = plt.subplots(2, 1, figsize=(9, 7), sharex=True)
+    references = (
+        (event["peak_cm"], "black", "-", "observed peak"),
+        (event["pre_event_cm"], "black", ":", "pre-event level"),
+        (high_water_cm, "#b22222", "--", f"{high_water_cm:.0f} cm"),
+    )
+    for level, colour, style, label in references:
+        height.axhline(level, color=colour, linestyle=style, linewidth=1.2)
+        height.annotate(
+            label, (0, level), xytext=(4, 2), textcoords="offset points", fontsize="small"
+        )
+    timing.axhline(0, color="black", linewidth=1.2)
+    for model in model_order(list(tracks["model"])):
+        track = tracks[tracks["model"] == model]
+        for ax, column in ((height, "peak_cm"), (timing, "timing_hours")):
+            ax.plot(track["issued_hours"], track[column], color=palette[model], label=model)
+    height.set_ylabel("forecast peak (cm)")
+    height.set_title(
+        f"Event {event['event']}: peak {event['peak_cm']:.0f} cm at {peak_at:%Y-%m-%d %H:%M} UTC"
+    )
+    timing.set_ylabel("forecast peak time (h after observed peak)")
+    timing.set_xlabel("issue time (h relative to the observed peak)")
+    timing.set_xlim(-TRACK_HOURS, 0)
+    for ax in (height, timing):
+        ax.grid(alpha=0.3)
+    _legend_below(figure, timing)
     return _save(figure, path)
 
 
@@ -160,6 +194,7 @@ def write_plots(
     predictions: pd.DataFrame,
     tables: dict[str, pd.DataFrame],
     registered: list[str],
+    high_water_cm: float,
     plot_dir: Path,
 ) -> list[Path]:
     """Every plot the tables allow; a missing or empty table only skips its plots."""
@@ -176,8 +211,9 @@ def write_plots(
         plots.append(fold_plot(scores, palette, plot_dir / "mae-folds.png"))
     if events.empty:
         return plots
-    observed = observed_from_predictions(predictions)
-    for number, event in enumerate(events.to_dict("records"), start=1):
-        name = f"event-{number}-{pd.Timestamp(event['peak_at']):%Y-%m-%d}.png"
-        plots.append(event_plot(predictions, observed, pd.Series(event), palette, plot_dir / name))
+    for event in events.to_dict("records"):
+        name = f"peak-track-{event['event']}-{pd.Timestamp(event['peak_at']):%Y-%m-%d}.png"
+        plots.append(
+            peak_track_plot(predictions, pd.Series(event), high_water_cm, palette, plot_dir / name)
+        )
     return plots
