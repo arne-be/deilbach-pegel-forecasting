@@ -132,7 +132,7 @@ def test_a_skipped_hour_inside_a_run_does_not_split_it() -> None:
     hours = 200
     forecasts = [_forecast(h, {6: 90.0} if h in (100, 101, 103) else {}) for h in range(hours)]
     dataset = _dataset(hours)
-    dataset.loc[102, contract.KD_LAST_AT] -= pd.Timedelta(hours=4)
+    dataset.loc[102, contract.KD_LAST_AT] = _hour(102) - pd.Timedelta(hours=4)
     predictions = pd.concat(forecasts, ignore_index=True)
     table = false_alarms(predictions, dataset, _floods(), HIGH_WATER_CM, LEADS)
     assert int(table["count"].iloc[0]) == 1
