@@ -191,6 +191,7 @@ Only A touches `pyproject.toml`, `uv.lock` and `config/pegel.json`. Each PR adds
 - **Forecasting libraries** (skforecast, sktime, darts, Nixtla). The models are simple enough without them, and the harness is a few functions.
 - **Random or shuffled splits.** They leak the future.
 - **Automatic retraining.** No point until we know which model to retrain.
+- **A run without ICON-D2 for every learned model.** It doubles the runs for little: the learnings already show ICON-D2 is the strongest input, and the live shadow run shows what fresh runs add.
 - **LSTM.** One gauge and two years of data is the case where it does badly ([Kratzert et al.](https://research.google/pubs/hess-opinions-never-train-a-long-short-term-memory-lstm-network-on-a-single-basin/)). Only reconsider by fine-tuning a model pretrained on many basins.
 - **NSE and KGE.** Skill against persistence says more for short leads ([Knoben et al. 2019](https://hess.copernicus.org/articles/23/4323/2019/)).
 
