@@ -1,4 +1,4 @@
-"""Figures and tables for docs/evaluation-methodology.md: the fold split and every flood event.
+"""Figures and tables for docs/evaluation.md: the fold split and every flood event.
 
 Reads the frozen dataset only, with the same folds, embargo and event rule as the scorer.
 

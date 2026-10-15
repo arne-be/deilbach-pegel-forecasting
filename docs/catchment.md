@@ -120,6 +120,26 @@ These rows go under their own source, `open_meteo_previous_runs`, with run_at se
 
 **For training:** a run is only out about 85 minutes after run_at (measured 84.8 and 85.8 min for the 09 and 12 UTC runs on 2026-10-13, as `last_run_availability_time − last_run_initialisation_time`). Training uses a value only if its `available_at` ≤ the issue time. The live step stamps a run with the issue slot (:30) of the run that fetched it; the exact fetch time stays in `fetched_at`. Archive rows get what the live system would have done: the first hourly run (:30) at or after run_at + `available_after`, which is `rain.forecast.available_after_minutes` (120) for both sources. Any delay between 91 and 150 minutes gives the same :30 run, so 120 keeps a wide margin at no cost. Most day-0 values (lead 1 to 3 h) weren't available until after their hour had started, so treat them as close to an observation, not a forecast.
 
+#### What a model sees at an issue time
+
+The figures use one real issue time, 19 Nov 2024 at 12:30 UTC, a flood day.
+
+**Live, we keep whole runs.** At 12:30 the 12:00 run isn't ready yet, so we use the 09:00 run. The forecast for 1 hour ahead is then a 4-hour forecast; the one for 24 hours ahead a 27-hour forecast.
+
+![ICON-D2 runs at 03, 06, 09 and 12 UTC; the 09:00 run is the newest one ready at 12:30](images/icon-d2-live-runs.svg)
+
+**In the archive only the day-old values are known.** At 12:30 the fresh values for the coming hours come from runs that aren't ready yet. The first one or two hours sometimes get a fresh value.
+
+![For each hour, the fresh value is not yet known at 12:30; the day-old value is known up to 12:00 the next day](images/icon-d2-archive-values.svg)
+
+So live, short hours get short, sharp forecasts; in the archive every hour gets a 25–27 hour forecast. The two only meet around 22–24 hours ahead.
+
+![Live forecast lead rises from 4 to 27 hours; the archive lead stays between 25 and 27 hours](images/icon-d2-forecast-lead.svg)
+
+- **Coverage is fine.** The archive always has a known value up to 22½ to 24½ hours ahead, so the 24 hourly sums of the evaluation dataset are complete.
+- **The backtest is fair between models**, since all get the same day-old forecasts.
+- **Live will differ.** A model trained on day-old forecasts learned to trust them little, so live it may underuse good short-range rain.
+
 Backfill:
 
 ```

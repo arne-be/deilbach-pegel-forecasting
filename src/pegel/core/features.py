@@ -82,7 +82,7 @@ def step_features(dataset: pd.DataFrame, *, with_icon: bool = True) -> pd.DataFr
     return long
 
 
-# Curated inputs of the v2 change models (docs/models/rain-change-v2.md). Each returns one value
+# Curated inputs of the v2 change models (docs/models.md). Each returns one value
 # per row, or per row and lead, and NaN where it can't be computed.
 
 

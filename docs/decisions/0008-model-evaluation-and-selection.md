@@ -7,7 +7,7 @@
 
 Find the best point forecast for Kupferdreh for leads 1 to 24 hours. Every model is scored on the same issue times, the same targets and the same folds. The result is a table and a graph of the error per lead time for every model.
 
-A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](../model-evaluation.md).
+How it works, with figures: [evaluation.md](../evaluation.md). The models: [models.md](../models.md).
 
 ## Decisions
 
@@ -59,7 +59,7 @@ A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](
 | Fold | Test period | Floods above 95 cm |
 |---|---|---|
 | F1 | 2024-10-01 to 2024-12-31 | 4 |
-| F2 | 2025-01-01 to 2025-03-31 | 2 |
+| F2 | 2025-01-01 to 2025-03-31 | 4 |
 | F3 | 2025-04-01 to 2025-09-30 | 0 |
 | F4 | 2025-10-01 to 2026-04-12 | 0 |
 
@@ -162,24 +162,10 @@ Anything beyond that (other boosting setups, neural networks) only if LightGBM l
 
 **A uv dependency group `analysis`** with what only the evaluation needs: pyarrow for the Parquet files and matplotlib for the plots. Pinned, not in the Lambda image.
 
-### Order of work
-
-Built by several agents in parallel, each on its own branch and PR.
-
-| Wave | PRs |
-|---|---|
-| 0 | **A** dependencies, `evaluation` config block, folds, model interface, file schemas, synthetic test data |
-| 1 | **B** as-of reads and `pegel build-eval-set` · **C** features and the three targets · **D** metrics and events · **E** harness and persistence |
-| 2 | **F** simple models 2 to 4 · **G** ridge · **R** report, graph per lead, experiment log |
-| Gate | A person builds the dataset from prod, freezes it and reads the first report |
-| 3 | **H** LightGBM |
-
-Only A touches `pyproject.toml`, `uv.lock` and `config/pegel.json`. Each PR adds one line to `AGENTS.md`, merged in the order above.
-
 ## Accepted
 
 - Training sees only rain forecasts with a 25 to 27 hour lead; live, short hours get much shorter leads. The archive scores are likely a bit pessimistic for rain-driven leads.
-- Only 6 floods fall in the test folds, all in winter. There is no summer thunderstorm event to test on.
+- Only 8 flood events (6 first crossings of 95 cm) fall in the test folds, all in winter. There is no summer thunderstorm event to test on.
 - LANUV is sometimes later than the 25 minutes we assume (for example 2026-10-14 12:30). The backtest assumes 25 minutes; live may have one hour less upstream data now and then.
 - Picking the best of many models on the same folds is mild overfitting to those folds. The live shadow run checks it.
 - The Lambda image gets bigger with pandas, scikit-learn and lightgbm (and their numpy and scipy).
