@@ -39,7 +39,8 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Ridge model per lead, level or change target, with or without ICON-D2 (`ridge:level`, `ridge:change`, `…:no_icon`): `src/pegel/evaluation/models/ridge.py`
 - Rain change models `rain_change` and `rain_change:split` (last level plus a per-lead linear change from upstream, radar and ICON-D2): `src/pegel/evaluation/models/rain_change.py`
 - Curated change models v2 `rain_change:v2:split` and `ridge:change:v2` (named physical inputs per lead, inner-split candidate list): `src/pegel/evaluation/models/curated.py`, `analysis/model-evaluation/models-v2-candidates.csv`
-- Learnings about data, models and evaluation, append-only: `analysis/model-evaluation/learnings.md`
+- Learnings about models and evaluation, append-only: `analysis/model-evaluation/learnings.md`
+- Preliminary data analysis (target, gauges, radar, ICON-D2), append-only: `analysis/preliminary-data-analysis.md`
 - Run report and experiment log (`python -m pegel.evaluation.report <run dir>`, plots and one appended section per run): `src/pegel/evaluation/report.py`, `report_tables.py`, `report_plots.py`, `analysis/model-evaluation/`
 - How the evaluation works (data, split, flood events, metrics) and every model on one page: `docs/evaluation.md`, `docs/models.md`, `analysis/model-evaluation/methodology_plots.py`
 
