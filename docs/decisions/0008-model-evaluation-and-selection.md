@@ -85,7 +85,7 @@ How it works, with figures: [evaluation.md](../evaluation.md). The models: [mode
 
 Why: a model should be judged on what matters on a flood day, whether and how early it sees the peak coming, and the scores should be readable at a glance. The earlier rules, warnings per threshold crossing with a ±6 hour match and per-lead hits, were hard to follow and left out every flood that stays below 95 cm.
 
-**False alarms are the counterweight.** A forecast that shows a new event while none is running or starting within 24 hours is a false alarm; a run of such forecasts counts once. Reported per month.
+**False alarms are the counterweight.** A forecast that shows a new event while none is running or starting within 24 hours is a false alarm; a run of such forecasts counts once. Reported as the count divided by the number of test months.
 
 **A forecast replay per run.** An interactive page steps through the forecasts of each event, from 24 hours before the peak to its end, so models can be compared by eye. A static peak track per event goes into the experiment log.
 

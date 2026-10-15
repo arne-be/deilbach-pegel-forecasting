@@ -18,7 +18,7 @@ Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10
 | **`ridge:change:v2`** | 20 named inputs, ridge penalty | 2.1 | 4.8 | `models/curated.py` |
 | `ridge:level:no_icon`, `ridge:change:no_icon` | ridge without ICON-D2, kept for reference | 3.4, 3.1 | 8.4, 7.7 | `models/ridge.py` |
 
-The two v2 models are the current best. Under the selection rule both win over `rain_change:split` and `ridge:change` (`rain_change:v2:split` ties `ridge:change` in F2 and wins on high water). They are level over all issue times, and `ridge:change:v2` is better at high water but has more false alarms (0.60 a month at 95 cm against 0.38).
+The two v2 models are the current best. Under the selection rule both win over `rain_change:split` and `ridge:change` (`rain_change:v2:split` ties `ridge:change` in F2 and wins on high water). They are level over all issue times, and `ridge:change:v2` is better at high water but had more false alarms under the old crossing rule (0.60 a month at 95 cm against 0.38).
 
 All learned models except `ridge:level` forecast the **change** from the last cleaned level, one fit per lead (1 to 24 hours), so the forecast is `last + change_k`. In the rain change models a missing upstream change (v2: also the Kupferdreh change and the recent rise) counts as 0; any other missing input gives persistence. Ridge fills gaps instead (below). They are all trained on day-old ICON-D2 (see [evaluation.md](evaluation.md#the-icon-d2-archive)).
 
@@ -88,7 +88,7 @@ change_k = c0 + c1·(last − base_30d)
 
 - **No gain at +1 h.** About 0.67 cm, persistence 0.66, `upstream` 0.60.
 - **Too low at high water.** Bias about −1.5 to −1.7 cm at +6 h and −3.7 to −3.8 cm at +24 h. Rises are still caught late.
-- **Warnings.** 2 of 6 first crossings at 95 cm warned 3 hours or more ahead. The 145 cm crossing of 2024-11-19 is not warned 3 hours ahead.
-- **Fewer warnings than `ridge:change`**, which warns 3 of 6 at 95 cm and the 145 cm crossing 3 hours ahead.
+- **Warnings (old crossing rule).** 2 of 6 first crossings at 95 cm warned 3 hours or more ahead. The 145 cm crossing of 2024-11-19 is not warned 3 hours ahead.
+- **Fewer warnings than `ridge:change`** (old crossing rule), which warns 3 of 6 at 95 cm and the 145 cm crossing 3 hours ahead.
 - **Chosen from many candidates** on inner splits that overlap earlier test periods.
 - **Trained on day-old ICON-D2.** How the fitted coefficients behave on fresh runs is unknown until the live shadow run.
