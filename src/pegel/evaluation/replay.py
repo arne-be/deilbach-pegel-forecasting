@@ -60,7 +60,7 @@ def issue_times(peak_at: pd.Timestamp, end: pd.Timestamp, previous_end: object) 
     return pd.date_range(first, end, freq="h")
 
 
-def _rounded(values: np.ndarray) -> list[float | None]:
+def rounded(values: np.ndarray) -> list[float | None]:
     return [None if np.isnan(value) else round(float(value), 1) for value in values]
 
 
@@ -79,11 +79,11 @@ def forecast_arrays(
     for model in models:
         per_issue = wide.loc[model] if model in wide.index.get_level_values(0) else wide.iloc[:0]
         table = per_issue.reindex(issued).to_numpy(dtype=float)
-        result[model] = [None if np.isnan(row).all() else _rounded(row) for row in table]
+        result[model] = [None if np.isnan(row).all() else rounded(row) for row in table]
     return result
 
 
-def _milliseconds(at: pd.Timestamp) -> int:
+def milliseconds(at: pd.Timestamp) -> int:
     return int(at.value // 1_000_000)
 
 
@@ -107,18 +107,18 @@ def replay_data(
             pd.date_range(issued[0] - HISTORY_HOURS * _HOUR, issued[-1] + leads * _HOUR, freq="h")
         )
         forecasts = forecast_arrays(predictions, models, issued, leads)
-        observed_values = _rounded(window.to_numpy(dtype=float))
+        observed_values = rounded(window.to_numpy(dtype=float))
         replays.append(
             {
                 "number": event["number"],
-                "start": _milliseconds(event["start"]),
-                "end": _milliseconds(event["end"]),
+                "start": milliseconds(event["start"]),
+                "end": milliseconds(event["end"]),
                 "pre_event_cm": round(float(event["pre_event_cm"]), 1),
                 "peak_cm": round(float(event["peak_cm"]), 1),
-                "peak_at": _milliseconds(event["peak_at"]),
-                "first_issue": _milliseconds(issued[0]),
+                "peak_at": milliseconds(event["peak_at"]),
+                "first_issue": milliseconds(issued[0]),
                 "issues": len(issued),
-                "observed_from": _milliseconds(window.index[0]),
+                "observed_from": milliseconds(window.index[0]),
                 "observed": observed_values,
                 "forecasts": forecasts,
                 "y_range": _y_range([high_water_cm, *observed_values]),

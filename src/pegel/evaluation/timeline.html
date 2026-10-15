@@ -173,7 +173,8 @@ function drawPanel(index, lead, yr, ticks) {
   ctx.textAlign = "right";
   for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) ctx.fillText(v + " cm", M.left - 6, y(v) + 4);
   ctx.textAlign = "left";
-  for (const f of DATA.folds) if (f.start >= view[0] && f.start <= view[1]) ctx.fillText(f.name, x(f.start) + 3, M.top + 10);
+  // A fold starting just before the data (F1 starts at midnight, the grid at 03:30) is labelled at the edge.
+  for (const f of DATA.folds) if (f.start >= view[0] - DAY && f.start <= view[1]) ctx.fillText(f.name, Math.max(x(f.start), M.left) + 3, M.top + 10);
   ctx.textAlign = "center";
   let lastRight = -Infinity;
   for (const [t, label] of ticks) {
@@ -242,7 +243,7 @@ let drag = null;
 for (const i of [0, 1]) {
   const canvas = el("panel-" + i);
   el("title-" + i).textContent = DATA.leads[i] + " h ahead: forecasts made " + DATA.leads[i] + " hours before each time";
-  canvas.addEventListener("wheel", (e) => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.25 : 0.8, timeAt(canvas, e.clientX)); }, { passive: false });
+  canvas.addEventListener("wheel", (e) => { e.preventDefault(); if (!e.deltaY) return; zoom(e.deltaY > 0 ? 1.25 : 0.8, timeAt(canvas, e.clientX)); }, { passive: false });
   canvas.addEventListener("pointerdown", (e) => {
     drag = { x: e.clientX, view: view.slice(), width: canvas.getBoundingClientRect().width - M.left - M.right };
     canvas.setPointerCapture(e.pointerId); canvas.classList.add("dragging");
@@ -252,8 +253,9 @@ for (const i of [0, 1]) {
       const shift = (drag.x - e.clientX) / drag.width * (drag.view[1] - drag.view[0]);
       setView(drag.view[0] + shift, drag.view[1] + shift);
     }
-    const index = Math.round((timeAt(canvas, e.clientX) - T0) / HOUR);
-    hoverIndex = index >= 0 && index < N ? index : null;
+    const at = timeAt(canvas, e.clientX);
+    const index = Math.round((at - T0) / HOUR);
+    hoverIndex = at >= view[0] && at <= view[1] && index >= 0 && index < N ? index : null;
     showTip(e); schedule();
   });
   const end = () => { drag = null; canvas.classList.remove("dragging"); };
@@ -284,6 +286,7 @@ el("event").addEventListener("change", (e) => {
   if (e.target.value === "") return;
   const ev = DATA.events[Number(e.target.value)];
   setView(ev.start - 2 * DAY, ev.end + 2 * DAY);
+  e.target.value = "";  // so the same event can be picked again
 });
 el("zoom-in").addEventListener("click", () => zoom(0.5));
 el("zoom-out").addEventListener("click", () => zoom(2));

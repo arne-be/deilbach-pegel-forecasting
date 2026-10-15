@@ -20,7 +20,7 @@ import pandas as pd
 from pegel.config import load_config
 from pegel.evaluation import contract, events
 from pegel.evaluation.metrics import PERSISTENCE
-from pegel.evaluation.replay import _milliseconds, _rounded, replay_events
+from pegel.evaluation.replay import milliseconds, replay_events, rounded
 
 TEMPLATE = Path(__file__).with_name("timeline.html")
 DATA_MARKER = "/*TIMELINE_DATA*/"
@@ -50,15 +50,15 @@ def timeline_data(
     present = set(predictions["fold"])
     flood = replay_events(observed, high_water_cm)
     return {
-        "start": _milliseconds(grid[0]),
+        "start": milliseconds(grid[0]),
         "high_water_cm": high_water_cm,
         "leads": list(LEADS),
         "default_model": PERSISTENCE,
         "models": models,
-        "observed": _rounded(observed.reindex(grid).to_numpy(dtype=float)),
+        "observed": rounded(observed.reindex(grid).to_numpy(dtype=float)),
         "forecasts": {
             str(lead): {
-                model: _rounded(
+                model: rounded(
                     events.forecast_levels(predictions, model, lead)
                     .reindex(grid)
                     .to_numpy(dtype=float)
@@ -68,16 +68,16 @@ def timeline_data(
             for lead in LEADS
         },
         "folds": [
-            {"name": fold.name, "start": _milliseconds(pd.Timestamp(fold.test_start, tz="UTC"))}
+            {"name": fold.name, "start": milliseconds(pd.Timestamp(fold.test_start, tz="UTC"))}
             for fold in contract.FOLDS
             if fold.name in present
         ],
         "events": [
             {
                 "number": event["number"],
-                "start": _milliseconds(event["start"]),
-                "end": _milliseconds(event["end"]),
-                "peak_at": _milliseconds(event["peak_at"]),
+                "start": milliseconds(event["start"]),
+                "end": milliseconds(event["end"]),
+                "peak_at": milliseconds(event["peak_at"]),
                 "peak_cm": round(float(event["peak_cm"]), 1),
             }
             for event in flood.to_dict("records")
