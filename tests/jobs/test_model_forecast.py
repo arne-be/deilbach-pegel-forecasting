@@ -59,13 +59,12 @@ def test_model_forecast_is_saved_next_to_persistence(conn: Conn) -> None:
     assert newest_forecast(conn, "kupferdreh", RIDGE) == result
     assert newest_forecast(conn, "kupferdreh", "persistence") is not None
     assert (result.model, result.newest_observation_at) == (RIDGE, NEWEST_AT)
-    assert len(result.points) == CONFIG.forecast.horizon_hours
+    # One point per lead the model forecasts, nothing beyond.
+    assert len(result.points) == CONFIG.evaluation.leads_hours
     # Lead k at floor(t) + k h + 22 min, the training target time.
     assert result.points[0].valid_at == NEWEST_AT + timedelta(hours=1)
-    assert result.points[-1].valid_at == NEWEST_AT + timedelta(hours=48)
+    assert result.points[-1].valid_at == NEWEST_AT + timedelta(hours=24)
     assert [point.level_cm for point in result.points[:2]] == [56.0, 57.0]
-    # After the model's last lead the level holds.
-    assert {point.level_cm for point in result.points[23:]} == {79.0}
 
 
 def raise_on_load() -> RisingModel:

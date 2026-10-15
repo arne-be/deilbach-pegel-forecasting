@@ -34,8 +34,8 @@
     "station_id": "kupferdreh",
     "model": "ridge:change:v2",
     "model_file": "models/ridge-change-v2-20261015T1702Z.json",
-    "horizon_hours": 48,
-    "summary_horizons_hours": [3, 24, 48],
+    "horizon_hours": 24,
+    "summary_horizons_hours": [3, 24],
     "issue_minute": 30,
     "ingest_lookback_hours": 6,
     "upstream_ingest_lookback_hours": 24

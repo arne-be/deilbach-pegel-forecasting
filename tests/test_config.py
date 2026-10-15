@@ -50,6 +50,6 @@ def test_non_positive_cleaning_setting_is_rejected(tmp_path: Path) -> None:
 def test_a_model_other_than_persistence_needs_a_model_file() -> None:
     forecast = load_config().forecast.model_dump()
     with pytest.raises(ValidationError, match="model_file"):
-        ForecastSettings.model_validate(forecast | {"model": "ridge:change:v2"})
+        ForecastSettings.model_validate(forecast | {"model": "ridge:change:v2", "model_file": None})
     ridge = forecast | {"model": "ridge:change:v2", "model_file": "models/ridge.json"}
     assert ForecastSettings.model_validate(ridge).model_file == "models/ridge.json"
