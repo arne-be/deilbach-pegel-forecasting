@@ -187,7 +187,7 @@ Without a counterweight, a model that forecasts a flood all the time would alway
 ### Tables
 
 1. **Summary, one row per model**: per lead, the events predicted (e.g. `9 of 13`), the median size and the median timing of the predicted events, and the false alarms per month (the rate above). Persistence is the first row.
-2. **Per model, one row per event**: per lead, ✓ or ✗ with size and timing, e.g. `✓ 82 % −2 h`, coloured by size.
+2. **Per model, one row per event**: per lead, ✓ or ✗ with size and timing, e.g. `✓ 82 % −2 h`, `✗ 31 % +5 h`, `—` when missing, `≥ +4 h` when the forecast may peak later.
 
 ### Plots
 
