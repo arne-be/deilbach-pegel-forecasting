@@ -1,7 +1,7 @@
 """Curated change models: the last level plus a linear change in a few named inputs, per lead.
 
-The second iteration of `rain_change` and `ridge:change`, built from the learnings in
-analysis/model-evaluation/learnings.md. Each model is a list of input names from `INPUTS`, so
+The second iteration of `rain_change` and `ridge:change`, built from the findings in
+analysis/preliminary-data-analysis.md. Each model is a list of input names from `INPUTS`, so
 every coefficient has a physical meaning. Per lead k:
 
     change_k = sum_i c_ik · input_i(row, k)
