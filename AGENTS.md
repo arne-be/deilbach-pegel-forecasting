@@ -44,6 +44,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Forecast replay page per run, one self-contained HTML file (`python -m pegel.evaluation.replay <run dir> <eval.parquet>`, writes `replay.html`): `src/pegel/evaluation/replay.py`, `replay.html`
 - Lead timeline page, 1, 3, 6, 12 and 24 h ahead over the whole test period (`python -m pegel.evaluation.timeline <run dir> <eval.parquet>`, writes `timeline.html`): `src/pegel/evaluation/timeline.py`, `timeline.html`
 - How the evaluation works (data, split, flood events, metrics) and every model on one page: `docs/evaluation.md`, `docs/models.md`, `analysis/model-evaluation/methodology_plots.py`
+- Capped-training stress test, `<model>:cap100` trained without issue times above 100 cm: `src/pegel/evaluation/models/capped.py`
 
 ## Layout
 
