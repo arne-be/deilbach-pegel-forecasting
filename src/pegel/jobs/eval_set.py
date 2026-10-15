@@ -113,11 +113,11 @@ def run(
     """Builds the dataset from the database read-only, writes it and prints its coverage."""
     # Checked before connecting, so a rerun or a git failure costs no read of the database.
     paths = output_paths(out_dir)
-    git_commit = _git_commit()
+    commit = git_commit()
     with connect_read_only(database_url) as conn:
         dataset, late = build_dataset(conn, config, first_day, last_day)
         database = database_label(conn)
-    write_dataset(dataset, paths, config, first_day, last_day, git_commit, database)
+    write_dataset(dataset, paths, config, first_day, last_day, commit, database)
     print(coverage_report(dataset))
     print(f"Cleaned values (with look-back) known more than 2 h after their time: {late}")
     print(f"Wrote {len(dataset)} rows to {paths[0]} (database {database})")
@@ -148,7 +148,7 @@ def coverage_report(dataset: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def _git_commit() -> str:
+def git_commit() -> str:
     """HEAD, marked dirty when the working tree has changes, so the code can be found again."""
     repo = Path(__file__).resolve().parent
 
