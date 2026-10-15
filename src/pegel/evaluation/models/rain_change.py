@@ -9,7 +9,7 @@ Radar is the catchment mean: the zone means weighted by each zone's cell count. 
 per lead on the training rows with a target. A missing upstream change counts as 0 (no wave);
 any other missing input gives persistence. With `split=True` there are two coefficient sets:
 one for rising rows (Kupferdreh or Langenberg up more than 0.5 cm in 3 hours), one for the rest.
-Explained in docs/models/rain-change.md.
+Explained in docs/models.md.
 """
 
 import numpy as np

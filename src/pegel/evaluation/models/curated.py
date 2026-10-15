@@ -10,7 +10,7 @@ fitted on the training rows with a target by least squares, or by ridge with a f
 on standardised inputs. With `split=True` there are two coefficient sets: rising rows
 (Kupferdreh or Langenberg up more than 0.5 cm in 3 hours) and the rest. A missing upstream
 change, Kupferdreh change or recent rise counts as 0; any other missing input gives
-persistence. Explained in docs/models/rain-change-v2.md and docs/models/ridge-change-v2.md.
+persistence. Explained in docs/models.md.
 """
 
 from collections.abc import Callable, Sequence

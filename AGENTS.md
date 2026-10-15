@@ -37,11 +37,11 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Crossing warnings at every threshold and false alarms (`crossings.csv`, `false_alarms.csv`): `src/pegel/evaluation/crossings.py`
 - Simple models 2 to 4 of the ladder (`recession`, `damped_trend`, `upstream`), fitted per lead on the change: `src/pegel/evaluation/models/simple.py`
 - Ridge model per lead, level or change target, with or without ICON-D2 (`ridge:level`, `ridge:change`, `…:no_icon`): `src/pegel/evaluation/models/ridge.py`
-- Rain change models `rain_change` and `rain_change:split` (last level plus a per-lead linear change from upstream, radar and ICON-D2): `src/pegel/evaluation/models/rain_change.py`, `docs/models/rain-change.md`
-- Curated change models v2 `rain_change:v2:split` and `ridge:change:v2` (named physical inputs per lead, inner-split candidate list): `src/pegel/evaluation/models/curated.py`, `docs/models/rain-change-v2.md`, `docs/models/ridge-change-v2.md`, `analysis/model-evaluation/models-v2-candidates.csv`
+- Rain change models `rain_change` and `rain_change:split` (last level plus a per-lead linear change from upstream, radar and ICON-D2): `src/pegel/evaluation/models/rain_change.py`
+- Curated change models v2 `rain_change:v2:split` and `ridge:change:v2` (named physical inputs per lead, inner-split candidate list): `src/pegel/evaluation/models/curated.py`, `analysis/model-evaluation/models-v2-candidates.csv`
 - Learnings about data, models and evaluation, append-only: `analysis/model-evaluation/learnings.md`
 - Run report and experiment log (`python -m pegel.evaluation.report <run dir>`, plots and one appended section per run): `src/pegel/evaluation/report.py`, `report_tables.py`, `report_plots.py`, `analysis/model-evaluation/`
-- Evaluation methodology with the fold split and every flood event plotted: `docs/evaluation-methodology.md`, `analysis/model-evaluation/methodology_plots.py`
+- How the evaluation works (data, ICON-D2 archive, split, flood events, metrics) and every model on one page: `docs/evaluation.md`, `docs/models.md`, `analysis/model-evaluation/methodology_plots.py`
 
 ## Layout
 
