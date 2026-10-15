@@ -10,6 +10,7 @@ from pegel.evaluation import contract
 from pegel.evaluation.events import (
     alarms,
     episodes,
+    flood_events,
     lag_check,
     observed_levels,
     peak_errors,
@@ -82,6 +83,67 @@ def test_peaks_less_than_a_day_apart_are_one_event() -> None:
     assert floods["peak_cm"].tolist() == [110, 120]
     assert floods["start"].iloc[0] == START + pd.Timedelta(hours=10)
     assert floods["end"].iloc[0] == START + pd.Timedelta(hours=20)
+
+
+def _rise(levels: list[float], at: int, values: list[float]) -> pd.Series:
+    """A base level with a dip to 49 cm just before `values` start at hour `at`."""
+    levels[at - 1] = 49
+    levels[at : at + len(values)] = values
+    return _hours(levels)
+
+
+def _hour(hour: int) -> pd.Timestamp:
+    return START + pd.Timedelta(hours=hour)
+
+
+def test_flood_event_runs_from_the_low_before_the_rise_back_to_it() -> None:
+    floods = flood_events(_rise([50.0] * 60, 30, [70, 90, 100, 80, 60, 53]), 75)
+    assert floods.to_dict("records") == [
+        {
+            "start": _hour(29),
+            "end": _hour(35),
+            "pre_event_cm": 49,
+            "peak_cm": 100,
+            "peak_at": _hour(32),
+        }
+    ]
+
+
+def test_a_new_rise_before_the_end_joins_the_event() -> None:
+    levels = _rise([50.0] * 60, 30, [70, 90, 100, 80, 70, 70, 70, 90, 120, 90, 60, 50])
+    floods = flood_events(levels, 75)
+    assert floods[["start", "end", "peak_cm"]].values.tolist() == [[_hour(29), _hour(41), 120]]
+
+
+def test_separate_rises_are_separate_events() -> None:
+    levels = [50.0] * 120
+    levels[30:34] = [90, 100, 60, 50]
+    levels[80:84] = [90, 110, 60, 50]
+    floods = flood_events(_hours(levels), 75)
+    assert floods["peak_cm"].tolist() == [100, 110]
+    assert floods["end"].tolist() == [_hour(33), _hour(83)]
+
+
+def test_flood_event_ends_when_flat_below_high_water() -> None:
+    levels = _rise([50.0] * 30 + [70.0] * 40, 30, [80, 100, 90])
+    floods = flood_events(levels, 75)
+    # Back at 70 cm from hour 33; 24 hours later it has not fallen.
+    assert floods["end"].tolist() == [_hour(57)]
+
+
+def test_daily_dip_above_high_water_is_no_event() -> None:
+    hours = np.arange(24 * 5)
+    levels = pd.Series(
+        74 + 4 * np.sin(hours * 2 * np.pi / 24), index=_hours([0.0] * hours.size).index
+    )
+    assert flood_events(levels, 75).empty
+
+
+def test_hours_without_a_level_are_skipped() -> None:
+    base = [50.0] * 60
+    base[10] = np.nan
+    floods = flood_events(_rise(base, 30, [70, 90, 100, np.nan, np.nan, 53]), 75)
+    assert floods[["start", "end", "peak_cm"]].values.tolist() == [[_hour(29), _hour(35), 100]]
 
 
 def test_hits_misses_and_false_alarms_per_threshold() -> None:

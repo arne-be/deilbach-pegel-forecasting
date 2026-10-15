@@ -17,9 +17,18 @@ from pegel.evaluation.metrics import high_water, with_truth
 # Exceedances whose peaks are less than this apart are one event.
 MERGE_HOURS = 24
 MAX_SHIFT_HOURS = 24
+# Flood events (docs/evaluation.md#flood-events): a rise of RISE_CM within RISE_HOURS to above
+# high water starts one; back within BACK_CM of the pre-event level, or below high water and
+# falling less than FLAT_CM over FLAT_HOURS, ends it.
+RISE_CM = 15
+RISE_HOURS = 24
+BACK_CM = 5
+FLAT_CM = 2
+FLAT_HOURS = 24
 
 _HOUR = pd.Timedelta(hours=1)
 EPISODE_COLUMNS = ["start", "end", "peak_at", "peak_cm"]
+FLOOD_EVENT_COLUMNS = ["start", "end", "pre_event_cm", "peak_cm", "peak_at"]
 
 
 def _target_time(rows: pd.DataFrame) -> pd.Series:
@@ -75,6 +84,58 @@ def episodes(levels: pd.Series, threshold_cm: float) -> pd.DataFrame:
             continue
         merged.append(candidate)
     return pd.DataFrame(merged, columns=EPISODE_COLUMNS)
+
+
+def _flood_end(values: np.ndarray, rise_at: int, pre_event_cm: float, high_water_cm: float) -> int:
+    """The first hour after the rise back near the pre-event level, or below high water and
+    flat; the last hour if neither comes. NaN hours never match, so gaps are skipped."""
+    for at in range(rise_at + 1, len(values)):
+        if values[at] <= pre_event_cm + BACK_CM:
+            return at
+        if at < FLAT_HOURS:
+            continue
+        fall = values[at - FLAT_HOURS] - values[at]
+        if values[at] < high_water_cm and 0 <= fall < FLAT_CM:
+            return at
+    return len(values) - 1
+
+
+def flood_events(levels: pd.Series, high_water_cm: float) -> pd.DataFrame:
+    """Flood events on an hourly level series on a full grid (NaN where missing).
+
+    An hour above high water that is at least RISE_CM above the lowest level of the RISE_HOURS
+    before it starts an event at that lowest hour (the pre-event level). The look-back never
+    reaches into the previous event. See `_flood_end` for the end; a new rise before the end
+    belongs to the same event.
+    """
+    values = levels.to_numpy(dtype=float)
+    found: list[dict[str, Any]] = []
+    earliest = 0
+    at = RISE_HOURS
+    while at < len(values):
+        low = max(at - RISE_HOURS, earliest)
+        before = values[low:at]
+        if (
+            not values[at] > high_water_cm
+            or np.isnan(before).all()
+            or values[at] - np.nanmin(before) < RISE_CM
+        ):
+            at += 1
+            continue
+        start = low + int(np.nanargmin(before))
+        end = _flood_end(values, at, values[start], high_water_cm)
+        event = levels.iloc[start : end + 1]
+        found.append(
+            {
+                "start": levels.index[start],
+                "end": levels.index[end],
+                "pre_event_cm": values[start],
+                "peak_cm": event.max(),
+                "peak_at": event.idxmax(),
+            }
+        )
+        earliest = at = end + 1
+    return pd.DataFrame(found, columns=FLOOD_EVENT_COLUMNS)
 
 
 def peak_errors(predictions: pd.DataFrame, events: pd.DataFrame) -> pd.DataFrame:
