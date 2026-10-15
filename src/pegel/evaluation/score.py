@@ -12,23 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from pegel.config import PegelConfig, load_config
-from pegel.evaluation import contract, crossings, events, metrics
-
-# Category 2 ("kritisch") is the second alarm level next to the flood threshold.
-ALARM_CATEGORY = 2
-
-
-def alarm_thresholds(config: PegelConfig) -> tuple[float, float]:
-    category = next(c for c in config.categories if c.number == ALARM_CATEGORY)
-    if category.above_cm is None:
-        raise ValueError(f"category {ALARM_CATEGORY} has no lower bound")
-    return config.evaluation.flood_cm, category.above_cm
-
-
-def warning_thresholds(config: PegelConfig) -> list[float]:
-    """The flood threshold and every category bound: each is its own warning."""
-    bounds = [category.above_cm for category in config.categories if category.above_cm is not None]
-    return [config.evaluation.flood_cm, *bounds]
+from pegel.evaluation import events, flood_scores, metrics
 
 
 def score_tables(
@@ -37,27 +21,17 @@ def score_tables(
     """Every result table by file stem."""
     settings = config.evaluation
     leads = settings.leads_hours
-    thresholds = alarm_thresholds(config)
-    warning_levels = warning_thresholds(config)
     observed = events.observed_levels(dataset, leads)
-    last_readings = dataset.set_index(contract.ISSUED_AT)[
-        [contract.KD_LAST_CM, contract.KD_LAST_AT]
-    ]
-    # Only events the predictions cover; the dataset also spans the training periods.
-    first = predictions[contract.ISSUED_AT].min()
-    last = predictions[contract.ISSUED_AT].max() + pd.Timedelta(hours=leads)
-    floods = events.episodes(observed[first:last], settings.flood_cm)
+    # On the whole window: a test event's previous event or a false alarm's event can be earlier.
+    floods = events.flood_events(observed, settings.high_water_cm)
+    scored = flood_scores.scored_events(floods, set(predictions["fold"]))
     return {
         "scores": metrics.scores(predictions, dataset, settings),
         "bootstrap": metrics.bootstrap_skill(predictions),
-        "events": floods,
-        "peaks": events.peak_errors(predictions, floods),
-        "alarms": events.alarms(predictions, observed, thresholds),
-        "crossings": crossings.crossing_warnings(
-            predictions, observed, last_readings, warning_levels
-        ),
-        "false_alarms": crossings.false_alarms(
-            predictions, observed, last_readings, warning_levels
+        "events": scored,
+        "peaks": flood_scores.flood_peaks(predictions, floods, scored, leads),
+        "false_alarms": flood_scores.false_alarms(
+            predictions, dataset, floods, settings.high_water_cm, leads
         ),
         "lag": events.lag_check(predictions, dataset, leads, settings.high_water_cm),
     }

@@ -6,7 +6,7 @@ How we score forecast models for Kupferdreh: the data, the split into training a
 
 1. **Build the dataset once.** `pegel build-eval-set`, read-only from prod (command in `AGENTS.md`). Every input as of its issue time. Frozen as `eval.parquet` with a checksum in `eval.manifest.json`, outside the repo.
 2. **Fit and predict.** `python -m pegel.evaluation.predict <dataset> --out <dir>` trains every registered model on each fold's training rows and predicts its test rows. Writes `predictions.parquet`.
-3. **Score.** `python -m pegel.evaluation.score <predictions> <dataset> --out <dir>` writes `scores.csv`, `bootstrap.csv`, `events.csv`, `peaks.csv` (size, timing and predicted per event, model and lead), `false_alarms.csv` (count and rate per model) and `lag.csv`, and a forecast replay page per run (see [Flood forecasts](#flood-forecasts); proposed, the code still writes the old `crossings.csv` and `alarms.csv`).
+3. **Score.** `python -m pegel.evaluation.score <predictions> <dataset> --out <dir>` writes `scores.csv`, `bootstrap.csv`, `lag.csv`, `events.csv` (the test events), `peaks.csv` (size, timing and predicted per model, event and lead, in `src/pegel/evaluation/flood_scores.py`) and `false_alarms.csv` (count and rate per model). The forecast replay page will come from a separate command.
 4. **Log it.** `python -m pegel.evaluation.report <run dir>` appends a section with tables and plots to `analysis/model-evaluation/experiments.md`. Add what we learned to `learnings.md`.
 
 ## Data
@@ -43,7 +43,7 @@ Four expanding-window folds, fixed in code (`src/pegel/evaluation/contract.py`).
 
 ## Flood events
 
-Found by `flood_events` in `src/pegel/evaluation/events.py`. The scorer's peak scores still use spells above 95 cm until the flood forecast scoring lands.
+Found by `flood_events` in `src/pegel/evaluation/events.py`.
 
 A flood event is one rise of the river and its fall back, with a peak above 75 cm (`evaluation.high_water_cm`). It is found on the hourly cleaned level:
 
@@ -162,8 +162,6 @@ Every score is computed for **all issue times** (mostly low, slowly falling wate
 
 ## Flood forecasts
 
-**Proposed, not in the code yet.** The scorer still writes the old threshold warnings (`crossings.csv`, `false_alarms.csv` per threshold) and per-lead hits (`alarms.csv`). The rules below replace them.
-
 For each flood event we ask three questions of every model: did it see the peak coming, how big did it see it, and when. Each is answered at five leads: **24, 12, 6, 3 and 1 hour before the peak**. The peak is the event's highest level; an event with two peaks is scored on the higher one. A lead whose issue time falls before the end of the previous event is shown as missing, and the replay starts no earlier than that end.
 
 ### One forecast per event and lead
@@ -180,11 +178,11 @@ For lead L, take the forecast issued L hours before the observed peak. It covers
 - **Timing** is the time of the forecast peak minus the time of the observed peak, in hours. Negative is early, positive is late. If the forecast's highest value is at its last hour (24) and L is less than 24, it may peak later still, so the timing is shown as "at least 24 − L h late".
 - **Predicted** is yes when the size is more than 50 %: the forecast saw more than half the rise coming. Otherwise no. The bar is the same at every lead. At 1 hour the level is already close to the peak, so persistence is mostly a yes there; the leads that tell models apart are 6 to 24 hours.
 
-A missing forecast (no issue time, or a gap in the inputs) is shown as missing, not as no, and left out of the count: `9 of 12`, with 1 missing.
+A missing forecast (no issue time, or any of its 24 hours missing) is shown as missing, not as no, and left out of the count: `9 of 12`, with 1 missing.
 
 ### False alarms
 
-Without a counterweight, a model that forecasts a flood all the time would always be right. So we count false alarms: a forecast that shows a new event, its peak above 75 cm and at least 15 cm above the last known level, while no event is running at its issue time and none starts in the 24 hours after. Event start is as in [Flood events](#flood-events): the foot of the rise. The last known level must be at most 3 hours old; otherwise the issue time is skipped. A run of hourly issue times with such forecasts counts once. The rate is the count divided by the number of test months.
+Without a counterweight, a model that forecasts a flood all the time would always be right. So we count false alarms: a forecast that shows a new event, its peak above 75 cm and at least 15 cm above the last known level, while no event is running at its issue time and none starts in the 24 hours after. Event start is as in [Flood events](#flood-events): the foot of the rise. The last known level must be at most 3 hours old; otherwise the issue time is skipped. A run of hourly issue times with such forecasts counts once; a skipped issue time inside the run doesn't split it. A forecast with missing hours still counts if its known hours show the event. The rate is the count divided by the number of test months.
 
 ### Tables
 
