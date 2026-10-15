@@ -17,7 +17,7 @@
 
 **`forecast.model_file` in `config/pegel.json` picks the file.** A new model or a rollback is a reviewed config change. The Lambda already may read the bucket.
 
-**Leads 25 to 48 hold the +24 h value.** The model was only evaluated up to 24 hours ahead. A flat line says "no better guess" instead of inventing a trend.
+**The forecast covers 24 hours, not 48, for now.** The model has leads 1 to 24 only. A 48-hour model needs a rain forecast known 25 to 48 hours ahead at each issue time, and the ICON-D2 archive before 2026-04 doesn't keep one. Full runs exist from 2026-04, live upstream data from 2026-10. Once these cover enough months with floods, a 48-hour model is trained and evaluated like this one. Until then the forecast, its summaries and persistence stop at 24 hours. The rain forecast still fetches 48 hours, so the data builds up.
 
 **Persistence stays the fallback.** The hourly job saves persistence first, then the ridge forecast. If the ridge step fails, the run goes on, and the API serves persistence while the ridge forecast is older than the newest persistence one. The page is never left on a stale forecast.
 
@@ -25,12 +25,13 @@
 
 - No live check before going public. A bad live behaviour shows on the website first.
 - The model was trained on day-old ICON-D2 rain; live runs are fresher, so rain-driven leads may come out higher than in the backtest.
-- The flat line from 25 to 48 hours is not a forecast, only the last one held.
+- The website shows 24 hours instead of the planned 48 until the data supports more.
 - Each hourly run reads about 30 days of history to build its row.
 
 ## Rejected
 
 - **Shadow run first** (0008). Safer, but delays a better forecast by weeks for a model that already beats persistence on every fold.
-- **Showing only 24 hours.** Needs a website change, and the page and API are built for 48.
+- **Holding the +24 h value flat for 25 to 48 hours.** Looks like a forecast but isn't one.
+- **Fitting leads 25 to 48 without rain beyond 24 hours.** Would show the fall after a peak, but miss any rain still to come; better to wait for real data.
 - **Pickle or joblib.** Ties the file to library versions and runs code on load.
 - **A `current` pointer file on S3.** Rollback without a deploy, but the live model would no longer be visible in the repo.
