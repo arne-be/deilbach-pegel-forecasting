@@ -40,6 +40,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Rain change models `rain_change` and `rain_change:split` (last level plus a per-lead linear change from upstream, radar and ICON-D2): `src/pegel/evaluation/models/rain_change.py`, `docs/models/rain-change.md`
 - Learnings about data, models and evaluation, append-only: `analysis/model-evaluation/learnings.md`
 - Run report and experiment log (`python -m pegel.evaluation.report <run dir>`, plots and one appended section per run): `src/pegel/evaluation/report.py`, `report_tables.py`, `report_plots.py`, `analysis/model-evaluation/`
+- Evaluation methodology with the fold split and every flood event plotted: `docs/evaluation-methodology.md`, `analysis/model-evaluation/methodology_plots.py`
 
 ## Layout
 
