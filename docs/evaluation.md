@@ -1,6 +1,6 @@
 # Model evaluation
 
-How we score forecast models for Kupferdreh: the data, the ICON-D2 archive, the split into training and test periods, the flood events, the metrics and how to run it. The reasons behind each choice are in [decision 0008](decisions/0008-model-evaluation-and-selection.md). The models themselves are in [models.md](models.md). Results go in the [experiment log](../analysis/model-evaluation/experiments.md), insights in the [learnings](../analysis/model-evaluation/learnings.md).
+How we score forecast models for Kupferdreh: the data, the split into training and test periods, the flood events, the metrics and how to run it. The reasons behind each choice are in [decision 0008](decisions/0008-model-evaluation-and-selection.md). The models themselves are in [models.md](models.md). Results go in the [experiment log](../analysis/model-evaluation/experiments.md), insights in the [learnings](../analysis/model-evaluation/learnings.md).
 
 ## Running it
 
@@ -22,23 +22,7 @@ Left of the red line is what was known at 12:30 on 19 Nov 2024, a flood day. Blu
 
 ## The ICON-D2 archive
 
-ICON-D2 starts a new run every 3 hours. Each run forecasts 48 hours ahead and is ready about 2½ hours after it starts.
-
-**Live, we keep whole runs.** At 12:30 the 12:00 run isn't ready yet, so we use the 09:00 run. The forecast for 1 hour ahead is then a 4-hour forecast; the one for 24 hours ahead a 27-hour forecast.
-
-![ICON-D2 runs at 03, 06, 09 and 12 UTC; the 09:00 run is the newest one ready at 12:30](images/icon-d2-live-runs.svg)
-
-**The archive keeps only two values per hour.** Before April 2026 Open-Meteo keeps, for each hour, one value from a run 1–3 hours earlier and one from a run 25–27 hours earlier. At 12:30 the fresh values for the coming hours come from runs that aren't ready yet, so only the day-old values are known. The first one or two hours sometimes get a fresh value.
-
-![For each hour, the fresh value is not yet known at 12:30; the day-old value is known up to 12:00 the next day](images/icon-d2-archive-values.svg)
-
-So live, short hours get short, sharp forecasts; in the archive every hour gets a 25–27 hour forecast. The two only meet around 22–24 hours ahead.
-
-![Live forecast lead rises from 4 to 27 hours; the archive lead stays between 25 and 27 hours](images/icon-d2-forecast-lead.svg)
-
-- **Coverage is fine.** The archive always has a known value up to 22½ to 24½ hours ahead, so the 24 hourly sums are complete.
-- **The backtest is fair between models**, since all get the same day-old forecasts.
-- **Live will differ.** A model trained on day-old forecasts learned to trust them little, so live it may underuse good short-range rain. The live shadow run from 12 Oct 2026 has the final say.
+Before April 2026 the archive only has day-old ICON-D2 forecasts for most hours, so every model trains and tests on 25–27 hour old rain forecasts. Live, the short hours get much fresher ones. The backtest is fair between models, but it likely undervalues rain-driven leads; the live shadow run from 12 Oct 2026 has the final say. Details and figures: [catchment.md](catchment.md#what-a-model-sees-at-an-issue-time).
 
 ## Data split
 
