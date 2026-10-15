@@ -14,6 +14,7 @@ def handler(event: object, context: object) -> dict[str, Any]:
     load_secrets(secrets_manager())
     forecast = run_hourly_from_env(load_config())
     return {
+        "model": forecast.model,
         "issued_at": forecast.issued_at.isoformat(),
         "newest_observation_at": forecast.newest_observation_at.isoformat(),
     }

@@ -9,11 +9,13 @@ from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
 from pegel.adapters.storage.forecasts import save_forecast
-from pegel.api.app import app, get_database_url
+from pegel.api.app import app, get_config, get_database_url
+from pegel.config import load_config
 from pegel.core.forecasts import Forecast, ForecastPoint
 
 Conn = psycopg.Connection[TupleRow]
 STATION = "kupferdreh"
+RIDGE = "ridge:change:v2"
 OBSERVED_AT = datetime(2026, 10, 12, 15, 22, tzinfo=UTC)
 
 
@@ -58,3 +60,31 @@ def test_ignores_forecasts_of_other_models(client: TestClient, conn: Conn) -> No
 def test_no_forecast_is_404(client: TestClient) -> None:
     response = client.get("/api/forecast")
     assert (response.status_code, response.json()) == (404, {"detail": "no forecast yet"})
+
+
+@pytest.fixture
+def ridge_client(client: TestClient) -> Iterator[TestClient]:
+    config = load_config()
+    forecast_settings = config.forecast.model_copy(update={"model": RIDGE, "model_file": "m"})
+    app.dependency_overrides[get_config] = lambda: config.model_copy(
+        update={"forecast": forecast_settings}
+    )
+    yield client
+
+
+def test_serves_the_configured_model(ridge_client: TestClient, conn: Conn) -> None:
+    save_forecast(conn, forecast(OBSERVED_AT, [10.0]))
+    save_forecast(conn, forecast(OBSERVED_AT, [12.0], model=RIDGE))
+    assert ridge_client.get("/api/forecast").json()["model"] == RIDGE
+
+
+@pytest.mark.parametrize("ridge_hours_back", [None, 1])
+def test_falls_back_to_a_newer_persistence_forecast(
+    ridge_client: TestClient, conn: Conn, ridge_hours_back: int | None
+) -> None:
+    save_forecast(conn, forecast(OBSERVED_AT, [10.0]))
+    if ridge_hours_back is not None:
+        observed_at = OBSERVED_AT - timedelta(hours=ridge_hours_back)
+        save_forecast(conn, forecast(observed_at, [12.0], model=RIDGE))
+    body = ridge_client.get("/api/forecast").json()
+    assert (body["model"], body["points"][0]["level_cm"]) == ("persistence", 10.0)

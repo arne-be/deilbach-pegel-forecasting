@@ -28,7 +28,9 @@ class Station(_Frozen):
 class ForecastSettings(_Frozen):
     station_id: str
     # The model the page shows. Only models the hourly job can build are allowed.
-    model: Literal["persistence"]
+    model: Literal["persistence", "ridge:change:v2"]
+    # S3 key of the trained model in the data bucket; needed for every model but persistence.
+    model_file: str | None = None
     horizon_hours: int = Field(gt=0)
     summary_horizons_hours: tuple[int, ...]
     # The hourly run is scheduled at this minute; it is also the issue time of its forecast.
@@ -38,6 +40,12 @@ class ForecastSettings(_Frozen):
     # The same for the upstream stations. Longer, so missed runs heal on their own; LANUV only
     # serves the last seven days.
     upstream_ingest_lookback_hours: int = Field(gt=0, le=168)
+
+    @model_validator(mode="after")
+    def _check_model_file(self) -> "ForecastSettings":
+        if self.model != "persistence" and not self.model_file:
+            raise ValueError(f"forecast model {self.model!r} needs a model_file")
+        return self
 
 
 class Category(_Frozen):

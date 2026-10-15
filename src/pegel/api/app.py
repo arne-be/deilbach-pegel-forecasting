@@ -19,6 +19,7 @@ from pegel.api.schemas import (
 )
 from pegel.config import PegelConfig, load_config
 from pegel.core.history import DISPLAY_TIME_ZONE, history_days, utc_window
+from pegel.core.persistence import MODEL_NAME as PERSISTENCE
 from pegel.core.series import cleaned_level_series_id
 
 # Only plain dates, so a day has one spelling and one cache entry (no times, no timestamps).
@@ -57,9 +58,16 @@ def forecast(
     config: Annotated[PegelConfig, Depends(get_config)],
     database_url: Annotated[str, Depends(get_database_url)],
 ) -> ForecastResponse:
-    """The newest forecast, with its issue time and the newest reading it used."""
+    """The newest forecast of the configured model, with its issue time and the newest reading
+    it used. Persistence instead when the model's forecast is missing or older, so a failing
+    model step never leaves the page on a stale forecast."""
+    station_id = config.forecast.station_id
     with connect(database_url) as conn:
-        newest = newest_forecast(conn, config.forecast.station_id, config.forecast.model)
+        newest = newest_forecast(conn, station_id, config.forecast.model)
+        if config.forecast.model != PERSISTENCE:
+            fallback = newest_forecast(conn, station_id, PERSISTENCE)
+            if newest is None or (fallback is not None and fallback.issued_at > newest.issued_at):
+                newest = fallback
     if newest is None:
         raise HTTPException(status_code=404, detail="no forecast yet")
     return ForecastResponse(

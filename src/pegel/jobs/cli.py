@@ -15,6 +15,7 @@ import httpx
 
 from pegel.adapters.env_files import load_env_files, main_checkout
 from pegel.adapters.logging import configure_logging
+from pegel.adapters.model_files import load_model_from_s3
 from pegel.adapters.sources import lanuv, open_meteo
 from pegel.adapters.sources.influx import fetch_levels, influx_settings_from_env, ssl_context
 from pegel.adapters.sources.lanuv_files import LevelFiles
@@ -107,7 +108,8 @@ def run_hourly_from_env(config: PegelConfig, issued_at: datetime | None = None) 
                 ),
             ),
         ]
-        return run_hourly(fetch, conn, config, issued_at, extra_steps)
+        load_model = partial(load_model_from_s3, config)
+        return run_hourly(fetch, conn, config, issued_at, extra_steps, load_model)
 
 
 @contextmanager
