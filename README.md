@@ -1,6 +1,6 @@
 # deilbach-pegel-prediction
 
-Hourly water level forecast for the **Deilbach at Kupferdreh** (Essen), 48 hours ahead, with flood categories and an uncertainty range, published on a public website.
+Hourly water level forecast for the **Deilbach at Kupferdreh** (Essen), 24 hours ahead (48 hours once the data supports it), with flood categories and an uncertainty range, published on a public website.
 
 > The forecast is an estimate, not an official flood warning (*keine amtliche Hochwasserwarnung*).
 
@@ -14,14 +14,14 @@ Hourly water level forecast for the **Deilbach at Kupferdreh** (Essen), 48 hours
 - Spikes and gaps are cleaned automatically. Raw readings are kept, shifted to our zero point; cleaned levels never drop below 0.
 
 **Forecast**
-- A new forecast every hour for the next 48 hours.
-- Shown as the highest expected level in the next **3, 24 and 48 hours**, each with its flood category.
+- A new forecast every hour for the next 24 hours. 48 hours later: the training data has no rain forecast beyond 24 hours yet ([decision 0009](docs/decisions/0009-ridge-in-production.md)).
+- Shown as the highest expected level in the next **3 and 24 hours**, each with its flood category.
 - Each forecast has a likely range, derived from the errors of past forecasts. The same range gives the chance of reaching each category.
 - A simple baseline forecast is built first, so we can check whether the real model adds value.
 - The model is retrained weekly. A new model only replaces the current one if it performs better.
 
 **Website**
-- One public page in German, no login: current level, 48-hour forecast chart, flood categories, short explanations.
+- One public page in German, no login: current level, 24-hour forecast chart, flood categories, short explanations.
 - If data is late or missing, the page says so clearly instead of showing an old forecast as current.
 - A paid login (annual fee) may be added later.
 

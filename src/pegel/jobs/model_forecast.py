@@ -36,14 +36,12 @@ def model_forecast(
         model=model.name,
         issued_at=issued_at,
         newest_observation_at=newest_observation_at.to_pydatetime(),
-        points=model_points(issued_at, levels, config.forecast.horizon_hours),
+        points=model_points(issued_at, levels),
     )
 
 
-def model_points(
-    issued_at: datetime, levels: npt.NDArray[np.float64], horizon_hours: int
-) -> tuple[ForecastPoint, ...]:
-    """Lead k at floor(t) + k h + 22 min; leads past the model's last hold its last value.
+def model_points(issued_at: datetime, levels: npt.NDArray[np.float64]) -> tuple[ForecastPoint, ...]:
+    """Lead k at floor(t) + k h + 22 min, one point per lead the model forecasts.
 
     The model was trained on the reading at exactly that time (issue_inputs.targets_by_lead).
     With the usual hh:22 newest reading it is also where persistence puts lead k (newest
@@ -52,8 +50,6 @@ def model_points(
     first_hour = issued_at.replace(minute=0, second=0, microsecond=0)
     offset = TARGET_MINUTE.to_pytimedelta()
     return tuple(
-        ForecastPoint(
-            first_hour + timedelta(hours=lead) + offset, float(levels[min(lead, len(levels)) - 1])
-        )
-        for lead in range(1, horizon_hours + 1)
+        ForecastPoint(first_hour + timedelta(hours=lead) + offset, float(level))
+        for lead, level in enumerate(levels, start=1)
     )
