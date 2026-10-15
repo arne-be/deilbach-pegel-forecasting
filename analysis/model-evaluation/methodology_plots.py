@@ -88,7 +88,7 @@ def split_plot(observed: pd.Series, floods: pd.DataFrame, settings, path: Path) 
 def event_plot(
     number: int, flood, dataset: pd.DataFrame, observed: pd.Series, settings, path: Path
 ) -> None:
-    """One flood: Kupferdreh, the upstream gauges and radar rain over the catchment."""
+    """One flood: Kupferdreh, the upstream gauges and radar rain in the wettest catchment cell."""
     start, end = flood.start - pd.Timedelta(hours=36), flood.end + pd.Timedelta(hours=48)
     rows = dataset.set_index(contract.ISSUED_AT).loc[start:end]
     figure, (top, bottom) = plt.subplots(
@@ -122,14 +122,14 @@ def event_plot(
     top.axhline(
         settings.flood_cm, color="#b42343", linewidth=0.8, linestyle="--", label="flood 95 cm"
     )
-    top.axvspan(flood.start, flood.end, color=TEST, alpha=0.12)
+    top.axvspan(flood.start - HOUR / 2, flood.end + HOUR / 2, color=TEST, alpha=0.12)
     top.set_ylabel("level (cm)")
     top.set_title(
-        f"Event {number}: peak {flood.peak_cm:.0f} cm at {flood.peak_at:%d %b %Y %H:%M} UTC"
+        f"Event {number}: peak {flood.peak_cm:.1f} cm at {flood.peak_at:%d %b %Y %H:%M} UTC"
     )
     top.legend(fontsize=8, loc="upper right")
     bottom.bar(rows.index, rows["radar_catchment_lag_0"], width=1 / 24, color=RAIN)
-    bottom.set_ylabel("radar (mm/h)")
+    bottom.set_ylabel("radar, wettest\ncell (mm/h)")
     bottom.xaxis.set_major_formatter(mdates.DateFormatter("%d %b\n%H:%M"))
     figure.savefig(path, dpi=120)
     plt.close(figure)
@@ -175,10 +175,10 @@ def event_table(floods: pd.DataFrame, dataset: pd.DataFrame) -> pd.DataFrame:
                 "fold": next(name for name, (a, b) in fold_of.items() if a <= flood.peak_at < b),
                 "above 95 cm from (UTC)": f"{flood.start:%Y-%m-%d %H:%M}",
                 "to (UTC)": f"{flood.end:%Y-%m-%d %H:%M}",
-                "peak (cm)": round(flood.peak_cm),
+                "peak (cm)": round(flood.peak_cm, 1),
                 "peak at (UTC)": f"{flood.peak_at:%Y-%m-%d %H:%M}",
-                "radar rain 48 h before peak (mm)": round(
-                    radar[flood.peak_at - pd.Timedelta(hours=48) : flood.peak_at].sum(), 1
+                "radar, wettest cell, 48 h to peak (mm)": round(
+                    radar[flood.peak_at - pd.Timedelta(hours=47) : flood.peak_at].sum(), 1
                 ),
             }
         )
