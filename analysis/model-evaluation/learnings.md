@@ -67,6 +67,26 @@ From run [2026-10-15-flood-scores](experiments.md#2026-10-15-flood-scores).
 - **The same rain inputs overshoot small floods.** On 2026-02-22 (91 cm, from 70 cm) the v2 models forecast 145 to 162 % of the rise 12 hours ahead; even 1 hour before, the median over all 13 floods is 5 to 8 % above the rise (up to 127 % on 2024-12-06). A rise of 21 cm makes any overshoot large in relative terms.
 - **False alarms are rare under the new rule:** 2 (`rain_change:v2:split`) and 3 (`ridge:change:v2`) in 18 test months, `upstream` 1, persistence none. The extra flood `ridge:change:v2` sees a day ahead (event 8) costs about one false alarm.
 
+## 2026-10-15 · LightGBM on the ridge residual
+
+From run [2026-10-15-lightgbm-residual](experiments.md#2026-10-15-lightgbm-residual).
+
+- **Trees on the ridge residual don't beat ridge.** Plain and `linear_tree` variants lose over all issue times in 2 and 3 of 4 folds, by up to 0.13 cm (F1). Ridge seems to take what these inputs hold; the rest looks like noise and ICON-D2 error.
+- **The trees mostly learned season.** Season sine and cosine carry a third of the gain. With 8 to 20 months of training, each season is seen once or twice, so the correction is drift of those months, not a rule. F1 (trained Feb to Sep, tested Oct to Dec) loses most.
+- **The residual correction is safe for floods.** Flood size held and false alarms stayed below 0.25 per month (4 and 3 against ridge's 3), and the high-water bias at +24 h shrank from −3.8 to −3.2 cm. The cap on the trees did what was hoped: it limited only the correction.
+- **In-sample ridge residuals are too small to train on.** They were 8 to 33 % below out-of-fold ones on the inner splits, more at high water and long leads. Any model stacked on ridge needs out-of-fold residuals.
+- **The inner split wanted almost no boosting:** 10 rounds at a learning rate of 0.05. That alone says the residual holds little a tree can use with these inputs.
+
+## 2026-10-15 · Capped training: floods beyond the training range
+
+From run [2026-10-15-capped-training](experiments.md#2026-10-15-capped-training). Each `:cap100` model is trained without any issue time whose cleaned level or any target is above 100 cm, so the four test floods above 100 cm (121, 165, 125 and 105 cm) are bigger than anything in training.
+
+- **The linear change models extrapolate well enough.** No family loses more than 20 points of flood size, the agreed mark for "unfit for new record floods". The largest loss is 13 points (`rain_change:v2:split`, the 125 cm flood 12 hours before: 58 → 45 %); `ridge:change:v2` loses up to 10 points on the same flood. On the 121 and 165 cm floods the capped models are within 3 points of the uncapped ones.
+- **`upstream` doesn't care.** Its two factors per lead barely move, so its sizes match within 3 points and its high-water MAE is unchanged.
+- **High-water MAE rises a little for the v2 models:** about +0.1 cm at +1 h and +0.2 cm from +12 h, mean +0.2 cm over leads 1 to 24 h. They still beat persistence in all four folds.
+- **Persistence is identical capped and uncapped,** which checks that the wrapper filters training only.
+- **Caveat:** the cap also drops the rising limbs into big peaks, which carry most of the signal for rain coefficients. Read the losses as a comparison between families, not as what a real record flood would cost. A tree model (LightGBM), which can't go beyond its training range, is the case this test is meant for; it isn't in this run.
+
 ## 2026-10-15 · Rain response from a unit hydrograph
 
 From run [2026-10-15-rain-response](experiments.md#2026-10-15-rain-response).

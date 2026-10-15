@@ -18,7 +18,7 @@ import pandas as pd
 from pegel.config import EvaluationSettings
 from pegel.evaluation import harness
 from pegel.evaluation.contract import Manifest
-from pegel.evaluation.registry import MODELS
+from pegel.evaluation.registry import MODELS, STRESS_TESTS
 
 
 def manifest_path(dataset: Path) -> Path:
@@ -52,7 +52,7 @@ def selected_models(
 ) -> list[harness.ModelFactory]:
     if names is None:
         return list(MODELS)
-    by_name = {factory(settings).name: factory for factory in MODELS}
+    by_name = {factory(settings).name: factory for factory in [*MODELS, *STRESS_TESTS]}
     unknown = set(names) - by_name.keys()
     if unknown:
         raise ValueError(f"unknown models {sorted(unknown)}; registered: {sorted(by_name)}")
