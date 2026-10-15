@@ -1,5 +1,5 @@
 """Command line entry point for local runs: `backfill`, `backfill-*`, `clean`, `run-hourly`,
-`build-eval-set`."""
+`build-eval-set`, `train-model`."""
 
 import argparse
 import os
@@ -66,6 +66,21 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         database_url = _required_env("JOBS_DATABASE_URL")
         eval_set.run(config, database_url, arguments.start, arguments.end, arguments.out)
+        return 0
+    if arguments.command == "train-model":
+        # Lazy, like build-eval-set: training isn't part of the Lambda.
+        from pegel.jobs import train
+
+        evaluation = config.evaluation
+        train.run(
+            config,
+            _required_env("JOBS_DATABASE_URL"),
+            arguments.model,
+            arguments.start or evaluation.window_first_day,
+            arguments.end or evaluation.window_last_day,
+            arguments.out,
+            arguments.bucket,
+        )
         return 0
     if arguments.command == "clean":
         _clean_history(config, arguments.start, arguments.end)
@@ -239,6 +254,23 @@ def _parser() -> argparse.ArgumentParser:
         "--to", dest="end", type=date.fromisoformat, required=True, help="UTC date, inclusive"
     )
     eval_parser.add_argument("--out", type=Path, required=True, help="folder outside the repo")
+    train_parser = commands.add_parser(
+        "train-model", help="fit a model on the window and save it, reading the database read-only"
+    )
+    train_parser.add_argument(
+        "--model", required=True, help="registered name, e.g. ridge:change:v2"
+    )
+    train_parser.add_argument(
+        "--from", dest="start", type=date.fromisoformat, help="UTC date (default: eval window)"
+    )
+    train_parser.add_argument(
+        "--to",
+        dest="end",
+        type=date.fromisoformat,
+        help="UTC date, inclusive (default: eval window)",
+    )
+    train_parser.add_argument("--out", type=Path, required=True, help="folder outside the repo")
+    train_parser.add_argument("--bucket", help="also upload to s3://<bucket>/models/")
     hourly_parser = commands.add_parser("run-hourly", help="ingest recent hours and forecast")
     hourly_parser.add_argument(
         "--issued-at",
