@@ -1,6 +1,6 @@
 # Preliminary data analysis
 
-What we learned about the data before modelling: the Kupferdreh level, the upstream gauges, radar rain and the ICON-D2 forecast. It is a snapshot of the data as it was before the first models, not a record of model results; those are in [the model learnings](model-evaluation/learnings.md). Append-only: add a new dated section at the end, don't rewrite old ones. If a later finding changes an earlier one, say so in the new section.
+What we learned about the data before modelling: the Kupferdreh level, the upstream gauges, radar rain and the ICON-D2 forecast. It is a snapshot of the data as it was before the first models, with a few first-fit numbers where they explain the data. Model results are in [the model learnings](model-evaluation/learnings.md). Append-only: add a new dated section at the end, don't rewrite old ones. If a later finding changes an earlier one, say so in the new section.
 
 Numbers come from the frozen evaluation dataset of 2026-10-14 (`eval.parquet`, 19,248 issue times, 2024-02-01 to 2026-04-12) and the folds in [decision 0008](../docs/decisions/0008-model-evaluation-and-selection.md). Kupferdreh is always the cleaned series.
 
