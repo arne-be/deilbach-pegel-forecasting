@@ -67,7 +67,8 @@ resource "aws_lambda_function" "hourly" {
   architectures = ["arm64"]
   # Lambda's maximum. Normal runs take seconds; if every source stalls, their own timeouts and
   # retries add up to about 11 minutes (the rain forecast step at most about 4, as it starts no
-  # older run after 2 minutes), and the level forecast is saved last.
+  # older run after 2 minutes). The persistence forecast is saved before the model forecast,
+  # whose S3 read and database queries take seconds.
   timeout     = 900
   memory_size = 512
   # shortcut: no reserved concurrency of 1, because AWS refuses any reservation while the
@@ -82,6 +83,7 @@ resource "aws_lambda_function" "hourly" {
       INFLUX_CLIENT_CERT_SECRET_NAME = aws_secretsmanager_secret.influx_client_cert.name
       INFLUX_CLIENT_KEY_SECRET_NAME  = aws_secretsmanager_secret.influx_client_key.name
       JOBS_DATABASE_URL_SECRET_NAME  = aws_secretsmanager_secret.jobs_database_url.name
+      MODEL_BUCKET                   = aws_s3_bucket.data.bucket
     }
   }
 

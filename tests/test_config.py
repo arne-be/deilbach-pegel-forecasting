@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from pegel.config import DEFAULT_CONFIG_PATH, PegelConfig, load_config
+from pegel.config import DEFAULT_CONFIG_PATH, ForecastSettings, PegelConfig, load_config
 
 
 def test_repo_config_is_valid() -> None:
@@ -45,3 +45,11 @@ def test_non_positive_cleaning_setting_is_rejected(tmp_path: Path) -> None:
     cleaning = load_config().cleaning.model_dump() | {"min_deviation_cm": 0}
     with pytest.raises(ValidationError):
         load_config(_config_with(tmp_path / "pegel.json", cleaning=cleaning))
+
+
+def test_a_model_other_than_persistence_needs_a_model_file() -> None:
+    forecast = load_config().forecast.model_dump()
+    with pytest.raises(ValidationError, match="model_file"):
+        ForecastSettings.model_validate(forecast | {"model": "ridge:change:v2"})
+    ridge = forecast | {"model": "ridge:change:v2", "model_file": "models/ridge.json"}
+    assert ForecastSettings.model_validate(ridge).model_file == "models/ridge.json"

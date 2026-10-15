@@ -15,6 +15,7 @@ import httpx
 
 from pegel.adapters.env_files import load_env_files, main_checkout
 from pegel.adapters.logging import configure_logging
+from pegel.adapters.model_files import load_model_from_s3
 from pegel.adapters.sources import lanuv, open_meteo
 from pegel.adapters.sources.influx import fetch_levels, influx_settings_from_env, ssl_context
 from pegel.adapters.sources.lanuv_files import LevelFiles
@@ -23,7 +24,7 @@ from pegel.config import PegelConfig, config_file, load_config
 from pegel.core.forecasts import Forecast
 from pegel.core.schedule import issue_time
 from pegel.core.summary import summarize
-from pegel.jobs import rain_forecast
+from pegel.jobs import eval_set, rain_forecast
 from pegel.jobs.pipeline import (
     Conn,
     FetchLevels,
@@ -61,9 +62,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Backfill {start:%Y-%m-%d} to {end:%Y-%m-%d %H:%M} UTC: {changed} rows stored")
         return 0
     if arguments.command == "build-eval-set":
-        # Lazy: the Lambda imports this module, and the dataset build isn't part of it.
-        from pegel.jobs import eval_set
-
         database_url = _required_env("JOBS_DATABASE_URL")
         eval_set.run(config, database_url, arguments.start, arguments.end, arguments.out)
         return 0
@@ -107,7 +105,8 @@ def run_hourly_from_env(config: PegelConfig, issued_at: datetime | None = None) 
                 ),
             ),
         ]
-        return run_hourly(fetch, conn, config, issued_at, extra_steps)
+        load_model = partial(load_model_from_s3, config)
+        return run_hourly(fetch, conn, config, issued_at, extra_steps, load_model)
 
 
 @contextmanager

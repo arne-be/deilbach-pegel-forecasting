@@ -115,3 +115,11 @@ def test_lambda_handler_imports_without_pyarrow() -> None:
     # pyarrow isn't in the Lambda image; a None entry makes any import of it fail.
     code = "import sys; sys.modules['pyarrow'] = None; import pegel.jobs.lambda_handler"
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_one_live_row_equals_the_dataset_row(conn: Conn) -> None:
+    seed(conn)
+    dataset, _ = eval_set.build_dataset(conn, CONFIG, DAY, DAY)
+    issued_at = dataset[contract.ISSUED_AT].iloc[5]
+    live, _ = eval_set.build_rows(conn, CONFIG, pd.DatetimeIndex([issued_at]))
+    pd.testing.assert_frame_equal(live, dataset.iloc[[5]].reset_index(drop=True))

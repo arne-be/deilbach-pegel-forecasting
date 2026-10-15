@@ -19,6 +19,7 @@ from pegel.config import PegelConfig, Station
 from pegel.core.cleaning import outlier_flags
 from pegel.core.forecasts import Forecast
 from pegel.core.observations import Observation
+from pegel.core.persistence import MODEL_NAME as PERSISTENCE
 from pegel.core.persistence import persistence_forecast
 from pegel.core.schedule import issue_time, monthly_windows, scheduled_available_at
 from pegel.core.series import (
@@ -28,6 +29,7 @@ from pegel.core.series import (
     level_series,
     level_series_id,
 )
+from pegel.jobs.model_forecast import ModelLoader, model_forecast
 
 logger = logging.getLogger(__name__)
 
@@ -196,9 +198,10 @@ def run_hourly(
     config: PegelConfig,
     issued_at: datetime,
     extra_steps: Sequence[tuple[str, HourlyStep]] = (),
+    load_model: ModelLoader | None = None,
 ) -> Forecast:
     """Ingests the recent hours of every station and the extra inputs, cleans the forecast
-    station's levels, then forecasts.
+    station's levels, then forecasts. Returns the forecast the page shows.
 
     Only uses readings up to the issue time. A failing upstream station or extra step is logged
     and skipped, so it can't block the forecast; a failing forecast station fails the run.
@@ -232,4 +235,32 @@ def run_hourly(
                 "hourly step failed, continuing without it",
                 extra={"job": name, "issued_at": issued_at.isoformat()},
             )
-    return forecast(conn, config, issued_at)
+    # Always saved, and first: it is the baseline and the page's fallback.
+    persistence = forecast(conn, config, issued_at)
+    if config.forecast.model == PERSISTENCE:
+        return persistence
+    return save_model_forecast(conn, config, issued_at, load_model) or persistence
+
+
+def save_model_forecast(
+    conn: Conn, config: PegelConfig, issued_at: datetime, load_model: ModelLoader | None
+) -> Forecast | None:
+    """Builds and stores the configured model's forecast; None if anything fails (logged)."""
+    context = {
+        "job": "forecast",
+        "model": config.forecast.model,
+        "issued_at": issued_at.isoformat(),
+    }
+    try:
+        if load_model is None:
+            raise RuntimeError("no model loader passed")
+        result = model_forecast(conn, config, issued_at, load_model())
+        save_forecast(conn, result)
+    except Exception:
+        logger.exception("model forecast failed, keeping the persistence forecast", extra=context)
+        return None
+    logger.info(
+        "saved forecast",
+        extra=context | {"newest_observation_at": result.newest_observation_at.isoformat()},
+    )
+    return result
