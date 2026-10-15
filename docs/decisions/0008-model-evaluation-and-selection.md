@@ -52,8 +52,6 @@ A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](
 
 **We accept the stitch and measure its effect.** A model trained on old forecasts will trust short-lead rain less than it could. We check the size of this with the full runs from Open-Meteo Single Runs (2026-04 to 2026-10) and with a live shadow run from 2026-10-12.
 
-**Every learned model also runs without ICON-D2.** Because of the stitch, the backtest undervalues ICON-D2. The live shadow run then shows what ICON-D2 really adds.
-
 ### Folds
 
 **Four expanding-window folds.** Training always starts on 2024-02-01 and ends where the test starts. A 24-hour embargo drops the last training issue times, whose targets reach into the test.
@@ -193,6 +191,7 @@ Only A touches `pyproject.toml`, `uv.lock` and `config/pegel.json`. Each PR adds
 - **Forecasting libraries** (skforecast, sktime, darts, Nixtla). The models are simple enough without them, and the harness is a few functions.
 - **Random or shuffled splits.** They leak the future.
 - **Automatic retraining.** No point until we know which model to retrain.
+- **A run without ICON-D2 for every learned model.** It doubles the runs for little: the learnings already show ICON-D2 is the strongest input, and the live shadow run shows what fresh runs add.
 - **LSTM.** One gauge and two years of data is the case where it does badly ([Kratzert et al.](https://research.google/pubs/hess-opinions-never-train-a-long-short-term-memory-lstm-network-on-a-single-basin/)). Only reconsider by fine-tuning a model pretrained on many basins.
 - **NSE and KGE.** Skill against persistence says more for short leads ([Knoben et al. 2019](https://hess.copernicus.org/articles/23/4323/2019/)).
 
