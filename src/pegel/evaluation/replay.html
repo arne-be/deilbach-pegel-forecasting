@@ -140,7 +140,10 @@ function draw() {
 
   const nx = s.x(issuedAt);
   chart.append(svg("line", { x1: nx, x2: nx, y1: M.top, y2: H - M.bottom, stroke: "#333", "stroke-dasharray": "3 3" }));
-  chart.append(svg("text", { x: nx + 4, y: M.top + 10 }, "now"));
+  // Near the right edge the label goes left of the line, so it stays inside the chart.
+  const right = nx > W - M.right - 140;
+  chart.append(svg("text", { x: right ? nx - 4 : nx + 4, y: M.top + 10, "text-anchor": right ? "end" : "start",
+    "font-weight": "bold" }, "now: " + berlinShort.format(issuedAt)));
 
   el("issue").textContent = berlin.format(issuedAt);
   el("slider").value = step;
