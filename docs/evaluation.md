@@ -178,11 +178,11 @@ For lead L, take the forecast issued L hours before the observed peak. It covers
 - **Timing** is the time of the forecast peak minus the time of the observed peak, in hours. Negative is early, positive is late. If the forecast's highest value is at its last hour (24) and L is less than 24, it may peak later still, so the timing is shown as "at least 24 − L h late".
 - **Predicted** is yes when the size is more than 50 %: the forecast saw more than half the rise coming. Otherwise no. The bar is the same at every lead. At 1 hour the level is already close to the peak, so persistence is mostly a yes there; the leads that tell models apart are 6 to 24 hours.
 
-A missing forecast (no issue time, or a gap in the inputs) is shown as missing, not as no, and left out of the count: `9 of 12`, with 1 missing.
+A missing forecast (no issue time, or any of its 24 hours missing) is shown as missing, not as no, and left out of the count: `9 of 12`, with 1 missing.
 
 ### False alarms
 
-Without a counterweight, a model that forecasts a flood all the time would always be right. So we count false alarms: a forecast that shows a new event, its peak above 75 cm and at least 15 cm above the last known level, while no event is running at its issue time and none starts in the 24 hours after. Event start is as in [Flood events](#flood-events): the foot of the rise. The last known level must be at most 3 hours old; otherwise the issue time is skipped. A run of hourly issue times with such forecasts counts once. The rate is the count divided by the number of test months.
+Without a counterweight, a model that forecasts a flood all the time would always be right. So we count false alarms: a forecast that shows a new event, its peak above 75 cm and at least 15 cm above the last known level, while no event is running at its issue time and none starts in the 24 hours after. Event start is as in [Flood events](#flood-events): the foot of the rise. The last known level must be at most 3 hours old; otherwise the issue time is skipped. A run of hourly issue times with such forecasts counts once; a skipped issue time inside the run doesn't split it. A forecast with missing hours still counts if its known hours show the event. The rate is the count divided by the number of test months.
 
 ### Tables
 

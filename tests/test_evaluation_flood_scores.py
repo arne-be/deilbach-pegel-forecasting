@@ -128,6 +128,53 @@ def test_a_run_of_false_alarms_counts_once() -> None:
     assert _alarm_count(_floods(), [100, 101, 102, 150]) == 2
 
 
+def test_a_skipped_hour_inside_a_run_does_not_split_it() -> None:
+    hours = 200
+    forecasts = [_forecast(h, {6: 90.0} if h in (100, 101, 103) else {}) for h in range(hours)]
+    dataset = _dataset(hours)
+    dataset.loc[102, contract.KD_LAST_AT] -= pd.Timedelta(hours=4)
+    predictions = pd.concat(forecasts, ignore_index=True)
+    table = false_alarms(predictions, dataset, _floods(), HIGH_WATER_CM, LEADS)
+    assert int(table["count"].iloc[0]) == 1
+
+
+def test_an_alarm_needs_high_water_and_a_rise_of_15_cm() -> None:
+    hours = 10
+    dataset = _dataset(hours)
+    dataset[contract.KD_LAST_CM] = 70.0
+
+    def count(peak_cm: float) -> int:
+        predictions = _forecast(5, {6: peak_cm})
+        table = false_alarms(predictions, dataset, _floods(), HIGH_WATER_CM, LEADS)
+        return int(table["count"].iloc[0])
+
+    assert count(85.0) == 1  # above 75 cm, exactly 15 cm above the last level
+    assert count(84.9) == 0  # less than 15 cm above
+    dataset[contract.KD_LAST_CM] = 59.0
+    assert count(75.0) == 0  # 16 cm above, but not above 75 cm
+
+
+def test_an_alarm_uses_the_highest_known_value() -> None:
+    predictions = _forecast(5, {6: 90.0})
+    predictions.loc[predictions["lead"] == 1, "prediction"] = np.nan
+    table = false_alarms(predictions, _dataset(10), _floods(), HIGH_WATER_CM, LEADS)
+    assert int(table["count"].iloc[0]) == 1
+
+
+def test_a_forecast_with_a_missing_lead_is_missing_in_peaks() -> None:
+    forecast = _forecast(34, {8: 90.0})
+    forecast.loc[forecast["lead"] == 20, "prediction"] = np.nan
+    row = _row(_peaks(_floods(EVENT), forecast), 6)
+    assert np.isnan(row["size"])
+    assert pd.isna(row["predicted"])
+
+
+def test_no_events_give_empty_tables() -> None:
+    floods = _floods()
+    assert scored_events(floods, {"F1"}).empty
+    assert _peaks(floods, _forecast(5, {})).empty
+
+
 def test_a_stale_last_level_is_skipped() -> None:
     assert _alarm_count(_floods(), [100], last_age_hours=4) == 0
     assert _alarm_count(_floods(), [100], last_age_hours=3) == 1

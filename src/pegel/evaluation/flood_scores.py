@@ -133,7 +133,8 @@ def false_alarms(
     An alarm is a forecast whose peak is above high water and at least RISE_CM above the last
     known level, which must be at most STALE_HOURS old. It is false when no event in `floods`
     is running at its issue time or starts within `leads` hours after it. A run of hourly
-    issue times with false alarms counts once.
+    issue times with false alarms counts once; a skipped hour (stale level, no forecast) inside
+    a run doesn't split it.
     """
     last = dataset.set_index(contract.ISSUED_AT)[[contract.KD_LAST_CM, contract.KD_LAST_AT]]
     starts = floods["start"].to_numpy("datetime64[ns]")
@@ -148,8 +149,14 @@ def false_alarms(
         at = alarm_at.to_numpy("datetime64[ns]")[:, None]
         horizon = np.timedelta64(leads, "h")
         near_event = ((starts[None, :] <= at + horizon) & (ends[None, :] >= at)).any(axis=1)
-        false_at = pd.Series(alarm_at[~near_event])
-        count = int((false_at.diff() != _HOUR).sum())
+        # 1 for a false alarm, 0 for a checked hour without one, NaN for a skipped hour, which
+        # carries the state before it.
+        hourly = pd.date_range(peaks.index.min(), peaks.index.max(), freq=_HOUR)
+        state = pd.Series(np.nan, index=hourly)
+        state[peaks.index[fresh]] = 0.0
+        state[alarm_at[~near_event]] = 1.0
+        raised = state.ffill().fillna(0.0).astype(bool)
+        count = int((raised & ~raised.shift(fill_value=False)).sum())
         months = own[contract.ISSUED_AT].nunique() / HOURS_PER_MONTH
         rows.append({"model": model, "count": count, "months": months, "per_month": count / months})
     return pd.DataFrame(rows, columns=FALSE_ALARM_COLUMNS)
