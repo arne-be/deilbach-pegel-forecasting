@@ -56,3 +56,13 @@ The ridge and simple-model numbers come from PRs #68 and #70 before merge. Score
 - **Warnings per threshold crossing were hard to read and blind to most floods.** Matching forecast and observed crossings of 95 cm within ±6 hours, leaving out re-crossings and counting the earliest forecast that flickered, gave counts few people could follow. They covered only the 6 floods above 95 cm, all in winter 2024/25. Replaced by flood forecasts per event ([evaluation.md](../../docs/evaluation.md#flood-forecasts)): for each of the 13 events, did a forecast 24, 12, 6, 3 and 1 hour before the peak see more than half the rise, how much of it, and how many hours off.
 - **No model warns reliably yet.** Under the old crossing rule, no model got more than half of the 95 cm crossings 3 hours ahead, and none warned the 165 cm flood of 2024-11-19 at 145 cm more than 3 hours ahead. The new scores follow with the next run.
 - **Warning earlier costs false alarms.** Every model that warned at all raised false alarms; persistence never warns, so it never raises one. False alarms stay the counterweight in the new scores.
+
+## 2026-10-15 · First run with flood scores per event
+
+From run [2026-10-15-flood-scores](experiments.md#2026-10-15-flood-scores).
+
+- **The v2 models gain most 6 to 24 hours before the peak.** 6 hours before, both see all 13 floods, persistence 8 and `upstream` 10; 24 hours before, 8 and 9 against 5. At 3 and 1 hour every model sees almost all of them, so those leads don't tell models apart.
+- **Persistence's 5 floods a day ahead are not foresight.** All five (events 4, 7, 9, 10, 12) started from a level already high from an earlier peak, and persistence's own peak is at the issue time (timing −23 h). Read its 24 h count as the floor that slow, multi-peak events give for free.
+- **The biggest flood is missed a day ahead by every model.** On 2024-11-19 (165 cm) all four saw at most 32 % of the rise 12 and 24 hours before, because ICON-D2 badly underforecast the rain. Only once the rain had fallen (6 hours before) did the v2 models see 76 to 80 %. Fresher ICON-D2 runs live may help here; the backtest can't tell.
+- **The same rain inputs overshoot small floods.** On 2026-02-22 (91 cm, from 70 cm) the v2 models forecast 145 to 162 % of the rise 12 hours ahead; even 1 hour before, their median forecast is 5 to 8 % above the rise (up to 127 % on 2024-12-06). A rise of 21 cm makes any overshoot large in relative terms.
+- **False alarms are rare under the new rule:** 2 (`rain_change:v2:split`) and 3 (`ridge:change:v2`) in 18 test months, `upstream` 1, persistence none. The extra flood `ridge:change:v2` sees a day ahead (event 8) costs about one false alarm.

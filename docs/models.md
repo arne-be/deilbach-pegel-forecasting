@@ -4,16 +4,16 @@ Every model the evaluation runs, what it does and why. How models are scored is 
 
 ## Ladder
 
-Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10-15-models-v2](https://github.com/arne-be/deilbach-pegel-prediction/blob/fcca364/analysis/model-evaluation/experiments.md#2026-10-15-models-v2), the last run before the evaluation method changed (it is in git history, not in the current log). High water: above 75 cm at the issue time or at the target. MAE doesn't depend on the flood events, so these numbers hold; flood forecast scores follow with the first run of the new method.
+Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10-15-flood-scores](../analysis/model-evaluation/experiments.md#2026-10-15-flood-scores). High water: above 75 cm at the issue time or at the target. Floods seen 24 h ahead: of the 13 flood events, how many the forecast issued 24 hours before the peak saw more than half the rise of ([evaluation.md](evaluation.md#flood-forecasts)).
 
-| Model | Idea | All | High water | Code |
-|---|---|---|---|---|
-| `persistence` | the last level for every lead; the baseline | 2.8 | 8.3 | `models/persistence.py` |
-| `upstream` | Langenberg and Nierenhof 3-hour changes, no constant; the best at +1 h | 2.7 | 7.8 | `models/simple.py` |
-| **`rain_change:v2:split`** | 14 named inputs | 2.1 | 5.1 | `models/curated.py` |
-| **`ridge:change:v2`** | 20 named inputs, ridge penalty | 2.1 | 4.8 | `models/curated.py` |
+| Model | Idea | All | High water | Floods seen 24 h ahead | Code |
+|---|---|---|---|---|---|
+| `persistence` | the last level for every lead; the baseline | 2.8 | 8.3 | 5 | `models/persistence.py` |
+| `upstream` | Langenberg and Nierenhof 3-hour changes, no constant; the best at +1 h | 2.7 | 7.8 | 5 | `models/simple.py` |
+| **`rain_change:v2:split`** | 14 named inputs | 2.1 | 5.1 | 8 | `models/curated.py` |
+| **`ridge:change:v2`** | 20 named inputs, ridge penalty | 2.1 | 4.8 | 9 | `models/curated.py` |
 
-The two v2 models are the current best. Under the selection rule both win over `rain_change:split` and `ridge:change` (`rain_change:v2:split` ties `ridge:change` in F2 and wins on high water). They are level over all issue times, and `ridge:change:v2` is better at high water but had more false alarms under the old crossing rule (0.60 a month at 95 cm against 0.38).
+The two v2 models are the current best. Under the selection rule both win over `rain_change:split` and `ridge:change` (`rain_change:v2:split` ties `ridge:change` in F2 and wins on high water). They are level over all issue times, and `ridge:change:v2` is better at high water and sees one flood more a day ahead, but has one false alarm more (3 against 2 in 18 test months).
 
 All learned models forecast the **change** from the last cleaned level, one fit per lead (1 to 24 hours), so the forecast is `last + change_k`. `upstream` falls back to persistence when an upstream change is missing. In the v2 models a missing upstream change, Kupferdreh change or recent rise counts as 0; any other missing input gives persistence. The v2 models are trained on day-old ICON-D2 (see [evaluation.md](evaluation.md#the-icon-d2-archive)).
 
@@ -82,7 +82,8 @@ change_k = c0 + c1·(last − base_30d)
 
 - **No gain at +1 h.** About 0.67 cm, persistence 0.66, `upstream` 0.60.
 - **Too low at high water.** Bias about −1.5 to −1.7 cm at +6 h and −3.7 to −3.8 cm at +24 h. Rises are still caught late.
-- **Warnings (old crossing rule).** 2 of 6 first crossings at 95 cm warned 3 hours or more ahead. The 145 cm crossing of 2024-11-19 is not warned 3 hours ahead.
-- **Fewer warnings than the retired `ridge:change`** (old crossing rule), which warns 3 of 6 at 95 cm and the 145 cm crossing 3 hours ahead.
+- **Misses 4 to 5 of 13 floods a day ahead.** 6 hours before the peak both see all 13, 12 hours before 11 to 12. The 165 cm flood of 2024-11-19 is seen only from 6 hours before (26 % of the rise at 24 h): ICON-D2 badly underforecast its rain.
+- **Too high on small floods.** 12 hours before the 91 cm peak of 2026-02-22 they forecast 145 and 162 % of the rise.
+- **False alarms:** 2 (`rain_change:v2:split`) and 3 (`ridge:change:v2`) in 18 test months; persistence none.
 - **Chosen from many candidates** on inner splits that overlap earlier test periods.
 - **Trained on day-old ICON-D2.** How the fitted coefficients behave on fresh runs is unknown until the live shadow run.
