@@ -30,6 +30,10 @@ Retired on 2026-10-15, so run outputs show only the models that matter. The code
 
 With them went the shared ridge features (`features.features`) and the target forms (`evaluation/targets.py`) with the hourly-step features (`features.step_features`), which no remaining model used.
 
+Retired on 2026-10-15 after one run ([2026-10-15-rain-response](../analysis/model-evaluation/experiments.md#2026-10-15-rain-response)), never merged. The code is in git history at commit 7e5e5801c9d9 on branch `feat/rain-response-model` (PR #91; `git fetch origin pull/91/head`).
+
+- `rain_response:v1:offset`, `rain_response:v1:ridge` (idea 1): a two-store unit hydrograph (fast store 4–6 h, slow 96–144 h, peak about 2 cm per mm 4–5 hours after the rain), fitted per fold on radar-only rain episodes. It turned the last 168 hours of radar and the ICON-D2 hours ahead into a level change per lead. The offset variant added the radar response at the fitted gain and lost to `ridge:change:v2` in all four folds (2.2 / 5.1, 6 false alarms). The ridge variant used both responses as ridge inputs and only tied it (2.1 / 4.7). The floods of 120 cm or more got 0 to 3 points more of their rise a day ahead, and their peaks stayed 5 to 7 hours late.
+
 ## Rain change
 
 The Deilbach catchment is small and reacts within hours. Langenberg leads Kupferdreh by about 1 hour, Nierenhof by about 0 hours and radar rain by about 1 hour, all fading after about 4 hours. So a few inputs close to the issue time are enough, each with a physical reason:

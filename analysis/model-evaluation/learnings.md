@@ -86,3 +86,14 @@ From run [2026-10-15-capped-training](experiments.md#2026-10-15-capped-training)
 - **High-water MAE rises a little for the v2 models:** about +0.1 cm at +1 h and +0.2 cm from +12 h, mean +0.2 cm over leads 1 to 24 h. They still beat persistence in all four folds.
 - **Persistence is identical capped and uncapped,** which checks that the wrapper filters training only.
 - **Caveat:** the cap also drops the rising limbs into big peaks, which carry most of the signal for rain coefficients. Read the losses as a comparison between families, not as what a real record flood would cost. A tree model (LightGBM), which can't go beyond its training range, is the case this test is meant for; it isn't in this run.
+
+## 2026-10-15 · Rain response from a unit hydrograph
+
+From run [2026-10-15-rain-response](experiments.md#2026-10-15-rain-response).
+
+- **A hydrograph fitted on radar doesn't make big floods bigger.** Events 1, 2 and 6 (121, 165 and 125 cm) get 0 to 3 points more of their rise a day ahead than with `ridge:change:v2`, and their peaks stay 5 to 7 hours late 6 and 12 hours ahead. A day ahead the rain hasn't fallen, so the radar part can't help, and the ICON part is shrunk like the ICON sum was.
+- **The ridge keeps ICON at about half the radar gain.** Its coefficient on the ICON response is 0.34 to 0.58 in every fold and lead, so the regression dilution of day-old ICON stays whether the input is a sum or a convolution.
+- **At its fitted gain the radar response is too strong.** Added as a fixed offset it loses to `ridge:change:v2` in all four folds, is biased +0.4 cm at +24 h and doubles the false alarms (6 in 18 months). Given to the ridge, its weight drops to about 0.5 at +6 h and 0 at +24 h, where `recent_rise` and the Kupferdreh change already carry the recession.
+- **Fit the slow store on more than a day.** On the 24-hour change the slow store's time constant runs to the edge of any grid, because over a day it looks like a step. On 72 hours it settles at 96 to 144 h, with the fast store at 4 to 6 h and the peak 4 to 5 h after the rain, close to the analysis.
+- **As a ridge input the responses are a fair swap for the radar and ICON sums:** 2.06 against 2.07 cm over all issue times, 4.74 against 4.83 cm at high water, the same false alarms. Small enough to be selection noise. Both variants are retired; the code is in git history (see [models.md](../../docs/models.md#retired)).
+- **A day ahead the limit is ICON quality, not model form or training range.** Inside the ridge variant the ridge gives the ICON response 0.34 to 0.58 of the radar gain, and the radar response about 0 at +24 h. However the rain enters, as sums or through a physical hydrograph, the model can only trust day-old ICON about half, and a day ahead there is nothing else to go on.
