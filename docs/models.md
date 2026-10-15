@@ -12,6 +12,8 @@ Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10
 | `upstream` | Langenberg and Nierenhof 3-hour changes, no constant; the best at +1 h | 2.7 | 7.8 | 5 | `models/simple.py` |
 | **`rain_change:v2:split`** | 14 named inputs | 2.1 | 5.1 | 8 | `models/curated.py` |
 | **`ridge:change:v2`** | 20 named inputs, ridge penalty | 2.1 | 4.8 | 9 | `models/curated.py` |
+| `lgbm_residual:v1` | LightGBM on the residual of `ridge:change:v2`; ruled out | 2.1 | 4.8 | 10 | `models/residual.py` |
+| `lgbm_residual:v1:linear` | the same with `linear_tree`; ruled out | 2.1 | 4.9 | 10 | `models/residual.py` |
 
 The two v2 models are the current best. Under the selection rule both win over `rain_change:split` and `ridge:change` (`rain_change:v2:split` ties `ridge:change` in F2 and wins on high water). They are level over all issue times, and `ridge:change:v2` is better at high water and sees one flood more a day ahead, but has one false alarm more (3 against 2 in 18 test months).
 
@@ -77,6 +79,15 @@ change_k = c0 + c1·(last − base_30d)
 | other, +24 h | −1.30 | −0.09 | 1.27 | 1.61 | −0.68 | 0.64 | 0.74 | −0.16 | −0.27 |
 
 **How the inputs were chosen.** On an inner time split inside each fold's training rows: fit on the older 80 %, validate on the newest 20 %, with a 24-hour gap. Version 1 (retired) came from about 20 candidates, version 2 from 68 (`analysis/model-evaluation/models-v2-candidates.csv`). Tried and dropped: ICON-D2 p90, the radar zones and the catchment maximum, radar beyond 24 hours, Kupferdreh and upstream level lags, a recession gated to after the peak, other time constants (6, 8, 12, 36, 48 h) in place of the 24-hour one in `rain_change:v2:split`. The inner splits of later folds overlap earlier test periods, so this is not a clean hold-out; the live shadow run is.
+
+## LightGBM on the ridge residual
+
+Step 6 of the ladder, in a form that keeps ridge's flood size: `ridge:change:v2` makes the forecast, and one LightGBM booster per lead adds a correction fitted on its residual. Ridge is linear and extrapolates; a tree can't go past the residuals it trained on, so its cap limits only the correction. Numbers from run [2026-10-15-lightgbm-residual](../analysis/model-evaluation/experiments.md#2026-10-15-lightgbm-residual).
+
+- **Inputs:** the `ridge:change:v2` inputs without the constant, plus the last level and sine and cosine of the issue hour and of the day of the year.
+- **Out-of-fold residuals.** The training rows are cut into 3 time blocks; each block's residual comes from ridge fitted on the other two, without the 24 hours before the block, whose targets fall inside it. Ridge's residuals on its own training rows were 8 to 33 % smaller on the inner splits, so trees fitted on them would correct too little. The final ridge is fitted on all training rows.
+- **Settings:** learning rate 0.05, 15 leaves, depth 4, L2 penalty 10, 80 % of the inputs per tree, seeded and deterministic. 10 rounds and `min_data_in_leaf` 200 were chosen on the inner splits; more rounds made them worse. `lgbm_residual:v1:linear` fits a linear model in each leaf (`linear_tree`).
+- **Ruled out.** Over all issue times both lose to `ridge:change:v2` in 2 (plain) and 3 (linear) of 4 folds. Flood size holds, false alarms are 4 (plain) and 3 (linear) against 3, and the high-water bias at +24 h shrinks from −3.8 to −3.2 cm. The trees mostly learned season, which 8 to 20 months of training can't support.
 
 ## Known weaknesses of the current best
 
