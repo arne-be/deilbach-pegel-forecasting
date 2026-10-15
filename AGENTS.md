@@ -40,6 +40,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Learnings about models and evaluation, append-only: `analysis/model-evaluation/learnings.md`
 - Preliminary data analysis (target, gauges, radar, ICON-D2), append-only: `analysis/preliminary-data-analysis.md`
 - Run report and experiment log (`python -m pegel.evaluation.report <run dir>`, plots and one appended section per run): `src/pegel/evaluation/report.py`, `report_tables.py`, `report_plots.py`, `analysis/model-evaluation/`
+- Forecast replay page per run, one self-contained HTML file (`python -m pegel.evaluation.replay <run dir> <eval.parquet>`, writes `replay.html`): `src/pegel/evaluation/replay.py`, `replay.html`
 - How the evaluation works (data, split, flood events, metrics) and every model on one page: `docs/evaluation.md`, `docs/models.md`, `analysis/model-evaluation/methodology_plots.py`
 
 ## Layout

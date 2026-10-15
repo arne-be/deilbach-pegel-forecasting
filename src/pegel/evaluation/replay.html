@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forecast replay</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; color: #222; background: #fff; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  .controls input[type=range] { flex: 1; min-width: 200px; }
+  #models label { margin-right: 12px; white-space: nowrap; }
+  #models .swatch { display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 4px; }
+  #issue { font-weight: 600; font-variant-numeric: tabular-nums; }
+  svg { width: 100%; height: auto; max-height: 70vh; display: block; }
+  svg text { font-size: 11px; fill: #555; }
+  .help { color: #666; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Forecast replay</h1>
+<div class="controls">
+  <label>Event <select id="event"></select></label>
+  <span id="event-info"></span>
+</div>
+<div id="models" class="controls" role="group" aria-label="Models"></div>
+<div class="controls">
+  <button type="button" id="back" aria-label="One hour back">&minus;1 h</button>
+  <button type="button" id="play" aria-label="Play">Play</button>
+  <button type="button" id="forward" aria-label="One hour forward">+1 h</button>
+  <input type="range" id="slider" min="0" value="0" aria-label="Issue time">
+  <span>Issue time <span id="issue" aria-live="polite"></span></span>
+</div>
+<svg id="chart" viewBox="0 0 960 440" role="img" aria-label="Observed level and forecasts"></svg>
+<p class="help">Times in Europe/Berlin. Space plays or pauses, the arrow keys step one hour.
+Observed level solid up to the issue time, light after it. Faded lines are the three previous forecasts.</p>
+<script id="replay-data" type="application/json">/*REPLAY_DATA*/</script>
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("replay-data").textContent);
+const HOUR = 3600000;
+// No black or grey: those are the observed level.
+const COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+  "#e377c2", "#17becf", "#bcbd22", "#aec7e8", "#ffbb78", "#98df8a"];
+const FADE = [0.45, 0.25, 0.12];  // the 1st, 2nd and 3rd forecast before the current one
+const W = 960, H = 440, M = { left: 48, right: 16, top: 16, bottom: 32 };
+const berlin = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin",
+  weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const berlinShort = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin",
+  day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+const berlinHour = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "numeric", hourCycle: "h23" });
+
+const el = (id) => document.getElementById(id);
+const selected = new Set([DATA.default_model]);
+let event = null, step = 0, timer = null;
+
+function svg(tag, attrs, text) {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function scales() {
+  const x0 = event.observed_from;
+  const x1 = event.observed_from + (event.observed.length - 1) * HOUR;
+  let [y0, y1] = event.y_range;
+  for (const model of selected) {
+    const range = event.model_ranges[model];
+    if (range) { y0 = Math.min(y0, range[0]); y1 = Math.max(y1, range[1]); }
+  }
+  return {
+    x: (t) => M.left + (t - x0) / (x1 - x0) * (W - M.left - M.right),
+    y: (v) => H - M.bottom - (v - y0) / (y1 - y0) * (H - M.top - M.bottom),
+    x0, x1, y0, y1,
+  };
+}
+
+// One path through (time, value) pairs, broken where a value is missing.
+function path(points, s) {
+  let d = "", pen = false;
+  for (const [t, v] of points) {
+    if (v === null) { pen = false; continue; }
+    d += (pen ? "L" : "M") + s.x(t).toFixed(1) + "," + s.y(v).toFixed(1);
+    pen = true;
+  }
+  return d;
+}
+
+function hline(chart, s, value, color, dash, label) {
+  const y = s.y(value);
+  chart.append(svg("line", { x1: M.left, x2: W - M.right, y1: y, y2: y, stroke: color, "stroke-dasharray": dash }));
+  chart.append(svg("text", { x: W - M.right - 4, y: y - 4, "text-anchor": "end" }, label));
+}
+
+function axes(chart, s) {
+  const span = s.y1 - s.y0, stepCm = span > 120 ? 20 : span > 60 ? 10 : 5;
+  for (let v = Math.ceil(s.y0 / stepCm) * stepCm; v <= s.y1; v += stepCm) {
+    chart.append(svg("line", { x1: M.left, x2: W - M.right, y1: s.y(v), y2: s.y(v), stroke: "#eee" }));
+    chart.append(svg("text", { x: M.left - 6, y: s.y(v) + 4, "text-anchor": "end" }, v + " cm"));
+  }
+  const tickHours = (s.x1 - s.x0) / HOUR > 120 ? 24 : 12;
+  for (let t = s.x0; t <= s.x1; t += HOUR) {
+    if (Number(berlinHour.format(t)) % tickHours !== 0) continue;
+    chart.append(svg("line", { x1: s.x(t), x2: s.x(t), y1: M.top, y2: H - M.bottom, stroke: "#f2f2f2" }));
+    chart.append(svg("text", { x: s.x(t), y: H - M.bottom + 16, "text-anchor": "middle" }, berlinShort.format(t)));
+  }
+}
+
+function draw() {
+  const chart = el("chart");
+  chart.replaceChildren();
+  const s = scales();
+  const issuedAt = event.first_issue + step * HOUR;
+  axes(chart, s);
+  hline(chart, s, DATA.high_water_cm, "#c00", "6 4", "high water " + DATA.high_water_cm + " cm");
+  hline(chart, s, event.pre_event_cm, "#888", "2 3", "pre-event " + event.pre_event_cm + " cm");
+
+  const observed = event.observed.map((v, i) => [event.observed_from + i * HOUR, v]);
+  const now = Math.round((issuedAt - event.observed_from) / HOUR);
+  chart.append(svg("path", { d: path(observed.slice(now), s), fill: "none", stroke: "#bbb", "stroke-width": 2 }));
+  chart.append(svg("path", { d: path(observed.slice(0, now + 1), s), fill: "none", stroke: "#000", "stroke-width": 2.5 }));
+
+  const px = s.x(event.peak_at), py = s.y(event.peak_cm);
+  chart.append(svg("circle", { cx: px, cy: py, r: 4, fill: "none", stroke: "#000", "stroke-width": 1.5 }));
+  const untilPeak = Math.round((event.peak_at - issuedAt) / HOUR);
+  const when = untilPeak > 0 ? "in " + untilPeak + " h" : untilPeak < 0 ? -untilPeak + " h ago" : "now";
+  chart.append(svg("text", { x: px + 6, y: py - 6, "font-weight": "bold" },
+    "peak " + event.peak_cm + " cm, " + berlinShort.format(event.peak_at) + " (" + when + ")"));
+
+  DATA.models.forEach((model, index) => {
+    if (!selected.has(model)) return;
+    const color = COLORS[index % COLORS.length];
+    for (let back = FADE.length; back >= 0; back--) {
+      const at = step - back;
+      const forecast = at >= 0 ? event.forecasts[model][at] : null;
+      if (!forecast) continue;
+      const issued = event.first_issue + at * HOUR;
+      const points = forecast.map((v, lead) => [issued + (lead + 1) * HOUR, v]);
+      chart.append(svg("path", { d: path(points, s), fill: "none", stroke: color,
+        "stroke-width": back === 0 ? 2 : 1.5, opacity: back === 0 ? 1 : FADE[back - 1] }));
+    }
+  });
+
+  const nx = s.x(issuedAt);
+  chart.append(svg("line", { x1: nx, x2: nx, y1: M.top, y2: H - M.bottom, stroke: "#333", "stroke-dasharray": "3 3" }));
+  // Near the right edge the label goes left of the line, so it stays inside the chart.
+  const right = nx > W - M.right - 140;
+  // At the bottom, so it never covers the peak label at the top.
+  chart.append(svg("text", { x: right ? nx - 4 : nx + 4, y: H - M.bottom - 6, "text-anchor": right ? "end" : "start",
+    "font-weight": "bold" }, "now: " + berlinShort.format(issuedAt)));
+
+  el("issue").textContent = berlin.format(issuedAt);
+  el("slider").value = step;
+  const missing = DATA.models.filter((m) => selected.has(m) && !event.forecasts[m][step]);
+  el("issue").textContent += missing.length ? " (no forecast: " + missing.join(", ") + ")" : "";
+}
+
+function setEvent(index) {
+  event = DATA.events[index];
+  step = 0;
+  el("slider").max = event.issues - 1;
+  el("event-info").textContent = "peak " + event.peak_cm + " cm at " + berlin.format(event.peak_at)
+    + ", pre-event " + event.pre_event_cm + " cm, ends " + berlin.format(event.end);
+  draw();
+}
+
+function go(to) { step = Math.max(0, Math.min(event.issues - 1, to)); draw(); }
+
+function setPlaying(playing) {
+  clearInterval(timer);
+  if (playing && step === event.issues - 1) go(0);
+  timer = playing ? setInterval(() => step < event.issues - 1 ? go(step + 1) : setPlaying(false), 400) : null;
+  el("play").textContent = playing ? "Pause" : "Play";
+  el("play").setAttribute("aria-label", playing ? "Pause" : "Play");
+}
+
+DATA.events.forEach((e, i) => {
+  el("event").append(new Option("Event " + e.number + " · " + berlinShort.format(e.peak_at) + " · " + e.peak_cm + " cm", i));
+});
+DATA.models.forEach((model, index) => {
+  const label = document.createElement("label");
+  const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: selected.has(model) });
+  box.addEventListener("change", () => { box.checked ? selected.add(model) : selected.delete(model); draw(); });
+  const swatch = Object.assign(document.createElement("span"), { className: "swatch" });
+  swatch.style.background = COLORS[index % COLORS.length];
+  label.append(box, swatch, model);
+  el("models").append(label);
+});
+el("event").addEventListener("change", (e) => { setPlaying(false); setEvent(Number(e.target.value)); });
+el("back").addEventListener("click", () => { setPlaying(false); go(step - 1); });
+el("forward").addEventListener("click", () => { setPlaying(false); go(step + 1); });
+el("play").addEventListener("click", () => setPlaying(timer === null));
+el("slider").addEventListener("input", (e) => { setPlaying(false); go(Number(e.target.value)); });
+document.addEventListener("keydown", (e) => {
+  // Leave the keys to checkboxes and the event menu, which need them.
+  if (e.target.tagName === "SELECT" || e.target.type === "checkbox") return;
+  // A focused button already toggles on Space by itself.
+  if (e.key === " " && e.target.tagName === "BUTTON") return;
+  if (e.key === " ") { e.preventDefault(); setPlaying(timer === null); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); setPlaying(false); go(step - 1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); setPlaying(false); go(step + 1); }
+});
+setEvent(0);
+</script>
+</body>
+</html>
