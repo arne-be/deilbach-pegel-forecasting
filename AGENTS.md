@@ -37,7 +37,6 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Flood forecasts scored per event and lead, and false alarms (`events.csv`, `peaks.csv`, `false_alarms.csv`): `src/pegel/evaluation/flood_scores.py`
 - Upstream model, model 4 of the ladder (`upstream`), fitted per lead on the change: `src/pegel/evaluation/models/simple.py`
 - Curated change models v2 `rain_change:v2:split` and `ridge:change:v2` (named physical inputs per lead, inner-split candidate list): `src/pegel/evaluation/models/curated.py`, `analysis/model-evaluation/models-v2-candidates.csv`
-- Rain response models `rain_response:v1:offset` and `rain_response:v1:ridge` (two-store unit hydrograph fitted on radar episodes, convolution in `core/features.py`): `src/pegel/evaluation/models/rain_response.py`
 - Learnings about models and evaluation, append-only: `analysis/model-evaluation/learnings.md`
 - Preliminary data analysis (target, gauges, radar, ICON-D2), append-only: `analysis/preliminary-data-analysis.md`
 - Run report and experiment log (`python -m pegel.evaluation.report <run dir>`, plots and one appended section per run): `src/pegel/evaluation/report.py`, `report_tables.py`, `report_plots.py`, `analysis/model-evaluation/`

@@ -43,19 +43,13 @@ def zone_cell_counts() -> dict[str, int]:
     return {area: len(indices) for area, indices in cells.items() if area != CATCHMENT_AREA}
 
 
-def catchment_radar(rows: pd.DataFrame, cell_counts: dict[str, int], end: int) -> Array:
-    """Shape (rows, end): catchment mean radar rain of lags 0 to `end - 1`."""
-    all_cells = sum(cell_counts.values())
-    mean = np.zeros((len(rows), end))
-    for zone, cells in cell_counts.items():
-        columns = contract.lag_columns(f"radar_{zone}", end)
-        mean += rows[columns].to_numpy(np.float64) * cells / all_cells
-    return mean
-
-
 def radar_sum(rows: pd.DataFrame, cell_counts: dict[str, int], first: int, end: int) -> Array:
     """Catchment mean radar rain summed over lags `first` to `end - 1`."""
-    total: Array = catchment_radar(rows, cell_counts, end)[:, first:].sum(axis=1)
+    all_cells = sum(cell_counts.values())
+    total = np.zeros(len(rows))
+    for zone, cells in cell_counts.items():
+        columns = contract.lag_columns(f"radar_{zone}", end)[first:]
+        total += rows[columns].to_numpy(np.float64).sum(axis=1) * cells / all_cells
     return total
 
 
@@ -207,13 +201,9 @@ class CuratedChange:
         rising = (kupferdreh > RISING_CM) | (langenberg > RISING_CM)
         return [rising, ~rising]
 
-    def offset(self, rows: pd.DataFrame) -> Array:
-        """Shape (rows, leads): a fixed part of the change, not fitted here; 0 for these models."""
-        return np.zeros((len(rows), self._leads))
-
     def fit(self, train: pd.DataFrame) -> None:
         inputs = self.inputs(train)
-        change = _targets(train, self._leads) - _last_level(train) - self.offset(train)
+        change = _targets(train, self._leads) - train[[contract.KD_LAST_CM]].to_numpy(np.float64)
         coefficient_sets = []
         for group in self.groups(train):
             per_lead = []
@@ -231,9 +221,9 @@ class CuratedChange:
 
     def predict(self, rows: pd.DataFrame) -> Array:
         inputs = self.inputs(rows)
-        change = self.offset(rows)
+        change = np.zeros((len(rows), self._leads))
         for group, per_lead in zip(self.groups(rows), self.coefficients, strict=True):
-            change[group] += np.einsum("rli,li->rl", inputs[group], per_lead)
+            change[group] = np.einsum("rli,li->rl", inputs[group], per_lead)
         # A missing input gives a NaN change: fall back to persistence.
         change[~np.isfinite(change)] = 0.0
         prediction: Array = _last_level(rows) + change
