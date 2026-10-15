@@ -8,6 +8,7 @@ from functools import partial
 from pegel.evaluation.harness import ModelFactory
 from pegel.evaluation.models.curated import RAIN_CHANGE_V2, RIDGE_V2, RIDGE_V2_ALPHA, CuratedChange
 from pegel.evaluation.models.persistence import Persistence
+from pegel.evaluation.models.residual import ResidualTrees
 from pegel.evaluation.models.simple import Upstream
 
 MODELS: list[ModelFactory] = [
@@ -17,4 +18,6 @@ MODELS: list[ModelFactory] = [
     partial(
         CuratedChange, name="ridge:change:v2", inputs=RIDGE_V2, split=True, alpha=RIDGE_V2_ALPHA
     ),
+    partial(ResidualTrees, name="lgbm_residual:v1"),
+    partial(ResidualTrees, name="lgbm_residual:v1:linear", linear_tree=True),
 ]
