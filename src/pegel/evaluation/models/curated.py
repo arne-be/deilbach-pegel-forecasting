@@ -236,16 +236,19 @@ class CuratedChange:
             raise ValueError(f"{self.name} is not fitted")
         return {
             "name": self.name,
-            "inputs": self._input_names,
+            "inputs": list(self._input_names),
             "split": self._split,
             "alpha": self._alpha,
             "leads": self._leads,
+            # The radar inputs weight each zone by its cells; other weights change their meaning.
+            "cell_counts": self._cell_counts,
             "coefficients": self.coefficients.tolist(),
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], settings: EvaluationSettings) -> "CuratedChange":
-        """The model saved by `to_dict`; refuses one built for other leads or of the wrong shape."""
+        """The model saved by `to_dict`; refuses one built for other leads, other radar zones,
+        or with coefficients of the wrong shape or not finite."""
         if data["leads"] != settings.leads_hours:
             raise ValueError(f"model has {data['leads']} leads, config {settings.leads_hours}")
         model = cls(
@@ -259,6 +262,11 @@ class CuratedChange:
         expected = (2 if model._split else 1, model._leads, len(model._input_names))
         if coefficients.shape != expected:
             raise ValueError(f"coefficients have shape {coefficients.shape}, expected {expected}")
+        # A NaN coefficient would silently turn every forecast into persistence.
+        if not np.isfinite(coefficients).all():
+            raise ValueError("coefficients are not all finite")
+        if data["cell_counts"] != model._cell_counts:
+            raise ValueError("radar zones differ from the ones the model was fitted with")
         model.coefficients = coefficients
         return model
 

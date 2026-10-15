@@ -177,3 +177,9 @@ def test_loading_refuses_unfitted_wrong_leads_or_wrong_shape() -> None:
         CuratedChange.from_dict(saved | {"leads": LEADS + 1}, SETTINGS)
     with pytest.raises(ValueError, match="shape"):
         CuratedChange.from_dict(saved | {"split": True}, SETTINGS)
+    not_finite = np.array(saved["coefficients"])
+    not_finite[0, 0, 0] = np.nan
+    with pytest.raises(ValueError, match="finite"):
+        CuratedChange.from_dict(saved | {"coefficients": not_finite.tolist()}, SETTINGS)
+    with pytest.raises(ValueError, match="radar zones"):
+        CuratedChange.from_dict(saved | {"cell_counts": {"zone": 1}}, SETTINGS)
