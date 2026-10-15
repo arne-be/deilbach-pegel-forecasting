@@ -139,8 +139,9 @@ def _summary_cell(rows: pd.DataFrame) -> str:
     if scored.empty:
         return "—"
     predicted = scored[scored["predicted"].astype(bool)]
-    # shortcut: an "at least" timing counts with its lower bound in the median.
-    timing = _timing(predicted["timing_hours"].median())
+    # An "at least" timing counts with its lower bound, so the median may be later: say so.
+    at_least = bool(predicted["timing_at_least"].astype(bool).any())
+    timing = _timing(predicted["timing_hours"].median(), at_least)
     return f"{len(predicted)} of {len(scored)} · {_percent(scored['size'].median())} · {timing}"
 
 
@@ -158,7 +159,10 @@ def flood_summary_table(peaks: pd.DataFrame, false_alarms: pd.DataFrame) -> pd.D
     per_month = (
         false_alarms.set_index("model")["per_month"] if not false_alarms.empty else pd.Series()
     )
-    columns["false alarms / month"] = [_number(per_month.get(model), 2) for model in models]
+    columns["false alarms / month"] = [
+        "—" if pd.isna(per_month.get(model)) else _number(per_month.get(model), 2)
+        for model in models
+    ]
     return pd.DataFrame(columns, index=pd.Index(models, name="model"))
 
 

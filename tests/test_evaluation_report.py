@@ -7,6 +7,7 @@ import pytest
 
 from pegel.evaluation import report, report_tables
 from pegel.evaluation.metrics import PERSISTENCE
+from pegel.evaluation.report_plots import forecast_peaks
 
 LEADS = 24
 START = pd.Timestamp("2024-10-01T00:30Z")
@@ -259,7 +260,7 @@ def test_flood_summary_table_counts_events_with_a_forecast_and_puts_persistence_
     assert table.loc["ridge", "6 h before"] == "2 of 3 · 82 % · \N{MINUS SIGN}1 h"
     assert table.loc["ridge", "24 h before"] == "0 of 2 · 10 % · —"
     assert table.loc[PERSISTENCE, "24 h before"] == "1 of 3 · 10 % · \N{MINUS SIGN}23 h"
-    assert list(table["false alarms / month"]) == ["-", "0.12"]
+    assert list(table["false alarms / month"]) == ["—", "0.12"]
 
 
 def test_flood_grid_table_marks_predicted_missing_and_at_least_timings() -> None:
@@ -300,3 +301,25 @@ def test_section_points_to_the_replay_only_when_it_exists() -> None:
     assert "`replay.html` in the run folder" in with_replay
     assert "<summary>Flood events: persistence</summary>" in with_replay
     assert "replay.html" not in report.section("x", _run_info(), tables, [])
+
+
+def test_forecast_peaks_take_the_first_tied_hour_and_skip_incomplete_forecasts() -> None:
+    peak_at = pd.Timestamp("2024-11-19T17:30Z")
+    issued = [peak_at - pd.Timedelta(hours=6), peak_at - pd.Timedelta(hours=3)]
+
+    def forecast(issued_at: pd.Timestamp, values: list[float]) -> pd.DataFrame:
+        return pd.DataFrame(
+            {"issued_at": issued_at, "lead": range(1, 5), "model": "m", "prediction": values}
+        )
+
+    predictions = pd.concat(
+        [
+            forecast(issued[0], [60.0, 90.0, 90.0, 70.0]),  # tie at leads 2 and 3: take lead 2
+            forecast(issued[1], [60.0, float("nan"), 95.0, 70.0]),  # a missing hour: left out
+        ],
+        ignore_index=True,
+    )
+
+    peaks = forecast_peaks(predictions, peak_at)
+
+    assert peaks[["issued_hours", "peak_cm", "timing_hours"]].values.tolist() == [[-6, 90, -4]]
