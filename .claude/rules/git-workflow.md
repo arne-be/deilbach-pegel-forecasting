@@ -15,6 +15,7 @@ description: Branching, commit message and pull request rules
 - Before starting work, check `git branch --show-current`. If it says `main`, stop and create a worktree.
 - One topic per branch and worktree. Keep branches short-lived.
 - Before opening or updating a PR, rebase onto the newest main: `git fetch origin && git rebase origin/main`.
+  - Exception: if the PR's docs point to a commit on its own branch (e.g. retired code kept only in history), merge `origin/main` into the branch instead. A rebase rewrites that commit's SHA and breaks the link; the squash merge flattens the merge commit anyway. Name the commit together with `git fetch origin pull/<n>/head`, which still works after the branch is deleted.
 - After the PR is merged, clean up (see below).
 
 ## Commit messages
