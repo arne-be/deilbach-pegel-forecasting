@@ -1,0 +1,73 @@
+candidate,round,definition,split,alpha,inner_mae_mean,inner_mae_1,inner_mae_6,inner_mae_24,inner_high_water_mae,folds_better_than_rain_change_split,inner_mae_F1,inner_mae_F2,inner_mae_F3,inner_mae_F4
+persistence,1,model from PR #68/#70/#72 as registered,,,3.296,0.876,2.426,4.555,8.171,0,4.618,3.608,2.005,2.954
+rain_change:split,1,model from PR #68/#70/#72 as registered,,,2.622,0.815,2.042,3.49,5.299,0,3.377,2.54,1.778,2.795
+rain_change,1,model from PR #68/#70/#72 as registered,,,2.677,0.809,2.075,3.607,5.504,0,3.398,2.631,1.854,2.825
+ridge:change,1,model from PR #68/#70/#72 as registered,,,2.653,0.773,2.005,3.565,5.429,1,3.489,2.593,1.683,2.846
+c00_v1_replica,1,rain_change inputs,False,0.0,2.677,0.809,2.075,3.607,5.504,0,3.398,2.631,1.854,2.825
+c01_+kd3h,1,rain_change inputs +kd_change_3h,False,0.0,2.665,0.83,2.077,3.62,5.435,0,3.414,2.605,1.832,2.808
+c02_+fast,1,rain_change inputs +recent_rise_8h,False,0.0,2.591,0.803,1.968,3.537,5.384,2,3.209,2.439,1.896,2.82
+c03_+hour,1,rain_change inputs +summer_hour_sin +summer_hour_cos,False,0.0,2.64,0.816,2.014,3.592,5.51,1,3.457,2.618,1.845,2.642
+c04_+icon6_24,1,rain_change inputs +icon_1_6 +icon_1_24,False,0.0,2.685,0.815,2.084,3.593,5.441,0,3.428,2.64,1.854,2.82
+c05_+icon_x_base,1,rain_change inputs +icon_x_to_base,False,0.0,2.678,0.805,2.045,3.667,5.507,0,3.408,2.651,1.816,2.838
+c06_upstream_to6,1,rain_change inputs -lb_change_3h -nh_change_3h +lb_change_3h_to_6 +nh_change_3h_to_6,False,0.0,2.704,0.809,2.075,3.65,5.539,0,3.433,2.648,1.872,2.865
+c07_radar_0_5_6_11,1,rain_change inputs -radar_0_2 -radar_3_11 +radar_0_5 +radar_6_11,False,0.0,2.681,0.812,2.088,3.605,5.538,0,3.403,2.65,1.853,2.82
+c08_+radar12_23,1,rain_change inputs +radar_12_23,False,0.0,2.648,0.805,2.049,3.575,5.5,2,3.355,2.602,1.844,2.791
+c09_all,1,rain_change inputs +kd_change_3h +recent_rise_8h +summer_hour_sin +summer_hour_cos +icon_1_6 +icon_1_24 +icon_x_to_base,False,0.0,2.595,0.85,1.92,3.61,5.48,3,3.333,2.534,1.888,2.627
+c10_all_split,1,rain_change inputs +kd_change_3h +recent_rise_8h +summer_hour_sin +summer_hour_cos +icon_1_6 +icon_1_24 +icon_x_to_base,True,0.0,2.536,0.871,1.927,3.472,5.377,4,3.297,2.511,1.773,2.561
+c11_v1_split_replica,1,rain_change inputs,True,0.0,2.614,0.809,2.045,3.468,5.293,4,3.365,2.538,1.761,2.791
+r2_v1+fast_after_peak1,2,rain_change inputs +recent_rise_8h_after_peak,False,0.0,2.653,0.804,2.042,3.59,5.482,1,3.328,2.584,1.875,2.827
+r2_v1+fast_after_peak2,2,rain_change inputs +recent_rise_8h_after_peak_2h,False,0.0,2.653,0.804,2.042,3.59,5.482,1,3.328,2.584,1.875,2.827
+r2_v1+fast_6,2,rain_change inputs +recent_rise_6h,False,0.0,2.603,0.805,1.978,3.559,5.365,2,3.259,2.462,1.877,2.816
+r2_v1+fast_12,2,rain_change inputs +recent_rise_12h,False,0.0,2.573,0.801,1.965,3.499,5.366,2,3.149,2.423,1.901,2.818
+r2_v1+fast_24,2,rain_change inputs +recent_rise_24h,False,0.0,2.566,0.8,1.982,3.47,5.279,2,3.137,2.44,1.879,2.808
+r2_v1+above_min_24h,2,rain_change inputs +above_min_24h,False,0.0,2.641,0.811,2.034,3.614,5.434,2,3.24,2.534,1.957,2.834
+r2_B+icon_x_last,2,rain_change inputs +recent_rise_8h +icon_to_lead_x_level,False,0.0,2.601,0.807,1.961,3.582,5.136,2,3.183,2.253,1.864,3.104
+r2_B+icon_hinge5,2,rain_change inputs +recent_rise_8h +icon_to_lead_above_5,False,0.0,2.585,0.802,1.964,3.526,5.357,3,3.296,2.427,1.871,2.745
+r2_B+icon_late3,2,rain_change inputs +recent_rise_8h +icon_late3,False,0.0,2.602,0.803,1.977,3.554,5.386,2,3.223,2.464,1.898,2.823
+r2_B+radar_x_base,2,rain_change inputs +recent_rise_8h +radar_x_base,False,0.0,2.578,0.806,1.96,3.513,5.384,2,3.224,2.421,1.857,2.811
+r2_B+kd_change_1h,2,rain_change inputs +recent_rise_8h +kd_change_1h,False,0.0,2.59,0.805,1.973,3.539,5.371,2,3.221,2.441,1.883,2.814
+r2_B+kd_change_6h,2,rain_change inputs +recent_rise_8h +kd_change_6h,False,0.0,2.61,0.814,1.987,3.539,5.406,2,3.295,2.452,1.889,2.803
+r2_B+kd_change_3h_to_3,2,rain_change inputs +recent_rise_8h +kd_change_3h_to_3,False,0.0,2.593,0.819,1.968,3.537,5.378,2,3.214,2.438,1.896,2.825
+r2_B+summer_hour_sin+summer_hour_cos,2,rain_change inputs +recent_rise_8h +summer_hour_sin +summer_hour_cos,False,0.0,2.562,0.814,1.926,3.523,5.39,3,3.274,2.423,1.892,2.659
+r2_B+summer_hour2_sin+summer_hour2_cos+summer_hour_sin+summer_hour_cos,2,rain_change inputs +recent_rise_8h +summer_hour2_sin +summer_hour2_cos +summer_hour_sin +summer_hour_cos,False,0.0,2.537,0.795,1.876,3.521,5.394,3,3.225,2.422,1.892,2.611
+r2_B+radarmax_0_2,2,rain_change inputs +recent_rise_8h +radarmax_0_2,False,0.0,2.594,0.803,1.976,3.534,5.391,2,3.221,2.437,1.898,2.821
+r2_B+radar_24_71,2,rain_change inputs +recent_rise_8h +radar_24_71,False,0.0,2.712,0.808,2.026,3.713,5.473,1,3.614,2.502,1.91,2.821
+r2_B+radar_12_23,2,rain_change inputs +recent_rise_8h +radar_12_23,False,0.0,2.591,0.803,1.961,3.56,5.388,2,3.213,2.437,1.898,2.817
+r2_B_sqrtbase,2,rain_change inputs -to_base +sqrt_to_base +recent_rise_8h,False,0.0,2.622,0.8,1.977,3.602,5.547,2,3.286,2.505,1.893,2.803
+r2_B_split,2,rain_change inputs +recent_rise_8h,True,0.0,2.545,0.803,1.958,3.404,5.217,3,3.226,2.404,1.796,2.753
+r2_B+hour_split,2,rain_change inputs +recent_rise_8h +summer_hour_sin +summer_hour_cos,True,0.0,2.504,0.81,1.908,3.402,5.232,3,3.249,2.378,1.788,2.603
+r2_B+hour+r12_split,2,rain_change inputs +recent_rise_8h +summer_hour_sin +summer_hour_cos +radar_12_23,True,0.0,2.496,0.808,1.897,3.432,5.221,3,3.255,2.365,1.784,2.582
+r3_v1+fast_36,3,rain_change inputs +recent_rise_36h,False,0.0,2.57,0.8,1.992,3.471,5.248,2,3.153,2.452,1.869,2.806
+r3_v1+fast_48,3,rain_change inputs +recent_rise_48h,False,0.0,2.573,0.801,1.998,3.475,5.238,2,3.166,2.458,1.865,2.805
+r3_v1+fast_inf,3,rain_change inputs +rise_24h_unfaded,False,0.0,2.589,0.803,2.018,3.496,5.235,2,3.213,2.478,1.857,2.807
+r3_v1+fast24+fast6,3,rain_change inputs +recent_rise_24h +recent_rise_6h,False,0.0,2.568,0.805,1.957,3.513,5.328,2,3.168,2.406,1.889,2.809
+r3_F+h1,3,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos,False,0.0,2.535,0.809,1.933,3.459,5.286,3,3.205,2.427,1.875,2.633
+r3_F+h2,3,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos,False,0.0,2.51,0.793,1.884,3.456,5.289,3,3.157,2.426,1.874,2.583
+r3_F+h2_split,3,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos,True,0.0,2.469,0.799,1.863,3.397,5.178,3,3.191,2.349,1.787,2.551
+r3_F+h1_split,3,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos,True,0.0,2.491,0.81,1.912,3.392,5.173,3,3.219,2.352,1.791,2.6
+r3_F_split,3,rain_change inputs +recent_rise_24h,True,0.0,2.536,0.801,1.966,3.393,5.172,3,3.206,2.375,1.801,2.76
+r3_F+h2+icon_x_last_split,3,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +icon_to_lead_x_level,True,0.0,2.507,0.801,1.879,3.485,5.085,2,3.196,2.234,1.799,2.799
+r3_F+h2+kd3h_split,3,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_3h,True,0.0,2.43,0.816,1.82,3.396,5.155,4,3.142,2.34,1.75,2.489
+r3_F+h2+hinge_split,3,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +icon_to_lead_above_5,True,0.0,2.452,0.8,1.874,3.339,5.137,4,3.256,2.333,1.739,2.482
+r3_F+h2+radar_x_base_split,3,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +radar_x_base,True,0.0,2.474,0.804,1.881,3.39,5.236,4,3.2,2.377,1.766,2.551
+r3_ridge_big_a0,3,rain_change inputs +kd_change_1h +kd_change_3h +kd_change_6h +recent_rise_6h +recent_rise_24h +above_min_24h +radar_0_5 +radar_6_11 +radar_12_23 +radar_24_71 +radarmax_0_2 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_late3 +icon_to_lead_x_level +radar_x_base +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos,False,0.0,2.554,0.843,1.903,3.633,5.09,2,3.525,2.252,1.804,2.634
+r3_ridge_big_agrid,3,rain_change inputs +kd_change_1h +kd_change_3h +kd_change_6h +recent_rise_6h +recent_rise_24h +above_min_24h +radar_0_5 +radar_6_11 +radar_12_23 +radar_24_71 +radarmax_0_2 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_late3 +icon_to_lead_x_level +radar_x_base +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos,False,0.1/1/10/100/1000,2.52,0.81,1.887,3.565,5.325,2,3.482,2.354,1.799,2.444
+r3_ridge_big_grid_split,3,rain_change inputs +kd_change_1h +kd_change_3h +kd_change_6h +recent_rise_6h +recent_rise_24h +above_min_24h +radar_0_5 +radar_6_11 +radar_12_23 +radar_24_71 +radarmax_0_2 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_late3 +icon_to_lead_x_level +radar_x_base +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos,True,0.1/1/10/100/1000,2.448,0.802,1.861,3.409,5.176,3,3.438,2.362,1.654,2.339
+r4_F+h2+kd3h+hinge_split (final rain_change:v2:split),4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_3h +icon_to_lead_above_5,True,0.0,2.41,0.817,1.828,3.336,5.116,4,3.204,2.321,1.697,2.416
+r4_F+h2+icon_x_base_split,4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +icon_x_to_base,True,0.0,2.493,0.798,1.887,3.468,5.291,3,3.212,2.423,1.784,2.552
+r4_F+h2+icon_x_last+hinge_split,4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +icon_to_lead_x_level +icon_to_lead_above_5,True,0.0,2.487,0.807,1.89,3.414,5.056,4,3.252,2.221,1.748,2.728
+r4_F+h2+icon1_24_split,4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +icon_1_24,True,0.0,2.475,0.799,1.861,3.397,5.136,4,3.205,2.346,1.778,2.571
+r4_F+h2_upstream_to6_split,4,rain_change inputs -lb_change_3h -nh_change_3h +lb_change_3h_to_6 +nh_change_3h_to_6 +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos,True,0.0,2.542,0.799,1.863,3.549,5.352,3,3.252,2.409,1.898,2.609
+r4_F+h2+kd3h_to3_split,4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_3h_to_3,True,0.0,2.469,0.816,1.863,3.397,5.176,3,3.191,2.35,1.789,2.545
+r4_ridge_med_a10_split,4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_1h +kd_change_3h +recent_rise_6h +radar_12_23 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_to_lead_x_level,True,10,2.452,0.83,1.844,3.449,4.959,4,3.235,2.235,1.703,2.634
+r4_ridge_med_a100_split (final ridge:change:v2),4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_1h +kd_change_3h +recent_rise_6h +radar_12_23 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_to_lead_x_level,True,100,2.406,0.815,1.823,3.371,4.905,4,3.195,2.238,1.659,2.53
+r4_ridge_med_a1000_split,4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_1h +kd_change_3h +recent_rise_6h +radar_12_23 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_to_lead_x_level,True,1000,2.362,0.776,1.802,3.273,5.11,4,3.161,2.314,1.639,2.333
+r4_ridge_med_grid_split,4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_1h +kd_change_3h +recent_rise_6h +radar_12_23 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_to_lead_x_level,True,1/10/100/1000,2.387,0.795,1.818,3.32,5.141,4,3.195,2.314,1.703,2.333
+r4_ridge_med_a100,4,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_1h +kd_change_3h +recent_rise_6h +radar_12_23 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_to_lead_x_level,False,100,2.462,0.819,1.83,3.514,4.99,3,3.184,2.2,1.796,2.67
+r5_R_sqrtbase_split,5,rain_change inputs -to_base +sqrt_to_base +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_3h +icon_to_lead_above_5,True,0.0,2.424,0.814,1.833,3.377,5.157,4,3.262,2.361,1.682,2.392
+r5_R+sqrtbase_split,5,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_3h +icon_to_lead_above_5 +sqrt_to_base,True,0.0,2.441,0.812,1.827,3.413,5.147,4,3.288,2.362,1.702,2.41
+r5_R_h1_split,5,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +kd_change_3h +icon_to_lead_above_5,True,0.0,2.432,0.841,1.869,3.331,5.115,4,3.238,2.324,1.699,2.466
+r5_ridge_med_noxlast_a100_split,5,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_1h +kd_change_3h +recent_rise_6h +radar_12_23 +icon_1_6 +icon_1_24 +icon_to_lead_above_5,True,100,2.385,0.813,1.81,3.324,5.04,4,3.175,2.314,1.667,2.386
+r5_ridge_med_sqrt_a100_split,5,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_1h +kd_change_3h +recent_rise_6h +radar_12_23 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_to_lead_x_level +sqrt_to_base,True,100,2.418,0.81,1.823,3.408,4.906,4,3.247,2.247,1.654,2.523
+r5_ridge_med+upstream_to6_a100_split,5,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_1h +kd_change_3h +recent_rise_6h +radar_12_23 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_to_lead_x_level +lb_change_3h_to_6 +nh_change_3h_to_6,True,100,2.406,0.816,1.822,3.371,4.907,4,3.195,2.238,1.66,2.529
+r5_ridge_med_a300_split,5,rain_change inputs +recent_rise_24h +summer_hour_sin +summer_hour_cos +summer_hour2_sin +summer_hour2_cos +kd_change_1h +kd_change_3h +recent_rise_6h +radar_12_23 +icon_1_6 +icon_1_24 +icon_to_lead_above_5 +icon_to_lead_x_level,True,300,2.375,0.797,1.808,3.309,4.941,4,3.165,2.259,1.643,2.434
