@@ -73,6 +73,6 @@ From run [2026-10-15-lightgbm-residual](experiments.md#2026-10-15-lightgbm-resid
 
 - **Trees on the ridge residual don't beat ridge.** Plain and `linear_tree` variants lose over all issue times in 2 and 3 of 4 folds, by up to 0.13 cm (F1). Ridge seems to take what these inputs hold; the rest looks like noise and ICON-D2 error.
 - **The trees mostly learned season.** Season sine and cosine carry a third of the gain. With 8 to 20 months of training, each season is seen once or twice, so the correction is drift of those months, not a rule. F1 (trained Feb to Sep, tested Oct to Dec) loses most.
-- **The residual correction is safe for floods.** Flood size and false alarms did not change, and the high-water bias at +24 h shrank from −3.8 to −3.2 cm. The cap on the trees did what was hoped: it limited only the correction.
+- **The residual correction is safe for floods.** Flood size held and false alarms stayed below 0.25 per month (4 and 3 against ridge's 3), and the high-water bias at +24 h shrank from −3.8 to −3.2 cm. The cap on the trees did what was hoped: it limited only the correction.
 - **In-sample ridge residuals are too small to train on.** They were 8 to 33 % below out-of-fold ones on the inner splits, more at high water and long leads. Any model stacked on ridge needs out-of-fold residuals.
 - **The inner split wanted almost no boosting:** 10 rounds at a learning rate of 0.05. That alone says the residual holds little a tree can use with these inputs.

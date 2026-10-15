@@ -85,9 +85,9 @@ change_k = c0 + c1·(last − base_30d)
 Step 6 of the ladder, in a form that keeps ridge's flood size: `ridge:change:v2` makes the forecast, and one LightGBM booster per lead adds a correction fitted on its residual. Ridge is linear and extrapolates; a tree can't go past the residuals it trained on, so its cap limits only the correction. Numbers from run [2026-10-15-lightgbm-residual](../analysis/model-evaluation/experiments.md#2026-10-15-lightgbm-residual).
 
 - **Inputs:** the `ridge:change:v2` inputs without the constant, plus the last level and sine and cosine of the issue hour and of the day of the year.
-- **Out-of-fold residuals.** The training rows are cut into 3 time blocks; each block's residual comes from ridge fitted on the other two. Ridge's residuals on its own training rows were 8 to 33 % smaller on the inner splits, so trees fitted on them would correct too little. The final ridge is fitted on all training rows.
+- **Out-of-fold residuals.** The training rows are cut into 3 time blocks; each block's residual comes from ridge fitted on the other two, without the 24 hours before the block, whose targets fall inside it. Ridge's residuals on its own training rows were 8 to 33 % smaller on the inner splits, so trees fitted on them would correct too little. The final ridge is fitted on all training rows.
 - **Settings:** learning rate 0.05, 15 leaves, depth 4, L2 penalty 10, 80 % of the inputs per tree, seeded and deterministic. 10 rounds and `min_data_in_leaf` 200 were chosen on the inner splits; more rounds made them worse. `lgbm_residual:v1:linear` fits a linear model in each leaf (`linear_tree`).
-- **Ruled out.** Over all issue times both lose to `ridge:change:v2` in 2 (plain) and 3 (linear) of 4 folds. Flood size and false alarms stay the same, and the high-water bias at +24 h shrinks from −3.8 to −3.2 cm. The trees mostly learned season, which 8 to 20 months of training can't support.
+- **Ruled out.** Over all issue times both lose to `ridge:change:v2` in 2 (plain) and 3 (linear) of 4 folds. Flood size holds, false alarms are 4 (plain) and 3 (linear) against 3, and the high-water bias at +24 h shrinks from −3.8 to −3.2 cm. The trees mostly learned season, which 8 to 20 months of training can't support.
 
 ## Known weaknesses of the current best
 
