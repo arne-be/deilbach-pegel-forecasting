@@ -14,6 +14,7 @@ persistence. Explained in docs/models.md.
 """
 
 from collections.abc import Callable, Sequence
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -228,6 +229,38 @@ class CuratedChange:
         change[~np.isfinite(change)] = 0.0
         prediction: Array = _last_level(rows) + change
         return prediction
+
+    def to_dict(self) -> dict[str, Any]:
+        """The fitted model as plain JSON values, so a stored model can't run code when loaded."""
+        if self.coefficients.size == 0:
+            raise ValueError(f"{self.name} is not fitted")
+        return {
+            "name": self.name,
+            "inputs": self._input_names,
+            "split": self._split,
+            "alpha": self._alpha,
+            "leads": self._leads,
+            "coefficients": self.coefficients.tolist(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any], settings: EvaluationSettings) -> "CuratedChange":
+        """The model saved by `to_dict`; refuses one built for other leads or of the wrong shape."""
+        if data["leads"] != settings.leads_hours:
+            raise ValueError(f"model has {data['leads']} leads, config {settings.leads_hours}")
+        model = cls(
+            settings,
+            name=data["name"],
+            inputs=data["inputs"],
+            split=data["split"],
+            alpha=data["alpha"],
+        )
+        coefficients = np.array(data["coefficients"], dtype=np.float64)
+        expected = (2 if model._split else 1, model._leads, len(model._input_names))
+        if coefficients.shape != expected:
+            raise ValueError(f"coefficients have shape {coefficients.shape}, expected {expected}")
+        model.coefficients = coefficients
+        return model
 
 
 def ridge_solve(inputs: Array, target: Array, alpha: float) -> Array:

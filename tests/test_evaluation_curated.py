@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -148,3 +150,30 @@ def test_zone_counts_come_from_the_cells_file_without_the_catchment() -> None:
     counts = zone_cell_counts()
     assert "catchment" not in counts
     assert set(counts) == {"neviges", "upper_deilbach", "felderbach", "middle", "lower"}
+
+
+def test_saved_model_loads_and_predicts_the_same() -> None:
+    model = _model(RIDGE_V2, split=True, alpha=100.0)
+    rows = _training_rows("2024-06-01T00:30Z", 600)
+    rows = _with_targets(rows, model, np.random.default_rng(1).normal(size=len(RIDGE_V2)))
+    model.fit(rows)
+    saved = json.loads(json.dumps(model.to_dict()))
+    loaded = CuratedChange.from_dict(saved, SETTINGS)
+    np.testing.assert_array_equal(loaded.predict(rows), model.predict(rows))
+    assert loaded.name == model.name
+
+
+def test_loading_refuses_unfitted_wrong_leads_or_wrong_shape() -> None:
+    with pytest.raises(ValueError, match="not fitted"):
+        _model().to_dict()
+    model = _model()
+    model.fit(
+        _with_targets(
+            _training_rows("2024-02-01T00:30Z", 100), model, np.zeros(len(RAIN_CHANGE_V2))
+        )
+    )
+    saved = model.to_dict()
+    with pytest.raises(ValueError, match="leads"):
+        CuratedChange.from_dict(saved | {"leads": LEADS + 1}, SETTINGS)
+    with pytest.raises(ValueError, match="shape"):
+        CuratedChange.from_dict(saved | {"split": True}, SETTINGS)
