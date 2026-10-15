@@ -7,7 +7,7 @@
 <style>
   body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; color: #222; background: #fff; }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
-  #models label { margin-right: 12px; white-space: nowrap; }
+  #models label, #leads label { margin-right: 12px; white-space: nowrap; }
   .swatch { display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 4px; }
   h2 { font-size: 14px; margin: 12px 0 2px; }
   canvas { display: block; width: 100%; touch-action: none; }
@@ -23,8 +23,9 @@
 </style>
 </head>
 <body>
-<h1>Lead timeline: 3 h vs 24 h ahead</h1>
+<h1>Lead timeline: forecasts 3 to 24 h ahead</h1>
 <div id="models" class="controls" role="group" aria-label="Models"></div>
+<div id="leads" class="controls" role="group" aria-label="Leads shown">Leads shown:</div>
 <div class="controls">
   <button type="button" id="zoom-in">Zoom in</button>
   <button type="button" id="zoom-out">Zoom out</button>
@@ -32,14 +33,11 @@
   <button type="button" id="right" aria-label="Pan right">&rarr;</button>
   <button type="button" id="reset">Reset</button>
   <label>Jump to <select id="event"><option value="">event &hellip;</option></select></label>
-  <label><input type="checkbox" id="same-y"> same y axis in both panels</label>
+  <label><input type="checkbox" id="same-y"> same y axis in all panels</label>
   <span id="range" aria-live="polite"></span>
 </div>
 <canvas id="overview" role="img" aria-label="Overview of the observed level; click or drag to move the view"></canvas>
-<h2 id="title-0"></h2>
-<canvas id="panel-0" class="panel" role="img"></canvas>
-<h2 id="title-1"></h2>
-<canvas id="panel-1" class="panel" role="img"></canvas>
+<div id="panels"></div>
 <div id="tip"></div>
 <p class="help">Times in Europe/Berlin. Each forecast is drawn at its target time, so a model that
 only follows the observed level shows up shifted right by the lead. Mouse wheel zooms, drag pans.
@@ -70,6 +68,8 @@ const CAL = Array.from({ length: N }, (_, i) => {
 });
 
 const selected = new Set([DATA.default_model]);
+const shown = new Set(DATA.shown_leads);
+const shownLeads = () => DATA.leads.filter((lead) => shown.has(lead));
 let view = [T0, T1], hoverIndex = null, frame = 0;
 
 function setView(a, b) {
@@ -202,13 +202,12 @@ function drawOverview() {
 }
 
 function drawAll() {
-  const ranges = DATA.leads.map((lead) => yRange([lead]));
-  if (el("same-y").checked) {
-    const both = yRange(DATA.leads);
-    ranges.fill(both);
-  }
+  const leads = shownLeads(), all = el("same-y").checked ? yRange(leads) : null;
   const ticks = timeTicks();
-  DATA.leads.forEach((lead, i) => drawPanel(i, String(lead), ranges[i], ticks));
+  DATA.leads.forEach((lead, i) => {
+    el("section-" + i).hidden = !shown.has(lead);
+    if (shown.has(lead)) drawPanel(i, String(lead), all ?? yRange([lead]), ticks);
+  });
   drawOverview();
   el("range").textContent = berlinDate.format(view[0]) + " – " + berlinDate.format(view[1]);
 }
@@ -218,7 +217,7 @@ function showTip(event) {
   if (hoverIndex === null) { el("tip").style.display = "none"; return; }
   const rows = [`<b>${berlinLong.format(T0 + hoverIndex * HOUR)}</b>`, "<table>",
     `<tr><td><span class="swatch" style="background:#000"></span>observed</td><td>${fmt(DATA.observed[hoverIndex])}</td></tr>`];
-  for (const lead of DATA.leads) {
+  for (const lead of shownLeads()) {
     rows.push(`<tr><th colspan="2">${lead} h ahead</th></tr>`);
     for (const model of DATA.models) if (selected.has(model)) {
       rows.push(`<tr><td><span class="swatch" style="background:${colorOf(model)}"></span>${escapeHtml(model)}</td>`
@@ -240,9 +239,19 @@ function timeAt(canvas, clientX) {
 }
 
 let drag = null;
-for (const i of [0, 1]) {
-  const canvas = el("panel-" + i);
-  el("title-" + i).textContent = DATA.leads[i] + " h ahead: forecasts made " + DATA.leads[i] + " hours before each time";
+DATA.leads.forEach((lead, i) => {
+  const section = Object.assign(document.createElement("section"), { id: "section-" + i });
+  const title = document.createElement("h2");
+  title.textContent = lead + " h ahead: forecasts made " + lead + " hours before each time";
+  const canvas = Object.assign(document.createElement("canvas"), { id: "panel-" + i, className: "panel" });
+  canvas.setAttribute("role", "img");
+  section.append(title, canvas);
+  el("panels").append(section);
+  const label = document.createElement("label");
+  const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: shown.has(lead) });
+  box.addEventListener("change", () => { box.checked ? shown.add(lead) : shown.delete(lead); schedule(); });
+  label.append(box, " " + lead + " h");
+  el("leads").append(label);
   canvas.addEventListener("wheel", (e) => { e.preventDefault(); if (!e.deltaY) return; zoom(e.deltaY > 0 ? 1.25 : 0.8, timeAt(canvas, e.clientX)); }, { passive: false });
   canvas.addEventListener("pointerdown", (e) => {
     drag = { x: e.clientX, view: view.slice(), width: canvas.getBoundingClientRect().width - M.left - M.right };
@@ -262,7 +271,7 @@ for (const i of [0, 1]) {
   canvas.addEventListener("pointerup", end);
   canvas.addEventListener("pointercancel", end);
   canvas.addEventListener("pointerleave", () => { if (!drag) { hoverIndex = null; el("tip").style.display = "none"; schedule(); } });
-}
+});
 const overview = el("overview");
 function jumpTo(e) {
   const r = overview.getBoundingClientRect(), center = T0 + (e.clientX - r.left) / r.width * (T1 - T0);

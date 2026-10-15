@@ -9,6 +9,7 @@ from eval_factory import eval_dataset
 
 from pegel.config import load_config
 from pegel.evaluation import contract
+from pegel.evaluation.timeline import LEADS as TIMELINE_LEADS
 from pegel.evaluation.timeline import LONG_LEAD_HOURS, SHORT_LEAD_HOURS, main, render, timeline_data
 
 # Two days before the first test fold (F1 starts 2024-10-01), so the first event is in training.
@@ -64,7 +65,9 @@ def test_timeline_data_puts_each_forecast_at_its_target_time() -> None:
     data = timeline_data(predictions, _dataset(_observed()), LEADS, high_water_cm=75)
 
     assert data["models"] == ["persistence", "upstream"]
-    assert data["leads"] == [SHORT_LEAD_HOURS, LONG_LEAD_HOURS]
+    assert data["leads"] == list(TIMELINE_LEADS)
+    assert data["shown_leads"] == [SHORT_LEAD_HOURS, LONG_LEAD_HOURS]
+    assert set(data["forecasts"]) == {str(lead) for lead in TIMELINE_LEADS}
     first_target = issued[0] + pd.Timedelta(hours=SHORT_LEAD_HOURS)
     assert data["start"] == first_target.value // 1_000_000
     length = len(issued) - 1 + LONG_LEAD_HOURS - SHORT_LEAD_HOURS + 1

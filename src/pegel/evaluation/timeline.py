@@ -2,11 +2,12 @@
 
     uv run --group analysis python -m pegel.evaluation.timeline <run dir> <eval.parquet>
 
-Reads `<run dir>/predictions.parquet`, writes `<run dir>/timeline.html`. Two panels over the
-whole test period: the observed level and every model's forecast made SHORT_LEAD_HOURS
-(top) and LONG_LEAD_HOURS (bottom) earlier, plotted at the target time, with fold boundaries,
-flood events and the high water line. Times are epoch milliseconds (UTC) in the data; the page
-shows them in Europe/Berlin. Analysis only: reads Parquet (pyarrow, `analysis` group).
+Reads `<run dir>/predictions.parquet`, writes `<run dir>/timeline.html`. One panel per lead in
+LEADS over the whole test period: the observed level and every model's forecast made that many
+hours earlier, plotted at the target time, with fold boundaries, flood events and the high water
+line. SHORT_LEAD_HOURS and LONG_LEAD_HOURS are shown at first; the others can be switched on.
+Times are epoch milliseconds (UTC) in the data; the page shows them in Europe/Berlin.
+Analysis only: reads Parquet (pyarrow, `analysis` group).
 """
 
 import argparse
@@ -26,7 +27,8 @@ TEMPLATE = Path(__file__).with_name("timeline.html")
 DATA_MARKER = "/*TIMELINE_DATA*/"
 SHORT_LEAD_HOURS = 3
 LONG_LEAD_HOURS = 24
-LEADS = (SHORT_LEAD_HOURS, LONG_LEAD_HOURS)
+LEADS = (SHORT_LEAD_HOURS, 6, 12, LONG_LEAD_HOURS)
+SHOWN_LEADS = (SHORT_LEAD_HOURS, LONG_LEAD_HOURS)
 
 _HOUR = pd.Timedelta(hours=1)
 
@@ -53,6 +55,7 @@ def timeline_data(
         "start": milliseconds(grid[0]),
         "high_water_cm": high_water_cm,
         "leads": list(LEADS),
+        "shown_leads": list(SHOWN_LEADS),
         "default_model": PERSISTENCE,
         "models": models,
         "observed": rounded(observed.reindex(grid).to_numpy(dtype=float)),
