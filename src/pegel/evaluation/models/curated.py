@@ -19,10 +19,11 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from pegel.config import EvaluationSettings
+from pegel.adapters.sources.radolan import load_cells
+from pegel.config import EvaluationSettings, config_file, load_config
 from pegel.core import features
+from pegel.core.radar import CATCHMENT_AREA
 from pegel.evaluation import contract
-from pegel.evaluation.models.rain_change import radar_sum, zone_cell_counts
 
 Array = npt.NDArray[np.float64]
 Mask = npt.NDArray[np.bool_]
@@ -34,6 +35,22 @@ RISING_CM = 0.5
 RISE_HOURS_SLOW = 24.0
 RISE_HOURS_FAST = 6.0
 ICON_HINGE_MM = 5.0
+
+
+def zone_cell_counts() -> dict[str, int]:
+    """Radar cells per zone of the cells file; `catchment` is all of them, not a zone."""
+    cells = load_cells(config_file(load_config().rain.radar.cells_file))
+    return {area: len(indices) for area, indices in cells.items() if area != CATCHMENT_AREA}
+
+
+def radar_sum(rows: pd.DataFrame, cell_counts: dict[str, int], first: int, end: int) -> Array:
+    """Catchment mean radar rain summed over lags `first` to `end - 1`."""
+    all_cells = sum(cell_counts.values())
+    total = np.zeros(len(rows))
+    for zone, cells in cell_counts.items():
+        columns = contract.lag_columns(f"radar_{zone}", end)[first:]
+        total += rows[columns].to_numpy(np.float64).sum(axis=1) * cells / all_cells
+    return total
 
 
 def _same_for_all_leads(values: Array, leads: int) -> Array:

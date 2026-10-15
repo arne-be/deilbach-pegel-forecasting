@@ -11,7 +11,9 @@ from pegel.evaluation.models.curated import (
     RAIN_CHANGE_V2,
     RIDGE_V2,
     CuratedChange,
+    radar_sum,
     ridge_solve,
+    zone_cell_counts,
 )
 from pegel.evaluation.models.persistence import Persistence
 from pegel.evaluation.predict import selected_models
@@ -125,3 +127,24 @@ def test_missing_kupferdreh_lags_and_upstream_still_give_a_forecast() -> None:
     forecast = model.predict(rows)
     assert np.isfinite(forecast).all()
     assert not np.array_equal(forecast, Persistence(SETTINGS).predict(rows))
+
+
+def test_radar_is_the_cell_weighted_mean_of_the_zones() -> None:
+    counts = {"neviges": 1, "lower": 3}
+    rows = pd.DataFrame(
+        {
+            **{f"radar_neviges_lag_{k}": [4.0] for k in range(12)},
+            **{f"radar_lower_lag_{k}": [0.0] for k in range(12)},
+        }
+    )
+    rows["radar_lower_lag_1"] = 8.0
+    # Lags 0..2: neviges 3 x 4 mm with weight 1/4, lower 8 mm with weight 3/4.
+    assert radar_sum(rows, counts, 0, 3) == pytest.approx([3.0 + 6.0])
+    # Lags 3..11: only neviges, 9 x 4 mm with weight 1/4.
+    assert radar_sum(rows, counts, 3, 12) == pytest.approx([9.0])
+
+
+def test_zone_counts_come_from_the_cells_file_without_the_catchment() -> None:
+    counts = zone_cell_counts()
+    assert "catchment" not in counts
+    assert set(counts) == {"neviges", "upper_deilbach", "felderbach", "middle", "lower"}
