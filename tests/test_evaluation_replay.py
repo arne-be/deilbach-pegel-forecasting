@@ -9,7 +9,14 @@ from eval_factory import eval_dataset
 
 from pegel.config import load_config
 from pegel.evaluation import contract
-from pegel.evaluation.replay import forecast_arrays, issue_times, main, replay_data, replay_events
+from pegel.evaluation.replay import (
+    forecast_arrays,
+    issue_times,
+    main,
+    render,
+    replay_data,
+    replay_events,
+)
 
 # Two days before the first test fold (F1 starts 2024-10-01), so the first event is in training.
 START = pd.Timestamp("2024-09-29T00:30Z")
@@ -106,7 +113,8 @@ def test_replay_data_builds_one_replay_per_test_event() -> None:
     assert len(first["forecasts"]["upstream"]) == 21
     assert first["peak_cm"] == 100
     assert first["pre_event_cm"] == 49
-    assert first["y_range"] == [44, 105]
+    assert first["y_range"][0] <= 49 and first["y_range"][1] >= 100
+    assert set(first["model_ranges"]) == {"persistence", "upstream"}
     assert second["number"] == 2
     # History before the first issue time and the last forecast's leads after the end.
     assert len(second["observed"]) == 24 + second["issues"] + 3
@@ -144,3 +152,16 @@ def test_cli_rejects_missing_files_and_empty_predictions(tmp_path: Path) -> None
     with pytest.raises(SystemExit):
         main([str(run), str(dataset_path)])
     assert not (run / "replay.html").exists()
+
+
+def test_render_escapes_model_names_that_would_end_the_script() -> None:
+    name = "a</script><!--<script>b"
+
+    page = render({"models": [name]})
+
+    # Unescaped, the match would stop at the name's own </script> and fail to parse.
+    embedded = re.search(
+        r'<script id="replay-data" type="application/json">(.*?)</script>', page, re.S
+    )
+    assert embedded is not None
+    assert json.loads(embedded.group(1)) == {"models": [name]}

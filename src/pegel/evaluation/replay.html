@@ -63,7 +63,11 @@ function svg(tag, attrs, text) {
 function scales() {
   const x0 = event.observed_from;
   const x1 = event.observed_from + (event.observed.length - 1) * HOUR;
-  const [y0, y1] = event.y_range;
+  let [y0, y1] = event.y_range;
+  for (const model of selected) {
+    const range = event.model_ranges[model];
+    if (range) { y0 = Math.min(y0, range[0]); y1 = Math.max(y1, range[1]); }
+  }
   return {
     x: (t) => M.left + (t - x0) / (x1 - x0) * (W - M.left - M.right),
     y: (v) => H - M.bottom - (v - y0) / (y1 - y0) * (H - M.top - M.bottom),
@@ -157,6 +161,7 @@ function go(to) { step = Math.max(0, Math.min(event.issues - 1, to)); draw(); }
 
 function setPlaying(playing) {
   clearInterval(timer);
+  if (playing && step === event.issues - 1) go(0);
   timer = playing ? setInterval(() => step < event.issues - 1 ? go(step + 1) : setPlaying(false), 400) : null;
   el("play").textContent = playing ? "Pause" : "Play";
   el("play").setAttribute("aria-label", playing ? "Pause" : "Play");
@@ -182,6 +187,8 @@ el("slider").addEventListener("input", (e) => { setPlaying(false); go(Number(e.t
 document.addEventListener("keydown", (e) => {
   // Leave the keys to checkboxes and the event menu, which need them.
   if (e.target.tagName === "SELECT" || e.target.type === "checkbox") return;
+  // A focused button already toggles on Space by itself.
+  if (e.key === " " && e.target.tagName === "BUTTON") return;
   if (e.key === " ") { e.preventDefault(); setPlaying(timer === null); }
   else if (e.key === "ArrowLeft") { e.preventDefault(); setPlaying(false); go(step - 1); }
   else if (e.key === "ArrowRight") { e.preventDefault(); setPlaying(false); go(step + 1); }

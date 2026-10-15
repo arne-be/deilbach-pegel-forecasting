@@ -121,19 +121,18 @@ def replay_data(
                 "observed_from": _milliseconds(window.index[0]),
                 "observed": observed_values,
                 "forecasts": forecasts,
-                "y_range": _y_range(
-                    [
-                        high_water_cm,
-                        *observed_values,
-                        *(
-                            value
-                            for per_issue in forecasts.values()
-                            for forecast in per_issue
-                            if forecast is not None
-                            for value in forecast
-                        ),
-                    ]
-                ),
+                "y_range": _y_range([high_water_cm, *observed_values]),
+                # Per model, so the page sizes the axis to the models shown, not to all of them.
+                "model_ranges": {
+                    model: _y_range(
+                        value
+                        for forecast in per_issue
+                        if forecast is not None
+                        for value in forecast
+                    )
+                    for model, per_issue in forecasts.items()
+                    if any(forecast is not None for forecast in per_issue)
+                },
             }
         )
     return {
@@ -146,8 +145,8 @@ def replay_data(
 
 
 def render(data: dict[str, Any]) -> str:
-    """The template with the data embedded; `</` escaped so the JSON can't close the script."""
-    payload = json.dumps(data, allow_nan=False, separators=(",", ":")).replace("</", "<\\/")
+    """The template with the data embedded; every `<` escaped so the JSON can't end the script."""
+    payload = json.dumps(data, allow_nan=False, separators=(",", ":")).replace("<", "\\u003c")
     return TEMPLATE.read_text().replace(DATA_MARKER, payload)
 
 
