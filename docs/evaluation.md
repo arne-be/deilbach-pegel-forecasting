@@ -192,7 +192,12 @@ Without a counterweight, a model that forecasts a flood all the time would alway
 ### Plots
 
 - **Forecast replay**, one interactive HTML page per run. Pick an event and a set of models. The page steps through the issue times from 24 hours before the peak to the end of the event, with play, pause, a step of one hour back or forward, and a slider. It shows the observed level, solid up to the issue time and light after it, a vertical line at the issue time, each model's 24-hour forecast with the last few forecasts fading behind it, and the 75 cm line, the pre-event level and the peak.
-- **Peak track**, one static image per event for the experiment log. Top: each model's forecast peak height against its issue time, with the observed peak as a line. Bottom: each model's forecast peak time against its issue time. It shows when each model saw the flood and whether it held on to it.
+- **Three static plots per run** in the experiment log. Each answers one question and says the answer in its title, computed from the run. They show persistence in grey and the two best models by the [selection rule](#selection) that beat it; the tables show all models.
+  1. **How fast does the forecast get worse?** Average error (MAE) per hour ahead, all issue times and high water side by side on one scale.
+  2. **Does it see the floods coming?** Events predicted per lead before the peak, the earliest lead on the left.
+  3. **How much of each flood did it see?** One row per event: the size of each model's forecast issued 12 hours before the peak, with the 50 % bar (predicted) and 100 % (right height).
+
+  How each event unfolds hour by hour is the replay's job, so there is no static plot per event.
 
 Flood forecasts are reported, not used to select models yet.
 
