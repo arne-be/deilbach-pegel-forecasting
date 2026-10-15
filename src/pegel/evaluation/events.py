@@ -1,4 +1,4 @@
-"""Flood events, alarms, warning lead times and the lag check (docs/decisions/0008).
+"""Flood events, alarms and the lag check (docs/decisions/0008).
 
 Times are target times: an issue time plus the lead in whole hours, so every forecast and the
 observed level share one hourly grid on hh:30. The observed level is the cleaned target series
@@ -164,41 +164,6 @@ def alarms(
                     }
                 )
     return pd.DataFrame(rows)
-
-
-def warning_lead_times(
-    predictions: pd.DataFrame, observed: pd.Series, thresholds_cm: Sequence[float]
-) -> pd.DataFrame:
-    """For each observed crossing and model, the first forecast that showed it.
-
-    A crossing is the start of an observed episode above the threshold. A forecast shows it
-    when it was issued before the crossing and any of its values is above the threshold, so a
-    forecast that has the rise a few hours early or late still counts as a warning.
-    The first such forecast counts even if later forecasts drop the crossing again.
-    `warning_hours` is NaN when no forecast showed the crossing. Crossings without any forecast
-    issued in the hours before them are left out.
-    """
-    longest = pd.Timedelta(hours=int(predictions["lead"].max()))
-    rows: list[dict[str, object]] = []
-    for threshold in thresholds_cm:
-        for crossing_at in episodes(observed, threshold)["start"]:
-            issued_at = predictions[contract.ISSUED_AT]
-            before = predictions[(issued_at < crossing_at) & (issued_at >= crossing_at - longest)]
-            for model, forecasts in before.groupby("model"):
-                showing = forecasts.loc[forecasts["prediction"] > threshold, contract.ISSUED_AT]
-                first = showing.min() if not showing.empty else pd.NaT
-                rows.append(
-                    {
-                        "model": model,
-                        "threshold_cm": threshold,
-                        "crossing_at": crossing_at,
-                        "first_warning_at": first,
-                        "warning_hours": (crossing_at - first) / _HOUR,
-                    }
-                )
-    return pd.DataFrame(
-        rows, columns=["model", "threshold_cm", "crossing_at", "first_warning_at", "warning_hours"]
-    )
 
 
 def lag_check(

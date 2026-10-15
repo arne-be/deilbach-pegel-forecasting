@@ -26,7 +26,6 @@ CSV_TABLES = (
     "events",
     "peaks",
     "alarms",
-    "warnings",
     "crossings",
     "false_alarms",
     "lag",
@@ -64,9 +63,7 @@ def _table_details(summary: str, text: str, table: pd.DataFrame) -> list[str]:
 
 
 def _warning_details(tables: dict[str, pd.DataFrame]) -> list[str]:
-    crossings, false_alarms, warnings = (
-        tables.get(name, EMPTY) for name in ("crossings", "false_alarms", "warnings")
-    )
+    crossings, false_alarms = (tables.get(name, EMPTY) for name in ("crossings", "false_alarms"))
     body: list[str] = []
     if not crossings.empty:
         body += [
@@ -84,18 +81,10 @@ def _warning_details(tables: dict[str, pd.DataFrame]) -> list[str]:
             report_tables.markdown_table(report_tables.false_alarm_table(false_alarms)),
             "",
         ]
-    if not warnings.empty:
-        body += [
-            "Old rule (`warnings.csv`): every crossing and the first forecast that showed it."
-            " A re-crossing starts while the level was above the threshold in the 24 hours"
-            " before; its warning is not counted as lead time.",
-            "",
-            report_tables.markdown_table(report_tables.warning_table(warnings)),
-        ]
     return details("Warnings and false alarms per threshold", body) if body else []
 
 
-def _plot_lines(plots: Sequence[Path], fallback: bool) -> list[str]:
+def _plot_lines(plots: Sequence[Path]) -> list[str]:
     """The overview plots in the open, the event plots folded."""
     events = [plot for plot in plots if plot.stem.startswith("event-")]
     lines = []
@@ -103,8 +92,6 @@ def _plot_lines(plots: Sequence[Path], fallback: bool) -> list[str]:
         if plot in events:
             continue
         lines += ["", _image(plot)]
-        if plot.stem == "warnings" and fallback:
-            lines += ["", "_From the old `warnings.csv`: this run has no `crossings.csv`._"]
     if events:
         summary = f"Flood events: observed level and forecasts ({len(events)} plots)"
         lines += details(summary, [line for plot in events for line in (_image(plot), "")])
@@ -123,7 +110,7 @@ def section(
     Summary, notes and one headline table first, then the plots; the detail tables folded.
     """
     scores = tables.get("scores", EMPTY)
-    crossings = report_tables.first_crossings(tables)
+    crossings = tables.get("crossings", EMPTY)
     false_alarms = tables.get("false_alarms", EMPTY)
     flood_cm = float(run_info["settings"]["flood_cm"])
     lines = [f"## {run_name}", ""]
@@ -133,8 +120,7 @@ def section(
     if not scores.empty:
         headline = report_tables.headline_table(scores, crossings, false_alarms, flood_cm)
         lines += ["", report_tables.markdown_table(headline)]
-    fallback = tables.get("crossings", EMPTY).empty and not crossings.empty
-    lines += _plot_lines(plots, fallback)
+    lines += _plot_lines(plots)
     if not scores.empty:
         body: list[str] = []
         for subset in scores["subset"].unique():
@@ -204,9 +190,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_info = json.loads((run / "run.json").read_text())
     tables = {name: read_csv(run / f"{name}.csv") for name in CSV_TABLES}
     predictions = pd.read_parquet(run / "predictions.parquet")
-    if not tables["warnings"].empty:
-        observed = report_tables.observed_from_predictions(predictions)
-        tables["warnings"] = report_tables.mark_re_crossings(tables["warnings"], observed)
     registered = registered_models(EvaluationSettings.model_validate(run_info["settings"]))
     log = arguments.report_dir / "experiments.md"
     plot_dir = arguments.report_dir / "plots" / run.name

@@ -13,7 +13,6 @@ from pegel.evaluation.events import (
     lag_check,
     observed_levels,
     peak_errors,
-    warning_lead_times,
 )
 from pegel.evaluation.metrics import PERSISTENCE
 from pegel.evaluation.score import alarm_thresholds, main
@@ -116,19 +115,6 @@ def _rising() -> pd.Series:
     return _hours(levels)
 
 
-def test_warning_lead_time_of_a_perfect_forecast_is_the_longest_lead() -> None:
-    observed = _rising()
-    predictions = _predictions(
-        observed, {"perfect": _at(observed), PERSISTENCE: _persistence(observed)}
-    )
-    table = warning_lead_times(predictions, observed, [95]).set_index("model")
-    crossing = START + pd.Timedelta(hours=30)
-    assert (table["crossing_at"] == crossing).all()
-    assert table.loc["perfect", "warning_hours"] == LEADS
-    assert table.loc["perfect", "first_warning_at"] == crossing - pd.Timedelta(hours=LEADS)
-    assert pd.isna(table.loc[PERSISTENCE, "warning_hours"])
-
-
 def test_peak_errors_by_hours_before_the_peak() -> None:
     observed = _rising()
     predictions = _predictions(
@@ -185,6 +171,5 @@ def test_runner_writes_every_table(tmp_path: Path) -> None:
         "lag",
         "peaks",
         "scores",
-        "warnings",
     ]
     assert len(pd.read_csv(tmp_path / "out" / "events.csv")) == 1
