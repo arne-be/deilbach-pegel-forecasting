@@ -1,3 +1,4 @@
+import io
 import json
 from pathlib import Path
 
@@ -56,26 +57,24 @@ def test_lag_table_keeps_leads_6_and_12() -> None:
     assert list(report_tables.lag_table(lag).loc[PERSISTENCE]) == [6, 12]
 
 
-def test_colours_follow_the_registry_and_keep_persistence_grey() -> None:
+def test_colours_keep_persistence_grey_and_give_the_others_one_each_in_order() -> None:
     from pegel.evaluation.report_plots import MODEL_COLOURS, PERSISTENCE_COLOUR, colours
 
-    palette = colours(["zeta", "ridge", PERSISTENCE], ["persistence", "ridge"])
-    assert palette[PERSISTENCE] == PERSISTENCE_COLOUR
-    assert palette["ridge"] == MODEL_COLOURS[0]
-    assert palette["zeta"] == MODEL_COLOURS[1]
-    assert colours(["ridge"], ["persistence", "ridge"])["ridge"] == MODEL_COLOURS[0]
+    palette = colours([PERSISTENCE, "ridge", "zeta"])
+    assert palette == {
+        PERSISTENCE: PERSISTENCE_COLOUR,
+        "ridge": MODEL_COLOURS[0],
+        "zeta": MODEL_COLOURS[1],
+    }
 
 
-def test_colours_give_the_newest_of_many_models_dark_shades() -> None:
-    from pegel.evaluation.report_plots import MODEL_COLOURS, colours
-
-    registered = [PERSISTENCE, *(f"model_{i}" for i in range(11))]
-    palette = colours(registered, registered)
-    dark, light = MODEL_COLOURS[:9], MODEL_COLOURS[9:]
-    # 11 models, 9 dark shades: the two oldest get light ones, the rest all dark in order.
-    assert [palette["model_0"], palette["model_1"]] == light[:2]
-    assert [palette[f"model_{i}"] for i in range(2, 11)] == dark
-    assert len(set(map(str, palette.values()))) == len(palette)
+def test_plotted_models_keep_persistence_and_the_best_that_beat_it() -> None:
+    worse = _scores().query("model == 'ridge'").assign(model="worse", mae=lambda f: f["mae"] * 3)
+    close = _scores().query("model == 'ridge'").assign(model="close", mae=lambda f: f["mae"] * 1.1)
+    better = _scores().query("model == 'ridge'").assign(model="better", mae=lambda f: f["mae"] / 2)
+    scores = pd.concat([_scores(), worse, close, better])
+    # Only two models are plotted beside persistence; `worse` loses to it anyway.
+    assert report_tables.plotted_models(scores) == [PERSISTENCE, "better", "ridge"]
 
 
 def test_markdown_table_formats_floats_and_missing_values() -> None:
@@ -119,9 +118,10 @@ def test_headline_table_has_one_formatted_row_per_model() -> None:
         "mean MAE high water (cm)",
         "MAE +24 h high water (cm)",
         "skill +24 h high water",
+        "folds better than persistence",
     ]
-    assert list(table.loc[PERSISTENCE]) == ["12.5", "12.5", "24.0", "0.00"]
-    assert list(table.loc["ridge"]) == ["6.2", "6.2", "12.0", "0.50"]
+    assert list(table.loc[PERSISTENCE]) == ["12.5", "12.5", "24.0", "0.00", "-"]
+    assert list(table.loc["ridge"]) == ["6.2", "6.2", "12.0", "0.50", "1 of 1"]
 
 
 def test_summary_names_the_best_model() -> None:
@@ -144,52 +144,34 @@ def test_summary_names_the_best_model() -> None:
 
 def test_section_puts_summary_and_headline_first_and_folds_the_details() -> None:
     tables = {"scores": _scores()}
-    plots = [Path("plots/x/mae.png"), Path("plots/x/event-1-a.png")]
+    plots = [Path("plots/x/error.png"), Path("plots/x/floods-seen.png")]
     text = report.section("2026-10-14-x", _run_info(), tables, plots, "n")
     assert text.startswith("## 2026-10-14-x\n\nLowest mean MAE")
     notes, headline, image = (
         text.index("**Notes:** n"),
         text.index("| model | mean MAE all (cm)"),
-        text.index("![mae](plots/x/mae.png)"),
+        text.index("![error](plots/x/error.png)"),
     )
-    assert notes < headline < image < text.index("<details>")
-    assert "<summary>Flood events: observed level and forecasts (1 plots)</summary>" in text
+    assert notes < headline < image < text.index(report.CAPTIONS["error"]) < text.index("<details>")
+    assert "floods-seen" not in text  # no flood tables, no flood section
     assert "Subset `high_water`" in text
     assert "commit `0123456789ab` (dirty)" in text
     assert "Models: persistence, ridge" in text
     assert text.count("<details>") == text.count("</details>")
 
 
-def _predictions() -> pd.DataFrame:
-    issued = pd.date_range(START, periods=72, freq="h")
-    observed = pd.Series(range(72), index=issued, dtype=float) + 80
-    rows = [
-        {
-            "issued_at": at,
-            "lead": lead,
-            "model": model,
-            "fold": "F1",
-            "prediction": observed[at],
-            "target": observed.get(at + pd.Timedelta(hours=lead), float("nan")),
-        }
-        for model in (PERSISTENCE, "ridge")
-        for at in issued
-        for lead in range(1, LEADS + 1)
-    ]
-    return pd.DataFrame(rows)
-
-
 def test_main_writes_plots_and_appends_once(tmp_path: Path) -> None:
     run = tmp_path / "runs" / "2026-10-14-x"
     run.mkdir(parents=True)
-    _predictions().to_parquet(run / "predictions.parquet")
     (run / "run.json").write_text(json.dumps(_run_info()))
     _scores().to_csv(run / "scores.csv", index=False)
     (run / "bootstrap.csv").write_text("model,lead,n,mae_difference,low,high\n")
     events = {"start": START + pd.Timedelta(hours=20), "end": START + pd.Timedelta(hours=30)}
-    pd.DataFrame([{**events, "peak_at": events["end"], "peak_cm": 110.0}]).to_csv(
+    event = {**events, "event": 1, "fold": "F1", "pre_event_cm": 90.0}
+    pd.DataFrame([{**event, "peak_at": events["end"], "peak_cm": 110.0}]).to_csv(
         run / "events.csv", index=False
     )
+    _peaks().to_csv(run / "peaks.csv", index=False)
     report_dir = tmp_path / "report"
     report_dir.mkdir()
     log = report_dir / "experiments.md"
@@ -198,14 +180,119 @@ def test_main_writes_plots_and_appends_once(tmp_path: Path) -> None:
     report.main([str(run), "--report-dir", str(report_dir), "--notes", "first"])
 
     plots = sorted(path.name for path in (report_dir / "plots" / run.name).iterdir())
-    assert plots == [
-        "event-1-2024-10-02.png",
-        "mae-folds.png",
-        "mae.png",
-        "skill.png",
-    ]
+    assert plots == ["error.png", "flood-size.png", "floods-seen.png"]
     text = log.read_text()
     assert text.startswith("# Experiment log\n\n## 2026-10-14-x\n")
-    assert "](plots/2026-10-14-x/event-1-2024-10-02.png)" in text
+    flood_section = text.index("### Flood forecasts")
+    assert text.index("](plots/2026-10-14-x/error.png)") < flood_section
+    assert flood_section < text.index("](plots/2026-10-14-x/floods-seen.png)")
+    assert "replay.html" not in text
     with pytest.raises(ValueError, match="already has a section"):
         report.main([str(run), "--report-dir", str(report_dir)])
+
+
+def _peak(
+    model: str, event: int, lead: int, size: float, timing: int, **extra: object
+) -> dict[str, object]:
+    return {
+        "model": model,
+        "event": event,
+        "fold": "F1",
+        "lead_hours": lead,
+        "size": size,
+        "timing_hours": timing,
+        "timing_at_least": extra.get("at_least", False),
+        "predicted": size > 0.5,
+    }
+
+
+def _peaks() -> pd.DataFrame:
+    rows = [
+        _peak("ridge", 1, 6, 0.82, -2),
+        _peak("ridge", 2, 6, 0.31, 5, at_least=True),
+        _peak("ridge", 3, 6, 0.9, 0),
+        _peak(PERSISTENCE, 1, 6, 0.6, -5),
+        _peak(PERSISTENCE, 2, 6, 0.2, -5),
+        _peak(PERSISTENCE, 3, 6, 0.4, -5),
+    ]
+    missing = {**_peak("ridge", 3, 24, 0, 0), "size": None, "timing_hours": None}
+    rows += [
+        _peak(model, event, 24, 0.1, -23) for model in ("ridge", PERSISTENCE) for event in (1, 2)
+    ]
+    rows += [missing, {**_peak(PERSISTENCE, 3, 24, 0.7, -23)}]
+    peaks = pd.DataFrame(rows).astype({"timing_at_least": object, "predicted": object})
+    peaks.loc[peaks["size"].isna(), ["timing_at_least", "predicted"]] = None
+    # As the report reads it back from peaks.csv: booleans with NaN where missing.
+    return pd.read_csv(io.StringIO(peaks.to_csv(index=False)))
+
+
+def test_flood_summary_table_counts_events_with_a_forecast_and_puts_persistence_first() -> None:
+    false_alarms = pd.DataFrame({"model": ["ridge"], "count": [2], "per_month": [0.125]})
+    table = report_tables.flood_summary_table(_peaks(), false_alarms)
+    assert list(table.index) == [PERSISTENCE, "ridge"]
+    assert list(table.columns) == ["24 h before", "6 h before", "false alarms / month"]
+    assert table.loc["ridge", "6 h before"] == "2 of 3 · 82 % · \N{MINUS SIGN}1 h"
+    assert table.loc["ridge", "24 h before"] == "0 of 2 · 10 % · —"
+    assert table.loc[PERSISTENCE, "24 h before"] == "1 of 3 · 10 % · \N{MINUS SIGN}23 h"
+    assert list(table["false alarms / month"]) == ["—", "0.12"]
+
+
+def test_flood_grid_table_marks_predicted_missing_and_at_least_timings() -> None:
+    events = pd.DataFrame(
+        {
+            "event": [1, 2, 3],
+            "peak_at": [
+                "2024-10-10 02:30:00+00:00",
+                "2024-11-19 17:30:00+00:00",
+                "2025-01-01 00:30:00+00:00",
+            ],
+            "peak_cm": [120.7, 165.0, 97.3],
+        }
+    )
+    table = report_tables.flood_grid_table(_peaks(), events, "ridge")
+    assert list(table.columns) == ["peak (UTC)", "peak cm", "24 h before", "6 h before"]
+    assert list(table.loc[1]) == [
+        "2024-10-10",
+        "121",
+        "✗ 10 % \N{MINUS SIGN}23 h",
+        "✓ 82 % \N{MINUS SIGN}2 h",
+    ]
+    assert table.loc[2, "6 h before"] == "✗ 31 % ≥ +5 h"
+    assert list(table.loc[3, ["24 h before", "6 h before"]]) == ["—", "✓ 90 % ±0 h"]
+
+
+def test_flood_summary_names_the_best_model_against_persistence() -> None:
+    assert report_tables.flood_summary(_peaks()) == [
+        "Events predicted: ridge 2 of 3 at 6 h, 0 of 2 at 24 h; persistence 1 of 3 at 6 h,"
+        " 1 of 3 at 24 h."
+    ]
+
+
+def test_section_points_to_the_replay_only_when_it_exists() -> None:
+    events = pd.DataFrame({"event": [1, 2, 3], "peak_at": ["2025-01-01"] * 3, "peak_cm": 100.0})
+    tables = {"scores": _scores(), "peaks": _peaks(), "events": events}
+    with_replay = report.section("x", _run_info(), tables, [], replay=True)
+    assert "`replay.html` in the run folder" in with_replay
+    assert "<summary>Flood events: persistence</summary>" in with_replay
+    assert "replay.html" not in report.section("x", _run_info(), tables, [])
+
+
+def test_flood_titles_name_the_model_that_sees_most_against_persistence() -> None:
+    from pegel.evaluation import report_plots
+
+    models = [PERSISTENCE, "ridge"]
+    seen = report_plots._seen(_peaks())
+    # At 24 h ridge sees none of its 2 floods, persistence 1 of 3: persistence leads.
+    assert (
+        report_plots.seen_title(seen, models) == "persistence sees 1 of 3 floods coming 24 h ahead"
+    )
+    assert report_plots.seen_title(seen.drop(24, level="lead_hours"), models) == (
+        "ridge sees 2 of 3 floods coming 6 h ahead; persistence 1"
+    )
+    lead = report_plots.size_lead(_peaks())
+    sizes = _peaks()[_peaks()["lead_hours"] == lead].pivot(
+        index="event", columns="model", values="size"
+    )
+    assert report_plots.size_title(sizes, models, lead) == (
+        "6 h before the peak, ridge saw a median 82 % of the rise; persistence 40 %"
+    )

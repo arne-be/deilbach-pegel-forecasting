@@ -4,7 +4,7 @@
 
 Reads the files `predict` and `score` wrote into the run folder, writes the plots to
 `analysis/model-evaluation/plots/<run>/` and appends a section to
-`analysis/model-evaluation/experiments.md`. Analysis only: needs pyarrow and matplotlib.
+`analysis/model-evaluation/experiments.md`. Analysis only: needs matplotlib.
 """
 
 import argparse
@@ -15,20 +15,27 @@ from typing import Any
 
 import pandas as pd
 
-from pegel.config import EvaluationSettings
 from pegel.evaluation import report_tables
-from pegel.evaluation.registry import MODELS
 
 REPORT_DIR = Path("analysis/model-evaluation")
 CSV_TABLES = (
     "scores",
-    "bootstrap",
     "events",
     "peaks",
     "false_alarms",
     "lag",
 )
 EMPTY = pd.DataFrame()
+# One sentence under each plot on how to read it, by file stem.
+CAPTIONS = {
+    "error": "Each line is a model's average error, from 1 to 24 hours ahead; lower is better."
+    " Left all times, right only when the water is high.",
+    "floods-seen": "How many of the floods each model saw coming (its forecast showed more than"
+    " half the rise), by how long before the peak the forecast was made; higher is better.",
+    "flood-size": "One row per flood. A dot is how much of the rise a model's forecast saw:"
+    " right of the dotted line counts as seen coming, on the solid line is the right height.",
+}
+OVERVIEW_PLOTS = ("error",)
 
 
 def read_csv(path: Path) -> pd.DataFrame:
@@ -41,36 +48,46 @@ def read_csv(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def registered_models(settings: EvaluationSettings) -> list[str]:
-    """Model names in registry order; the registry only grows, so the order is stable."""
-    return [factory(settings).name for factory in MODELS]
-
-
 def details(summary: str, body: Sequence[str]) -> list[str]:
     """A block GitHub shows folded; the blank lines let the Markdown inside it render."""
     inner = "\n".join(body).strip("\n")
     return ["", "<details>", f"<summary>{summary}</summary>", "", inner, "", "</details>"]
 
 
-def _image(plot: Path) -> str:
-    return f"![{plot.stem}]({plot.as_posix()})"
+def _images(plots: Sequence[Path], stems: Sequence[str]) -> list[str]:
+    """The plots with these stems, each with its caption below it."""
+    lines: list[str] = []
+    for plot in plots:
+        if plot.stem in stems:
+            lines += ["", f"![{plot.stem}]({plot.as_posix()})", "", CAPTIONS[plot.stem]]
+    return lines
 
 
 def _table_details(summary: str, text: str, table: pd.DataFrame) -> list[str]:
     return details(summary, [text, "", report_tables.markdown_table(table)])
 
 
-def _plot_lines(plots: Sequence[Path]) -> list[str]:
-    """The overview plots in the open, the event plots folded."""
-    events = [plot for plot in plots if plot.stem.startswith("event-")]
-    lines = []
-    for plot in plots:
-        if plot in events:
-            continue
-        lines += ["", _image(plot)]
-    if events:
-        summary = f"Flood events: observed level and forecasts ({len(events)} plots)"
-        lines += details(summary, [line for plot in events for line in (_image(plot), "")])
+def _flood_lines(tables: dict[str, pd.DataFrame], plots: Sequence[Path], replay: bool) -> list[str]:
+    """Summary table, the flood plots, replay pointer, then the per-model grids folded."""
+    peaks, events = tables.get("peaks", EMPTY), tables.get("events", EMPTY)
+    if peaks.empty or events.empty:
+        return []
+    false_alarms = tables.get("false_alarms", EMPTY)
+    lines = [
+        "",
+        "### Flood forecasts",
+        "",
+        "Per lead before the peak: events predicted (forecast saw more than half the rise) of"
+        " events with a forecast, median size, median timing of the predicted ones.",
+        "",
+        report_tables.markdown_table(report_tables.flood_summary_table(peaks, false_alarms)),
+    ]
+    lines += _images(plots, [stem for stem in CAPTIONS if stem not in OVERVIEW_PLOTS])
+    if replay:
+        lines += ["", "Forecast replay: `replay.html` in the run folder."]
+    for model in report_tables.model_order(list(peaks["model"])):
+        grid = report_tables.flood_grid_table(peaks, events, model)
+        lines += _table_details(f"Flood events: {model}", "✓ predicted, ✗ not, — missing.", grid)
     return lines
 
 
@@ -80,6 +97,7 @@ def section(
     tables: dict[str, pd.DataFrame],
     plots: Sequence[Path],
     notes: str = "",
+    replay: bool = False,
 ) -> str:
     """The Markdown section for one run. `plots` are paths relative to the log file.
 
@@ -89,11 +107,21 @@ def section(
     lines = [f"## {run_name}", ""]
     if not scores.empty:
         lines += [*report_tables.summary(scores), ""]
+    peaks = tables.get("peaks", EMPTY)
+    if not peaks.empty:
+        lines += [*report_tables.flood_summary(peaks), ""]
     lines.append(f"**Notes:** {notes}")
     if not scores.empty:
         headline = report_tables.headline_table(scores)
         lines += ["", report_tables.markdown_table(headline)]
-    lines += _plot_lines(plots)
+    if plots:
+        lines += [
+            "",
+            "The plots show persistence (grey) and up to"
+            f" {report_tables.PLOTTED_MODELS} models that beat it by the selection rule;"
+            " the tables show all models.",
+        ]
+    lines += _images(plots, OVERVIEW_PLOTS)
     if not scores.empty:
         body: list[str] = []
         for subset in scores["subset"].unique():
@@ -118,6 +146,7 @@ def section(
             f"- Models: {models}",
         ],
     )
+    lines += _flood_lines(tables, plots, replay)
     return "\n".join(lines) + "\n"
 
 
@@ -145,14 +174,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     run: Path = arguments.run
     run_info = json.loads((run / "run.json").read_text())
     tables = {name: read_csv(run / f"{name}.csv") for name in CSV_TABLES}
-    predictions = pd.read_parquet(run / "predictions.parquet")
-    registered = registered_models(EvaluationSettings.model_validate(run_info["settings"]))
     log = arguments.report_dir / "experiments.md"
     plot_dir = arguments.report_dir / "plots" / run.name
     check_new_run(log, run.name)
-    plots = report_plots.write_plots(predictions, tables, registered, plot_dir)
+    high_water_cm = float(run_info["settings"]["high_water_cm"])
+    plots = report_plots.write_plots(tables, high_water_cm, plot_dir)
     relative = [plot.relative_to(arguments.report_dir) for plot in plots]
-    append_section(log, run.name, section(run.name, run_info, tables, relative, arguments.notes))
+    replay = (run / "replay.html").exists()
+    text = section(run.name, run_info, tables, relative, arguments.notes, replay)
+    append_section(log, run.name, text)
     return 0
 
 
