@@ -61,16 +61,38 @@ def _table_details(summary: str, text: str, table: pd.DataFrame) -> list[str]:
 
 
 def _plot_lines(plots: Sequence[Path]) -> list[str]:
-    """The overview plots in the open, the event plots folded."""
-    events = [plot for plot in plots if plot.stem.startswith("event-")]
-    lines = []
-    for plot in plots:
-        if plot in events:
-            continue
-        lines += ["", _image(plot)]
-    if events:
-        summary = f"Flood events: observed level and forecasts ({len(events)} plots)"
-        lines += details(summary, [line for plot in events for line in (_image(plot), "")])
+    """The overview plots in the open; the peak tracks go with the flood forecasts."""
+    return [line for plot in plots if not _is_track(plot) for line in ("", _image(plot))]
+
+
+def _is_track(plot: Path) -> bool:
+    return plot.stem.startswith("peak-track-")
+
+
+def _flood_lines(tables: dict[str, pd.DataFrame], plots: Sequence[Path], replay: bool) -> list[str]:
+    """Summary table, replay pointer, then per-model grids and peak tracks folded."""
+    peaks, events = tables.get("peaks", EMPTY), tables.get("events", EMPTY)
+    if peaks.empty or events.empty:
+        return []
+    false_alarms = tables.get("false_alarms", EMPTY)
+    lines = [
+        "",
+        "### Flood forecasts",
+        "",
+        "Per lead before the peak: events predicted (forecast saw more than half the rise) of"
+        " events with a forecast, median size, median timing of the predicted ones.",
+        "",
+        report_tables.markdown_table(report_tables.flood_summary_table(peaks, false_alarms)),
+    ]
+    if replay:
+        lines += ["", "Forecast replay: `replay.html` in the run folder."]
+    for model in report_tables.model_order(list(peaks["model"])):
+        grid = report_tables.flood_grid_table(peaks, events, model)
+        lines += _table_details(f"Flood events: {model}", "✓ predicted, ✗ not, — missing.", grid)
+    tracks = [plot for plot in plots if _is_track(plot)]
+    if tracks:
+        summary = f"Peak tracks: forecast peak height and time per event ({len(tracks)} plots)"
+        lines += details(summary, [line for plot in tracks for line in (_image(plot), "")])
     return lines
 
 
@@ -80,6 +102,7 @@ def section(
     tables: dict[str, pd.DataFrame],
     plots: Sequence[Path],
     notes: str = "",
+    replay: bool = False,
 ) -> str:
     """The Markdown section for one run. `plots` are paths relative to the log file.
 
@@ -89,6 +112,9 @@ def section(
     lines = [f"## {run_name}", ""]
     if not scores.empty:
         lines += [*report_tables.summary(scores), ""]
+    peaks = tables.get("peaks", EMPTY)
+    if not peaks.empty:
+        lines += [*report_tables.flood_summary(peaks), ""]
     lines.append(f"**Notes:** {notes}")
     if not scores.empty:
         headline = report_tables.headline_table(scores)
@@ -118,6 +144,7 @@ def section(
             f"- Models: {models}",
         ],
     )
+    lines += _flood_lines(tables, plots, replay)
     return "\n".join(lines) + "\n"
 
 
@@ -150,9 +177,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     log = arguments.report_dir / "experiments.md"
     plot_dir = arguments.report_dir / "plots" / run.name
     check_new_run(log, run.name)
-    plots = report_plots.write_plots(predictions, tables, registered, plot_dir)
+    high_water_cm = float(run_info["settings"]["high_water_cm"])
+    plots = report_plots.write_plots(predictions, tables, registered, high_water_cm, plot_dir)
     relative = [plot.relative_to(arguments.report_dir) for plot in plots]
-    append_section(log, run.name, section(run.name, run_info, tables, relative, arguments.notes))
+    replay = (run / "replay.html").exists()
+    text = section(run.name, run_info, tables, relative, arguments.notes, replay)
+    append_section(log, run.name, text)
     return 0
 
 

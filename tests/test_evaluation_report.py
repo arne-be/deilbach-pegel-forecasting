@@ -1,3 +1,4 @@
+import io
 import json
 from pathlib import Path
 
@@ -144,7 +145,7 @@ def test_summary_names_the_best_model() -> None:
 
 def test_section_puts_summary_and_headline_first_and_folds_the_details() -> None:
     tables = {"scores": _scores()}
-    plots = [Path("plots/x/mae.png"), Path("plots/x/event-1-a.png")]
+    plots = [Path("plots/x/mae.png"), Path("plots/x/peak-track-1-a.png")]
     text = report.section("2026-10-14-x", _run_info(), tables, plots, "n")
     assert text.startswith("## 2026-10-14-x\n\nLowest mean MAE")
     notes, headline, image = (
@@ -153,7 +154,7 @@ def test_section_puts_summary_and_headline_first_and_folds_the_details() -> None
         text.index("![mae](plots/x/mae.png)"),
     )
     assert notes < headline < image < text.index("<details>")
-    assert "<summary>Flood events: observed level and forecasts (1 plots)</summary>" in text
+    assert "Peak tracks" not in text  # no flood tables, no flood section
     assert "Subset `high_water`" in text
     assert "commit `0123456789ab` (dirty)" in text
     assert "Models: persistence, ridge" in text
@@ -187,9 +188,11 @@ def test_main_writes_plots_and_appends_once(tmp_path: Path) -> None:
     _scores().to_csv(run / "scores.csv", index=False)
     (run / "bootstrap.csv").write_text("model,lead,n,mae_difference,low,high\n")
     events = {"start": START + pd.Timedelta(hours=20), "end": START + pd.Timedelta(hours=30)}
-    pd.DataFrame([{**events, "peak_at": events["end"], "peak_cm": 110.0}]).to_csv(
+    event = {**events, "event": 1, "fold": "F1", "pre_event_cm": 90.0}
+    pd.DataFrame([{**event, "peak_at": events["end"], "peak_cm": 110.0}]).to_csv(
         run / "events.csv", index=False
     )
+    _peaks().to_csv(run / "peaks.csv", index=False)
     report_dir = tmp_path / "report"
     report_dir.mkdir()
     log = report_dir / "experiments.md"
@@ -199,13 +202,101 @@ def test_main_writes_plots_and_appends_once(tmp_path: Path) -> None:
 
     plots = sorted(path.name for path in (report_dir / "plots" / run.name).iterdir())
     assert plots == [
-        "event-1-2024-10-02.png",
         "mae-folds.png",
         "mae.png",
+        "peak-track-1-2024-10-02.png",
         "skill.png",
     ]
     text = log.read_text()
     assert text.startswith("# Experiment log\n\n## 2026-10-14-x\n")
-    assert "](plots/2026-10-14-x/event-1-2024-10-02.png)" in text
+    assert "](plots/2026-10-14-x/peak-track-1-2024-10-02.png)" in text
+    assert "### Flood forecasts" in text
+    assert "replay.html" not in text
     with pytest.raises(ValueError, match="already has a section"):
         report.main([str(run), "--report-dir", str(report_dir)])
+
+
+def _peak(
+    model: str, event: int, lead: int, size: float, timing: int, **extra: object
+) -> dict[str, object]:
+    return {
+        "model": model,
+        "event": event,
+        "fold": "F1",
+        "lead_hours": lead,
+        "size": size,
+        "timing_hours": timing,
+        "timing_at_least": extra.get("at_least", False),
+        "predicted": size > 0.5,
+    }
+
+
+def _peaks() -> pd.DataFrame:
+    rows = [
+        _peak("ridge", 1, 6, 0.82, -2),
+        _peak("ridge", 2, 6, 0.31, 5, at_least=True),
+        _peak("ridge", 3, 6, 0.9, 0),
+        _peak(PERSISTENCE, 1, 6, 0.6, -5),
+        _peak(PERSISTENCE, 2, 6, 0.2, -5),
+        _peak(PERSISTENCE, 3, 6, 0.4, -5),
+    ]
+    missing = {**_peak("ridge", 3, 24, 0, 0), "size": None, "timing_hours": None}
+    rows += [
+        _peak(model, event, 24, 0.1, -23) for model in ("ridge", PERSISTENCE) for event in (1, 2)
+    ]
+    rows += [missing, {**_peak(PERSISTENCE, 3, 24, 0.7, -23)}]
+    peaks = pd.DataFrame(rows).astype({"timing_at_least": object, "predicted": object})
+    peaks.loc[peaks["size"].isna(), ["timing_at_least", "predicted"]] = None
+    # As the report reads it back from peaks.csv: booleans with NaN where missing.
+    return pd.read_csv(io.StringIO(peaks.to_csv(index=False)))
+
+
+def test_flood_summary_table_counts_events_with_a_forecast_and_puts_persistence_first() -> None:
+    false_alarms = pd.DataFrame({"model": ["ridge"], "count": [2], "per_month": [0.125]})
+    table = report_tables.flood_summary_table(_peaks(), false_alarms)
+    assert list(table.index) == [PERSISTENCE, "ridge"]
+    assert list(table.columns) == ["24 h before", "6 h before", "false alarms / month"]
+    assert table.loc["ridge", "6 h before"] == "2 of 3 · 82 % · \N{MINUS SIGN}1 h"
+    assert table.loc["ridge", "24 h before"] == "0 of 2 · 10 % · —"
+    assert table.loc[PERSISTENCE, "24 h before"] == "1 of 3 · 10 % · \N{MINUS SIGN}23 h"
+    assert list(table["false alarms / month"]) == ["-", "0.12"]
+
+
+def test_flood_grid_table_marks_predicted_missing_and_at_least_timings() -> None:
+    events = pd.DataFrame(
+        {
+            "event": [1, 2, 3],
+            "peak_at": [
+                "2024-10-10 02:30:00+00:00",
+                "2024-11-19 17:30:00+00:00",
+                "2025-01-01 00:30:00+00:00",
+            ],
+            "peak_cm": [120.7, 165.0, 97.3],
+        }
+    )
+    table = report_tables.flood_grid_table(_peaks(), events, "ridge")
+    assert list(table.columns) == ["peak (UTC)", "peak cm", "24 h before", "6 h before"]
+    assert list(table.loc[1]) == [
+        "2024-10-10",
+        "121",
+        "✗ 10 % \N{MINUS SIGN}23 h",
+        "✓ 82 % \N{MINUS SIGN}2 h",
+    ]
+    assert table.loc[2, "6 h before"] == "✗ 31 % ≥ +5 h"
+    assert list(table.loc[3, ["24 h before", "6 h before"]]) == ["—", "✓ 90 % ±0 h"]
+
+
+def test_flood_summary_names_the_best_model_against_persistence() -> None:
+    assert report_tables.flood_summary(_peaks()) == [
+        "Events predicted: ridge 2 of 3 at 6 h, 0 of 2 at 24 h; persistence 1 of 3 at 6 h,"
+        " 1 of 3 at 24 h."
+    ]
+
+
+def test_section_points_to_the_replay_only_when_it_exists() -> None:
+    events = pd.DataFrame({"event": [1, 2, 3], "peak_at": ["2025-01-01"] * 3, "peak_cm": 100.0})
+    tables = {"scores": _scores(), "peaks": _peaks(), "events": events}
+    with_replay = report.section("x", _run_info(), tables, [], replay=True)
+    assert "`replay.html` in the run folder" in with_replay
+    assert "<summary>Flood events: persistence</summary>" in with_replay
+    assert "replay.html" not in report.section("x", _run_info(), tables, [])
