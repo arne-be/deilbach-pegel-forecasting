@@ -91,7 +91,7 @@ Step 6 of the ladder, in a form that keeps ridge's flood size: `ridge:change:v2`
 
 ## Capped training (stress test)
 
-`<model>:cap100` is the same model trained without any issue time whose cleaned level at the issue time or any target is above 100 cm (`models/capped.py`). Test rows are not filtered, so the four test floods above 100 cm lie beyond what the model saw. It shows how much flood size a model family loses on a flood bigger than its training range. It is a stress test only, never a live candidate. Results: run [2026-10-15-capped-training](../analysis/model-evaluation/experiments.md#2026-10-15-capped-training).
+`<model>:cap100` is the same model trained without any issue time whose cleaned level at the issue time or any target is above 100 cm (`models/capped.py`). Test rows are not filtered, so the four test floods above 100 cm lie beyond the levels and targets it learned from (lag and upstream inputs aren't capped). It shows how much flood size a model family loses on a flood bigger than its training range. It is a stress test only, never a live candidate: the variants sit in `STRESS_TESTS` in the registry and run only when named, e.g. `--models persistence,upstream:cap100`. Results: run [2026-10-15-capped-training](../analysis/model-evaluation/experiments.md#2026-10-15-capped-training).
 
 ## Known weaknesses of the current best
 

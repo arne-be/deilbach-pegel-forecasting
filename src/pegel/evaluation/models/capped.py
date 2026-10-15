@@ -1,8 +1,8 @@
 """Stress test: train a model only on issue times that stay below a cap.
 
 A training row is dropped when the cleaned level at the issue time or any target is above the
-cap, so the test floods above it are bigger than anything the model saw. Test rows are never
-filtered. Never a live candidate; see docs/models.md.
+cap, so the model never learns from an issue time with a level or target above it. Test rows
+are never filtered. Never a live candidate; see docs/models.md.
 """
 
 import numpy as np

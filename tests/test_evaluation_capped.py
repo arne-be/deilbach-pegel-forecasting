@@ -6,6 +6,7 @@ from pegel.config import load_config
 from pegel.evaluation import contract
 from pegel.evaluation.models.capped import capped
 from pegel.evaluation.models.simple import Upstream
+from pegel.evaluation.predict import selected_models
 
 SETTINGS = load_config().evaluation
 TARGETS = contract.lead_columns(contract.TARGET, SETTINGS.leads_hours)
@@ -47,3 +48,9 @@ def test_capped_model_predicts_like_the_model_fitted_on_the_kept_rows() -> None:
     uncapped = Upstream(SETTINGS)
     uncapped.fit(dataset)
     assert not np.allclose(capped_model.predict(rows), uncapped.predict(rows))
+
+
+def test_stress_tests_run_only_when_named() -> None:
+    assert not any(":cap" in factory(SETTINGS).name for factory in selected_models(None, SETTINGS))
+    [factory] = selected_models(["ridge:change:v2:cap100"], SETTINGS)
+    assert factory(SETTINGS).name == "ridge:change:v2:cap100"
