@@ -14,7 +14,7 @@ from pegel.core.features import (
     store_response,
 )
 from pegel.evaluation import contract
-from pegel.evaluation.models.rain_response import RainResponse
+from pegel.evaluation.models.rain_response import RainResponse, fit_hydrograph
 from pegel.evaluation.predict import selected_models
 
 SETTINGS = load_config().evaluation
@@ -111,3 +111,8 @@ def test_both_variants_predict_the_rain_world_without_targets(radar_offset: bool
 def test_variants_are_registered() -> None:
     names = ["rain_response:v1:offset", "rain_response:v1:ridge"]
     assert [factory(SETTINGS).name for factory in selected_models(names, SETTINGS)] == names
+
+
+def test_fit_refuses_too_few_episodes() -> None:
+    with pytest.raises(ValueError, match="usable episode rows"):
+        fit_hydrograph(np.zeros((0, 168)), np.zeros((0, 72)))

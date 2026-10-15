@@ -38,6 +38,8 @@ FIT_HOURS = 72
 # A fitting row: at least WET_MM of radar in the last 24 hours, at most DRY_MM in the next 72.
 WET_MM = 1.0
 DRY_MM = 0.6
+# With no rows lstsq gives amplitudes of 0 and no error, which would pass silently.
+MIN_EPISODE_ROWS = 50
 DAY = 24
 
 RESPONSE_RIDGE_V1 = tuple(
@@ -77,6 +79,8 @@ def fit_hydrograph(rain: Array, change: Array) -> features.Hydrograph:
     """
     hours = change.shape[1]
     usable = np.isfinite(change).all(axis=1) & np.isfinite(rain).all(axis=1)
+    if usable.sum() < MIN_EPISODE_ROWS:
+        raise ValueError(f"{usable.sum()} usable episode rows, need {MIN_EPISODE_ROWS}")
     rain, target = rain[usable], change[usable].ravel()
     ages = features.radar_ages(rain.shape[1])
     best: tuple[float, features.Hydrograph] | None = None

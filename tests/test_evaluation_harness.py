@@ -154,7 +154,8 @@ def test_runner_uses_the_settings_frozen_in_the_manifest(tmp_path: Path) -> None
     manifest = json.loads(predict.manifest_path(dataset).read_text())
     manifest["config"]["evaluation"]["leads_hours"] = SETTINGS.leads_hours - 1
     predict.manifest_path(dataset).write_text(json.dumps(manifest))
-    predict.main([str(dataset), "--out", str(tmp_path / "run")])
+    # Random rain never stays dry for 72 hours, so the rain response models can't fit here.
+    predict.main([str(dataset), "--out", str(tmp_path / "run"), "--models", "persistence"])
     predictions = pd.read_parquet(tmp_path / "run" / "predictions.parquet")
     assert predictions["lead"].max() == SETTINGS.leads_hours - 1
 
