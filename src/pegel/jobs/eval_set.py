@@ -9,6 +9,8 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
+import psycopg
+from psycopg.rows import TupleRow
 
 from pegel.adapters.sources.radolan import load_cells
 from pegel.adapters.storage.connection import connect
@@ -19,12 +21,19 @@ from pegel.core import issue_inputs
 from pegel.core.radar import radar_series
 from pegel.core.rain_forecast import catchment_series_id, ring_series_id
 from pegel.core.series import cleaned_level_series_id, level_series_id
+from pegel.evaluation import contract
 from pegel.evaluation.contract import GAUGE_PREFIXES, Manifest
-from pegel.jobs.pipeline import Conn
 
+# Not pegel.jobs.pipeline.Conn: the pipeline imports this module for the live input row.
+Conn = psycopg.Connection[TupleRow]
 DATASET_NAME = "eval.parquet"
-# The longest look-back of any input: the 30-day base level, plus the hour of its last window.
-LOOK_BACK = timedelta(days=30, hours=1)
+# How far before an issue time each input reads: its windows (issue_inputs), plus an hour.
+# Each only as far as it needs, since the hourly job fetches them every hour (Neon egress).
+BASE_LOOK_BACK = timedelta(hours=issue_inputs.BASE_HOURS + 1)
+LEVEL_LOOK_BACK = timedelta(hours=contract.LEVEL_LAG_HOURS + 1)
+RADAR_LOOK_BACK = timedelta(hours=contract.RADAR_LAG_HOURS + 1)
+# ICON-D2 column 1 is the hour from floor(t), so no forecast hour before t - 1 h is read.
+ICON_LOOK_BACK = timedelta(hours=1)
 # Cleaned values known this much after their time would mean revisions; the plan assumes none.
 LATE_AFTER = pd.Timedelta(hours=2)
 
@@ -32,19 +41,30 @@ LATE_AFTER = pd.Timedelta(hours=2)
 def build_dataset(
     conn: Conn, config: PegelConfig, first_day: date, last_day: date
 ) -> tuple[pd.DataFrame, int]:
-    """Fetches each series once for the window and builds one row per issue time.
-
-    Also returns how many fetched cleaned values were known more than 2 hours after their time.
-    """
+    """One row per issue time of the days, and how many fetched cleaned values were known more
+    than 2 hours after their time."""
     issued_at = issue_inputs.issue_times(first_day, last_day, config.forecast.issue_minute)
-    start = issued_at[0].to_pydatetime() - LOOK_BACK
+    return build_rows(conn, config, issued_at)
+
+
+def build_rows(
+    conn: Conn, config: PegelConfig, issued_at: pd.DatetimeIndex
+) -> tuple[pd.DataFrame, int]:
+    """Fetches each series once for the issue times and builds one row per issue time.
+
+    The live job builds its one row with this too, so training and forecasting see the same
+    inputs. Also returns the count of late cleaned values, as `build_dataset`.
+    """
+    first = issued_at[0].to_pydatetime()
     end = issued_at[-1].to_pydatetime() + timedelta(hours=config.evaluation.leads_hours + 1)
 
-    def observed(series_id: str) -> pd.DataFrame:
-        return issue_inputs.observed_frame(fetch_values(conn, series_id, start, end))
+    def observed(series_id: str, look_back: timedelta) -> pd.DataFrame:
+        values = fetch_values(conn, series_id, first - look_back, end)
+        return issue_inputs.observed_frame(values)
 
     def forecast(series_id: str) -> pd.DataFrame:
-        return issue_inputs.forecast_frame(fetch_input_forecasts(conn, series_id, start, end))
+        values = fetch_input_forecasts(conn, series_id, first - ICON_LOOK_BACK, end)
+        return issue_inputs.forecast_frame(values)
 
     rain = config.rain
     station_id = config.forecast.station_id
@@ -53,14 +73,14 @@ def build_dataset(
     # Archive first: on a tie in run_at, the live run wins.
     sources = (rain.forecast.archive_source, rain.forecast.source)
     percentile = rain.forecast.ring_percentile
-    cleaned = observed(cleaned_level_series_id(station_id))
+    cleaned = observed(cleaned_level_series_id(station_id), BASE_LOOK_BACK)
     upstream = [gauge for gauge in GAUGE_PREFIXES if gauge != station_id]
     dataset = issue_inputs.build_rows(
         issued_at,
         station_id,
         cleaned=cleaned,
-        upstream={gauge: observed(level_series_id(gauge)) for gauge in upstream},
-        radar={area: observed(series.id) for area, series in radar.items()},
+        upstream={gauge: observed(level_series_id(gauge), LEVEL_LOOK_BACK) for gauge in upstream},
+        radar={area: observed(series.id, RADAR_LOOK_BACK) for area, series in radar.items()},
         icon_mean=pd.concat([forecast(catchment_series_id(source)) for source in sources]),
         icon_p90=pd.concat([forecast(ring_series_id(source, percentile)) for source in sources]),
         leads=config.evaluation.leads_hours,
