@@ -68,15 +68,19 @@ def test_timeline_data_puts_each_forecast_at_its_target_time() -> None:
     assert data["leads"] == list(TIMELINE_LEADS)
     assert data["shown_leads"] == [SHORT_LEAD_HOURS, LONG_LEAD_HOURS]
     assert set(data["forecasts"]) == {str(lead) for lead in TIMELINE_LEADS}
-    first_target = issued[0] + pd.Timedelta(hours=SHORT_LEAD_HOURS)
+    first = min(TIMELINE_LEADS)
+    first_target = issued[0] + pd.Timedelta(hours=first)
     assert data["start"] == first_target.value // 1_000_000
-    length = len(issued) - 1 + LONG_LEAD_HOURS - SHORT_LEAD_HOURS + 1
+    length = len(issued) - 1 + LONG_LEAD_HOURS - first + 1
     short = data["forecasts"][str(SHORT_LEAD_HOURS)]["upstream"]
     long = data["forecasts"][str(LONG_LEAD_HOURS)]["upstream"]
     assert len(data["observed"]) == len(short) == len(long) == length
-    # Grid index i is target time start + i h: issued at hour 48 + i (short) or 27 + i (long).
-    assert short[0] == round(48 + SHORT_LEAD_HOURS / 100, 1)
-    assert long[0] is None and long[21] == round(48 + LONG_LEAD_HOURS / 100, 1)
+    # Grid index i is target time start + i h, so lead L first shows at index L - first,
+    # from the forecast issued at hour 48.
+    assert short[SHORT_LEAD_HOURS - first - 1] is None
+    assert short[SHORT_LEAD_HOURS - first] == round(48 + SHORT_LEAD_HOURS / 100, 1)
+    assert long[0] is None
+    assert long[LONG_LEAD_HOURS - first] == round(48 + LONG_LEAD_HOURS / 100, 1)
     assert short[-1] is None
     assert data["observed"][0] == _observed()[first_target]
 
