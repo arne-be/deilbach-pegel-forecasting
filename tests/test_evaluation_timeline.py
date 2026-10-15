@@ -92,8 +92,10 @@ def test_timeline_data_breaks_lines_at_gaps() -> None:
 
     data = timeline_data(predictions, _dataset(_observed()), LEADS, high_water_cm=75)
 
-    assert data["forecasts"][str(SHORT_LEAD_HOURS)]["persistence"][5] is None
-    assert data["forecasts"][str(SHORT_LEAD_HOURS)]["persistence"][6] is not None
+    # The forecast issued at issued[5] targets grid index 5 + lead - the first lead.
+    at = 5 + SHORT_LEAD_HOURS - min(TIMELINE_LEADS)
+    assert data["forecasts"][str(SHORT_LEAD_HOURS)]["persistence"][at] is None
+    assert data["forecasts"][str(SHORT_LEAD_HOURS)]["persistence"][at + 1] is not None
 
 
 def test_timeline_data_marks_folds_and_test_events() -> None:
