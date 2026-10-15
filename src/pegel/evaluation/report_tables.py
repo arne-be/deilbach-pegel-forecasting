@@ -12,6 +12,8 @@ from pegel.evaluation.metrics import ALL_FOLDS, PERSISTENCE, SUBSET_ALL, SUBSET_
 
 TABLE_LEADS = (1, 3, 6, 12, 24)
 LAG_LEADS = (6, 12)
+# The plots show persistence and this many of the best models; the tables show all.
+PLOTTED_MODELS = 2
 
 
 def model_order(models: Sequence[str]) -> list[str]:
@@ -40,9 +42,18 @@ def lag_table(lag: pd.DataFrame) -> pd.DataFrame:
     return table.reindex(model_order(list(table.index)))
 
 
+def _folds_won(scores: pd.DataFrame) -> pd.DataFrame:
+    """Per model: the folds where its mean MAE over all leads on `all` beats persistence's,
+    and the number of folds."""
+    per_fold = scores[(scores["fold"] != ALL_FOLDS) & (scores["subset"] == SUBSET_ALL)]
+    mean_mae = per_fold.pivot_table(index="model", columns="fold", values="mae", aggfunc="mean")
+    won = mean_mae.lt(mean_mae.loc[PERSISTENCE], axis=1).sum(axis=1)
+    return pd.DataFrame({"won": won, "folds": mean_mae.shape[1]})
+
+
 def _headline_numbers(scores: pd.DataFrame) -> pd.DataFrame:
     """Per model: mean MAE over all leads on `all` and high water, MAE and skill at high water
-    at the last lead."""
+    at the last lead, and the folds won against persistence."""
     pooled = scores[scores["fold"] == ALL_FOLDS]
     mean_mae = pooled.pivot_table(index="model", columns="subset", values="mae", aggfunc="mean")
     high = pooled[pooled["subset"] == SUBSET_HIGH_WATER]
@@ -55,7 +66,19 @@ def _headline_numbers(scores: pd.DataFrame) -> pd.DataFrame:
             "skill_high_last": last["skill"],
         },
         index=model_order(list(pooled["model"])),
-    )
+    ).join(_folds_won(scores))
+
+
+def plotted_models(scores: pd.DataFrame) -> list[str]:
+    """Persistence, then up to PLOTTED_MODELS models that beat it by the selection rule (mean
+    MAE lower in at least 3 of 4 folds, high-water MAE not worse), lowest mean MAE first."""
+    numbers = _headline_numbers(scores)
+    baseline = numbers.loc[PERSISTENCE]
+    winners = numbers[
+        (numbers["won"] * 4 >= numbers["folds"] * 3) & (numbers["mae_high"] <= baseline["mae_high"])
+    ].drop(PERSISTENCE, errors="ignore")
+    best = winners.sort_values(["mae_all", "mae_high"]).index[:PLOTTED_MODELS]
+    return [PERSISTENCE, *best]
 
 
 def _number(value: Any, digits: int) -> str:
@@ -71,6 +94,12 @@ def headline_table(scores: pd.DataFrame) -> pd.DataFrame:
         "mean MAE high water (cm)": [_number(v, 1) for v in numbers["mae_high"]],
         f"MAE +{last_lead} h high water (cm)": [_number(v, 1) for v in numbers["mae_high_last"]],
         f"skill +{last_lead} h high water": [_number(v, 2) for v in numbers["skill_high_last"]],
+        "folds better than persistence": [
+            "-" if model == PERSISTENCE else f"{won} of {folds}"
+            for model, won, folds in zip(
+                numbers.index, numbers["won"], numbers["folds"], strict=True
+            )
+        ],
     }
     return pd.DataFrame(columns, index=pd.Index(numbers.index, name="model"))
 

@@ -87,7 +87,7 @@ Why: a model should be judged on what matters on a flood day, whether and how ea
 
 **False alarms are the counterweight.** A forecast that shows a new event while none is running or starting within 24 hours is a false alarm; a run of such forecasts counts once. Reported as the count divided by the number of test months.
 
-**A forecast replay per run.** An interactive page steps through the forecasts of each event, from 24 hours before the peak to its end, so models can be compared by eye. A static peak track per event goes into the experiment log.
+**A forecast replay per run.** An interactive page steps through the forecasts of each event, from 24 hours before the peak to its end, so models can be compared by eye. The experiment log gets a few static plots instead, each answering one question in its title.
 
 **Few events.** With 13 events in the test folds, differences of one or two predicted events can't rank models.
 

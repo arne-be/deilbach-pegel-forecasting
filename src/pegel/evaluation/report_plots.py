@@ -1,223 +1,229 @@
-"""The plots of the run report: MAE and skill per lead, MAE per fold, and a peak track per flood.
+"""The plots of the run report, each answering one question with the answer in its title.
 
+1. `error.png`: how fast does the forecast get worse with the hours ahead?
+2. `floods-seen.png`: does it see the floods coming, and how early?
+3. `flood-size.png`: how much of each flood's rise did it see, half a day ahead?
+
+They show persistence and the best few models by the selection rule; the tables show all.
 Analysis only: matplotlib is in the `analysis` group, not in the Lambda image.
 """
 
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from pegel.evaluation import contract
-from pegel.evaluation.metrics import ALL_FOLDS, PERSISTENCE, SUBSET_ALL
-from pegel.evaluation.report_tables import model_order
+from pegel.evaluation.metrics import ALL_FOLDS, PERSISTENCE, SUBSET_ALL, SUBSET_HIGH_WATER
+from pegel.evaluation.report_tables import plotted_models
 
 PERSISTENCE_COLOUR = "#808080"
-# tab20 without the greys reserved for persistence: 9 dark and 9 light shades.
-_TAB20 = [c for i, c in enumerate(plt.get_cmap("tab20").colors) if i not in (14, 15)]  # type: ignore[attr-defined]
-MODEL_COLOURS = _TAB20[0::2] + _TAB20[1::2]
-# The peak track shows the issue times from this many hours before the observed peak to it.
-TRACK_HOURS = 24
-_HOUR = pd.Timedelta(hours=1)
+# The first three slots of the dataviz reference palette: they stay apart for colour-blind
+# readers in every pair. A colour goes by rank in the run, so it can differ between runs.
+MODEL_COLOURS = ("#2a78d6", "#eb6834", "#1baf7a")
+MARKERS = ("o", "s", "^", "D")
+# The flood-size plot shows the forecasts issued about this many hours before the peak.
+SIZE_LEAD = 12
 DPI = 100
 
+Palette = dict[str, str]
 
-Palette = dict[str, str | tuple[float, float, float]]
 
-
-def colours(models: list[str], registered: list[str]) -> Palette:
-    """A colour per model by its place in the registry, so a model keeps its colour across
-    runs; models not in the registry come after the registered ones. Beyond 9 models the
-    oldest get the light shades, so the newest models are never the faintest lines."""
-    unregistered = sorted(set(models) - set(registered))
-    others = [model for model in [*registered, *unregistered] if model != PERSISTENCE]
-    dark, light = MODEL_COLOURS[:9], MODEL_COLOURS[9:]
-    order = light[: max(0, len(others) - len(dark))] + dark + light
-    palette: Palette = {PERSISTENCE: PERSISTENCE_COLOUR}
-    palette.update({model: order[i % len(order)] for i, model in enumerate(others)})
-    return palette
+def colours(models: list[str]) -> Palette:
+    """Persistence grey, the others a colour each in the order given (best first)."""
+    others = [model for model in models if model != PERSISTENCE]
+    return {PERSISTENCE: PERSISTENCE_COLOUR, **dict(zip(others, MODEL_COLOURS, strict=False))}
 
 
 def _save(figure: Figure, path: Path) -> Path:
-    figure.savefig(path, dpi=DPI, bbox_inches="tight")
+    figure.savefig(path, dpi=DPI, facecolor="white")
     plt.close(figure)
     return path
 
 
-def _lead_axes(axes: Axes, ylabel: str, title: str) -> None:
-    axes.set_xlabel("hours ahead")
-    axes.set_ylabel(ylabel)
-    axes.set_title(title)
-    axes.set_xlim(left=0)
-    axes.grid(alpha=0.3)
+def _figure(title: str, rows: int = 1, columns: int = 1, **options: Any) -> tuple[Figure, Any]:
+    """A figure with the takeaway as its title; constrained layout keeps the title, the
+    legend and the axes apart."""
+    figure, axes = plt.subplots(rows, columns, layout="constrained", **options)
+    figure.suptitle(title)
+    return figure, axes
 
 
-def _by_lead(scores: pd.DataFrame, fold: str, subset: str) -> pd.DataFrame:
-    rows = scores[(scores["fold"] == fold) & (scores["subset"] == subset)]
-    return rows.pivot(index="lead", columns="model", values=["mae", "skill"])
+def _legend_below(figure: Figure) -> None:
+    handles, labels = figure.axes[0].get_legend_handles_labels()
+    figure.legend(handles, labels, loc="outside lower center", ncols=4, frameon=False)
 
 
-def mae_plot(scores: pd.DataFrame, bootstrap: pd.DataFrame, palette: Palette, path: Path) -> Path:
-    """MAE per lead for each subset, pooled over folds, with the bootstrap band on `all`."""
-    subsets = list(scores["subset"].unique())
-    figure, axes = plt.subplots(1, len(subsets), figsize=(5 * len(subsets), 4), squeeze=False)
-    for ax, subset in zip(axes[0], subsets, strict=True):
-        mae = _by_lead(scores, ALL_FOLDS, subset)["mae"]
-        for model in model_order(list(mae.columns)):
-            ax.plot(mae.index, mae[model], color=palette[model], label=model)
-            band = bootstrap[bootstrap["model"] == model] if not bootstrap.empty else bootstrap
-            if subset == SUBSET_ALL and not band.empty:
-                # A band clear of the grey line means a gain significant at 90 %.
-                band = band.set_index("lead").reindex(mae.index)
-                ax.fill_between(
-                    mae.index,
-                    mae[PERSISTENCE] + band["low"],
-                    mae[PERSISTENCE] + band["high"],
-                    color=palette[model],
-                    alpha=0.2,
-                )
-        _lead_axes(ax, "MAE (cm)", subset)
-        ax.set_ylim(bottom=0)
-    _legend_below(figure, axes[0][0])
-    return _save(figure, path)
+def _style(model: str, models: list[str], palette: Palette) -> dict[str, object]:
+    return {
+        "color": palette[model],
+        "marker": MARKERS[models.index(model) % len(MARKERS)],
+        "label": model,
+        # The baseline thinner and behind, so the models read as the subject.
+        "linewidth": 1.5 if model == PERSISTENCE else 2.2,
+        "zorder": 2 if model == PERSISTENCE else 3,
+    }
 
 
-def skill_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
-    """Skill per lead against persistence, one panel per subset."""
-    subsets = list(scores["subset"].unique())
-    figure, axes = plt.subplots(1, len(subsets), figsize=(5 * len(subsets), 4), squeeze=False)
-    for ax, subset in zip(axes[0], subsets, strict=True):
-        skill = _by_lead(scores, ALL_FOLDS, subset)["skill"]
-        for model in model_order(list(skill.columns)):
-            ax.plot(skill.index, skill[model], color=palette[model], label=model)
-        _lead_axes(ax, "skill" if ax is axes[0][0] else "", subset)
-    _legend_below(figure, axes[0][0])
-    return _save(figure, path)
-
-
-def _legend_below(figure: Figure, axes: Axes) -> None:
-    handles = axes.get_legend_handles_labels()
-    figure.legend(*handles, loc="upper center", ncols=4, bbox_to_anchor=(0.5, 0), fontsize="small")
-
-
-def fold_plot(scores: pd.DataFrame, palette: Palette, path: Path) -> Path:
-    """MAE per lead per fold, a row per subset, a column per fold."""
-    subsets = list(scores["subset"].unique())
-    folds = sorted(set(scores["fold"]) - {ALL_FOLDS})
-    figure, axes = plt.subplots(
-        len(subsets),
-        len(folds),
-        figsize=(3.2 * len(folds), 2.8 * len(subsets)),
-        squeeze=False,
-        sharex=True,
-        sharey="row",
+def error_title(pooled: pd.DataFrame, models: list[str]) -> str:
+    """`24 h ahead, m is off by 2.9 cm on average (persistence 4.0 cm), at high water ...`."""
+    last = int(pooled["lead"].max())
+    at_last = (
+        pooled[pooled["lead"] == last]
+        .pivot(index="model", columns="subset", values="mae")
+        .to_dict("index")
     )
-    for row, subset in enumerate(subsets):
-        for column, fold in enumerate(folds):
-            ax = axes[row][column]
-            # A fold without high water has no rows for that subset.
-            if ((scores["fold"] == fold) & (scores["subset"] == subset)).any():
-                mae = _by_lead(scores, fold, subset)["mae"]
-                for model in model_order(list(mae.columns)):
-                    ax.plot(mae.index, mae[model], color=palette[model], label=model)
-            _lead_axes(ax, f"MAE (cm), {subset}" if column == 0 else "", fold if row == 0 else "")
-            if row < len(subsets) - 1:
-                ax.set_xlabel("")
-    # After plotting: on shared axes an earlier set_ylim would freeze the top too.
-    for ax in axes.flat:
-        ax.set_ylim(bottom=0)
-    _legend_below(figure, axes[0][0])
-    return _save(figure, path)
-
-
-def forecast_peaks(predictions: pd.DataFrame, peak_at: pd.Timestamp) -> pd.DataFrame:
-    """Per model and issue time from TRACK_HOURS before `peak_at` to it: the forecast's highest
-    value and its time, both relative to the observed peak (hours, first of tied hours)."""
-    issued = predictions[contract.ISSUED_AT]
-    window = predictions[(issued >= peak_at - TRACK_HOURS * _HOUR) & (issued <= peak_at)]
-    # Only complete forecasts, as in flood_scores: a missing hour could hide the peak.
-    complete = window.groupby(["model", contract.ISSUED_AT])["prediction"].transform(
-        lambda values: values.notna().all()
-    )
-    window = window[complete.astype(bool)]
-    highest = window.loc[window.groupby(["model", contract.ISSUED_AT])["prediction"].idxmax()]
-    issued_at = highest[contract.ISSUED_AT]
-    return pd.DataFrame(
-        {
-            "model": highest["model"],
-            "issued_hours": (issued_at - peak_at) / _HOUR,
-            "peak_cm": highest["prediction"],
-            "timing_hours": (issued_at - peak_at) / _HOUR + highest["lead"],
-        }
+    best = models[1] if len(models) > 1 else PERSISTENCE
+    every, high = at_last[best][SUBSET_ALL], at_last[best][SUBSET_HIGH_WATER]
+    title = f"{last} h ahead, {best} is off by {every:.1f} cm on average"
+    if best == PERSISTENCE:
+        return f"{title}, at high water by {high:.1f} cm"
+    base = at_last[PERSISTENCE]
+    return (
+        f"{title} (persistence {base[SUBSET_ALL]:.1f} cm),\n"
+        f"at high water by {high:.1f} cm (persistence {base[SUBSET_HIGH_WATER]:.1f} cm)"
     )
 
 
-def peak_track_plot(
-    predictions: pd.DataFrame,
-    event: pd.Series,
-    high_water_cm: float,
-    palette: Palette,
-    path: Path,
-) -> Path:
-    """Each model's forecast peak height (top) and time (bottom) against its issue time, over
-    the TRACK_HOURS before the observed peak: when a model saw the flood and if it held on."""
-    peak_at = pd.Timestamp(event["peak_at"])
-    tracks = forecast_peaks(predictions, peak_at)
-    figure, (height, timing) = plt.subplots(2, 1, figsize=(9, 7), sharex=True)
-    references = (
-        (event["peak_cm"], "black", "-", "observed peak"),
-        (event["pre_event_cm"], "black", ":", "pre-event level"),
-        (high_water_cm, "#b22222", "--", f"{high_water_cm:.0f} cm"),
+def error_plot(scores: pd.DataFrame, models: list[str], high_water_cm: float, path: Path) -> Path:
+    """Average error per hour ahead, all times and high water side by side on one scale."""
+    pooled = scores[(scores["fold"] == ALL_FOLDS) & scores["model"].isin(models)]
+    palette = colours(models)
+    figure, axes = _figure(error_title(pooled, models), 1, 2, figsize=(10, 4.8), sharey=True)
+    panels = (
+        (SUBSET_ALL, "All times"),
+        (SUBSET_HIGH_WATER, f"High water (above {high_water_cm:.0f} cm)"),
     )
-    for level, colour, style, label in references:
-        height.axhline(level, color=colour, linestyle=style, linewidth=1.2)
-        height.annotate(
-            label, (0, level), xytext=(4, 2), textcoords="offset points", fontsize="small"
-        )
-    timing.axhline(0, color="black", linewidth=1.2)
-    for model in model_order(list(tracks["model"])):
-        track = tracks[tracks["model"] == model]
-        for ax, column in ((height, "peak_cm"), (timing, "timing_hours")):
-            ax.plot(track["issued_hours"], track[column], color=palette[model], label=model)
-    height.set_ylabel("forecast peak (cm)")
-    height.set_title(
-        f"Event {event['event']}: peak {event['peak_cm']:.0f} cm at {peak_at:%Y-%m-%d %H:%M} UTC"
-    )
-    timing.set_ylabel("forecast peak time (h after observed peak)")
-    timing.set_xlabel("issue time (h relative to the observed peak)")
-    timing.set_xlim(-TRACK_HOURS, 0)
-    for ax in (height, timing):
+    for ax, (subset, name) in zip(axes, panels, strict=True):
+        for model in models:
+            line = pooled[(pooled["model"] == model) & (pooled["subset"] == subset)]
+            line = line.sort_values("lead")
+            ax.plot(line["lead"], line["mae"], markevery=[-1], **_style(model, models, palette))
+        ax.set_title(name, fontsize="medium", loc="left")
+        ax.set_xlabel("hours ahead")
+        ax.set_xlim(0, pooled["lead"].max() + 1)
         ax.grid(alpha=0.3)
-    _legend_below(figure, timing)
+    axes[0].set_ylabel("average error (cm)")
+    axes[0].set_ylim(bottom=0)
+    _legend_below(figure)
+    return _save(figure, path)
+
+
+def _seen(peaks: pd.DataFrame) -> pd.DataFrame:
+    """Per model and lead: floods seen coming and floods with a forecast."""
+    scored = peaks.dropna(subset=["size"])
+    grouped = scored.assign(seen=scored["predicted"].astype(bool)).groupby(["model", "lead_hours"])
+    return grouped.agg(seen=("seen", "sum"), total=("seen", "size"))
+
+
+def seen_title(seen: pd.DataFrame, models: list[str]) -> str:
+    """`m sees 9 of 13 floods coming 24 h ahead; persistence 5`, for the model that sees most
+    at the earliest lead."""
+    earliest = seen.index.get_level_values("lead_hours").max()
+    at_earliest = seen[seen.index.get_level_values("lead_hours") == earliest]
+    first = at_earliest.droplevel("lead_hours").reindex(models).dropna().to_dict("index")
+    # max keeps the first of tied models, so the better one by the selection rule.
+    best = max(first, key=lambda model: first[model]["seen"])
+    title = (
+        f"{best} sees {first[best]['seen']:.0f} of {first[best]['total']:.0f} floods coming"
+        f" {earliest} h ahead"
+    )
+    if best == PERSISTENCE or PERSISTENCE not in first:
+        return title
+    return f"{title}; persistence {first[PERSISTENCE]['seen']:.0f}"
+
+
+def seen_plot(peaks: pd.DataFrame, models: list[str], path: Path) -> Path:
+    """Floods seen coming per lead before the peak, the leads evenly spaced, early on the left."""
+    seen = _seen(peaks)
+    models = [model for model in models if model in seen.index.get_level_values("model")]
+    leads = sorted(seen.index.get_level_values("lead_hours").unique(), reverse=True)
+    palette = colours(models)
+    figure, ax = _figure(seen_title(seen, models), figsize=(8, 4.8))
+    for model in models:
+        counts = seen.loc[model].reindex(leads)["seen"]
+        ax.plot(range(len(leads)), counts.values, markersize=7, **_style(model, models, palette))
+    floods = int(seen["total"].max())
+    ax.axhline(floods, color="black", linewidth=0.8, linestyle=":")
+    ax.annotate(f"all {floods}", (0, floods), xytext=(2, 3), textcoords="offset points")
+    ax.set_xticks(range(len(leads)), [f"{lead} h" for lead in leads])
+    ax.set_xlabel("hours before the peak the forecast was made")
+    ax.set_ylabel("floods seen coming")
+    ax.set_ylim(0, floods + 1)
+    ax.yaxis.get_major_locator().set_params(integer=True)
+    ax.grid(alpha=0.3)
+    _legend_below(figure)
+    return _save(figure, path)
+
+
+def size_lead(peaks: pd.DataFrame) -> int:
+    """SIZE_LEAD, or the scored lead nearest to it."""
+    return int(min(peaks["lead_hours"].unique(), key=lambda lead: abs(lead - SIZE_LEAD)))
+
+
+def size_title(sizes: pd.DataFrame, models: list[str], lead: int) -> str:
+    """`12 h before the peak, m saw a median 70 % of the rise; persistence 47 %`."""
+    median = sizes.median() * 100
+    best = models[1] if len(models) > 1 else PERSISTENCE
+    title = f"{lead} h before the peak, {best} saw a median {median[best]:.0f} % of the rise"
+    if best == PERSISTENCE:
+        return title
+    return f"{title}; persistence {median[PERSISTENCE]:.0f} %"
+
+
+def size_plot(peaks: pd.DataFrame, events: pd.DataFrame, models: list[str], path: Path) -> Path:
+    """Per flood, the share of the rise each model's forecast saw at one lead, with the
+    50 % bar for "seen coming" and the 100 % line for the right height."""
+    lead = size_lead(peaks)
+    rows = peaks[peaks["lead_hours"] == lead]
+    sizes = rows.pivot(index="event", columns="model", values="size")
+    models = [model for model in models if model in sizes.columns]
+    events = events.set_index("event").sort_values("peak_at")
+    palette = colours(models)
+    title = size_title(sizes[models], models, lead)
+    figure, ax = _figure(title, figsize=(9, 0.4 * len(events) + 2))
+    for row, event in enumerate(events.index):
+        for i, model in enumerate(models):
+            # A small vertical offset per model, so equal values don't hide each other.
+            offset = (i - (len(models) - 1) / 2) * 0.15
+            style = _style(model, models, palette)
+            style.update(linestyle="none", markersize=7, label=model if row == 0 else None)
+            ax.plot(
+                sizes.get(model, pd.Series()).get(event, float("nan")) * 100, row + offset, **style
+            )
+    labels = [
+        f"{pd.Timestamp(at):%d %b %Y} · {cm:.0f} cm"
+        for at, cm in zip(events["peak_at"], events["peak_cm"], strict=True)
+    ]
+    ax.set_yticks(range(len(events)), labels)
+    ax.set_ylim(len(events) - 0.5, -0.5)
+    for share, text in ((50, "half the rise:\nseen coming"), (100, "full rise:\nright height")):
+        ax.axvline(share, color="black", linewidth=0.8, linestyle=":" if share == 50 else "-")
+        transform = ax.get_xaxis_transform()
+        ax.text(share, 1.01, text, transform=transform, ha="center", va="bottom", fontsize="small")
+    ax.set_xlabel("share of the rise the forecast saw (%)")
+    left = min(0, sizes.min().min() * 100 - 5)
+    ax.axvspan(left, 50, color="#f0efec", zorder=0)  # missed: less than half the rise
+    ax.set_xlim(left=left)
+    ax.grid(axis="x", alpha=0.3)
+    _legend_below(figure)
     return _save(figure, path)
 
 
 def write_plots(
-    predictions: pd.DataFrame,
-    tables: dict[str, pd.DataFrame],
-    registered: list[str],
-    high_water_cm: float,
-    plot_dir: Path,
+    tables: dict[str, pd.DataFrame], high_water_cm: float, plot_dir: Path
 ) -> list[Path]:
     """Every plot the tables allow; a missing or empty table only skips its plots."""
     plot_dir.mkdir(parents=True, exist_ok=True)
-    scores, events = tables["scores"], tables["events"]
-    palette = colours(list(predictions["model"]), registered)
-    plots: list[Path] = []
-    if not scores.empty:
-        plots.append(mae_plot(scores, tables["bootstrap"], palette, plot_dir / "mae.png"))
-        # Skill is 0 by definition for persistence, so a run of it alone has nothing to show.
-        if set(scores["model"]) != {PERSISTENCE}:
-            plots.append(skill_plot(scores, palette, plot_dir / "skill.png"))
-    if not scores.empty:
-        plots.append(fold_plot(scores, palette, plot_dir / "mae-folds.png"))
-    if events.empty:
+    scores = tables["scores"]
+    if scores.empty:
+        return []
+    models = plotted_models(scores)
+    plots = [error_plot(scores, models, high_water_cm, plot_dir / "error.png")]
+    peaks, events = tables["peaks"], tables["events"]
+    if peaks.empty or events.empty:
         return plots
-    for event in events.to_dict("records"):
-        name = f"peak-track-{event['event']}-{pd.Timestamp(event['peak_at']):%Y-%m-%d}.png"
-        plots.append(
-            peak_track_plot(predictions, pd.Series(event), high_water_cm, palette, plot_dir / name)
-        )
+    plots.append(seen_plot(peaks, models, plot_dir / "floods-seen.png"))
+    plots.append(size_plot(peaks, events, models, plot_dir / "flood-size.png"))
     return plots

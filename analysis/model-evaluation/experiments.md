@@ -12,12 +12,18 @@ run follows once they are updated.
 
 ## How to read this
 
-Each section starts with a short summary, the notes and one table with a row per model. The
-plots follow; the detail tables and the plot per flood are folded below them. Plots live in
-`plots/<run>/`. The full rules are in [docs/evaluation.md](../../docs/evaluation.md).
+Each section starts with a short summary, the notes and one table with a row per model, then
+the error plot; the detail tables are folded below it. The flood forecasts follow with their
+summary table, two plots and one folded table per model. Each plot answers one question in its
+title and has one line under it on how to read it. Plots show persistence (grey) and the two
+best models by the selection rule; the tables show all models. Plots live in `plots/<run>/`.
+The full rules are in [docs/evaluation.md](../../docs/evaluation.md).
 
-- **MAE:** mean absolute error of the forecast level in cm, pooled over the four test folds.
-  "Mean MAE" averages the leads 1 to 24 hours.
+- **MAE** ("average error" in the plots): mean absolute error of the forecast level in cm,
+  pooled over the four test folds. "Mean MAE" averages the leads 1 to 24 hours. **Lead**: how
+  many hours ahead the forecast looks.
+- **Folds better than persistence:** in how many of the four test periods the model's mean
+  MAE beats persistence. The selection rule asks for at least 3 of 4.
 - **Skill:** 1 - MAE / MAE of persistence on the same rows. Persistence is 0; above 0 is
   better than holding the last level.
 - **High water:** issue times where the cleaned level is above `evaluation.high_water_cm`
