@@ -122,7 +122,10 @@ function draw() {
 
   const px = s.x(event.peak_at), py = s.y(event.peak_cm);
   chart.append(svg("circle", { cx: px, cy: py, r: 4, fill: "none", stroke: "#000", "stroke-width": 1.5 }));
-  chart.append(svg("text", { x: px + 6, y: py - 6 }, "peak " + event.peak_cm + " cm"));
+  const untilPeak = Math.round((event.peak_at - issuedAt) / HOUR);
+  const when = untilPeak > 0 ? "in " + untilPeak + " h" : untilPeak < 0 ? -untilPeak + " h ago" : "now";
+  chart.append(svg("text", { x: px + 6, y: py - 6, "font-weight": "bold" },
+    "peak " + event.peak_cm + " cm, " + berlinShort.format(event.peak_at) + " (" + when + ")"));
 
   DATA.models.forEach((model, index) => {
     if (!selected.has(model)) return;
@@ -142,7 +145,8 @@ function draw() {
   chart.append(svg("line", { x1: nx, x2: nx, y1: M.top, y2: H - M.bottom, stroke: "#333", "stroke-dasharray": "3 3" }));
   // Near the right edge the label goes left of the line, so it stays inside the chart.
   const right = nx > W - M.right - 140;
-  chart.append(svg("text", { x: right ? nx - 4 : nx + 4, y: M.top + 10, "text-anchor": right ? "end" : "start",
+  // At the bottom, so it never covers the peak label at the top.
+  chart.append(svg("text", { x: right ? nx - 4 : nx + 4, y: H - M.bottom - 6, "text-anchor": right ? "end" : "start",
     "font-weight": "bold" }, "now: " + berlinShort.format(issuedAt)));
 
   el("issue").textContent = berlin.format(issuedAt);
