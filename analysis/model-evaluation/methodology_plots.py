@@ -1,6 +1,6 @@
 """Figures and tables for docs/evaluation.md: the fold split and every flood event.
 
-Reads the frozen dataset only, with the same folds, embargo and event rule as the scorer.
+Reads the frozen dataset only, with the scorer's folds and embargo and `events.flood_events`.
 
     uv run --group analysis python analysis/model-evaluation/methodology_plots.py \
         ~/data/deilbach-pegel/eval/2026-10-14/eval.parquet docs/images/evaluation-methodology
@@ -50,20 +50,22 @@ def split_plot(observed: pd.Series, floods: pd.DataFrame, settings, path: Path) 
         )
     previous_peak = None
     for number, flood in enumerate(floods.itertuples(), start=1):
+        top.axvspan(flood.start, flood.end, color="#b42343", alpha=0.25, linewidth=0)
         # Shift a label sideways when its peak is close to the previous one.
         close = previous_peak is not None and flood.peak_at - previous_peak < pd.Timedelta(days=5)
         top.annotate(
             str(number),
             (flood.peak_at, flood.peak_cm),
-            xytext=(7 if close else 0, 4),
+            xytext=(10 if close else 0, 4),
             textcoords="offset points",
             ha="center",
             fontsize=8,
             weight="bold",
+            bbox={"boxstyle": "round,pad=0.1", "facecolor": "white", "edgecolor": "none"},
         )
         previous_peak = flood.peak_at
     top.set_ylabel("Kupferdreh, cleaned (cm)")
-    top.set_title("Cleaned level, test periods shaded, flood events numbered")
+    top.set_title("Cleaned level, test periods shaded, flood events in red and numbered")
 
     first = pd.Timestamp(settings.window_first_day)
     for row, fold in enumerate(contract.FOLDS):
@@ -122,6 +124,13 @@ def event_plot(
     top.axhline(
         settings.flood_cm, color="#b42343", linewidth=0.8, linestyle="--", label="flood 95 cm"
     )
+    top.axhline(
+        flood.pre_event_cm,
+        color=LEVEL,
+        linewidth=0.8,
+        linestyle="-.",
+        label=f"pre-event level {flood.pre_event_cm:.1f} cm",
+    )
     top.axvspan(flood.start - HOUR / 2, flood.end + HOUR / 2, color=TEST, alpha=0.12)
     top.set_ylabel("level (cm)")
     top.set_title(
@@ -153,6 +162,9 @@ def fold_table(dataset: pd.DataFrame, floods: pd.DataFrame, settings) -> pd.Data
                     (test[contract.KD_LAST_CM] > settings.high_water_cm).sum()
                 ),
                 "flood events": int(in_test.sum()),
+                "of them above 95 cm": int(
+                    (in_test & (floods["peak_cm"] > settings.flood_cm)).sum()
+                ),
             }
         )
     return pd.DataFrame(rows)
@@ -173,8 +185,9 @@ def event_table(floods: pd.DataFrame, dataset: pd.DataFrame) -> pd.DataFrame:
             {
                 "event": number,
                 "fold": next(name for name, (a, b) in fold_of.items() if a <= flood.peak_at < b),
-                "above 95 cm from (UTC)": f"{flood.start:%Y-%m-%d %H:%M}",
-                "to (UTC)": f"{flood.end:%Y-%m-%d %H:%M}",
+                "start (UTC)": f"{flood.start:%Y-%m-%d %H:%M}",
+                "end (UTC)": f"{flood.end:%Y-%m-%d %H:%M}",
+                "pre-event level (cm)": round(flood.pre_event_cm, 1),
                 "peak (cm)": round(flood.peak_cm, 1),
                 "peak at (UTC)": f"{flood.peak_at:%Y-%m-%d %H:%M}",
                 "radar, wettest cell, 48 h to peak (mm)": round(
@@ -189,10 +202,10 @@ def main(dataset_path: Path, out_dir: Path) -> None:
     settings = load_config().evaluation
     dataset = pd.read_parquet(dataset_path)
     observed = events.observed_levels(dataset, settings.leads_hours)
-    # The scored events: only those in the test periods, as in score.py.
+    # Found on the whole window, so an event's look-back can reach before the first test period.
+    all_floods = events.flood_events(observed, settings.high_water_cm)
     test_start = pd.Timestamp(contract.FOLDS[0].test_start, tz="UTC")
-    floods = events.episodes(observed[test_start:], settings.flood_cm)
-    all_floods = events.episodes(observed, settings.flood_cm)
+    floods = all_floods[all_floods["peak_at"] >= test_start].reset_index(drop=True)
     out_dir.mkdir(parents=True, exist_ok=True)
     split_plot(observed, floods, settings, out_dir / "split.png")
     for number, flood in enumerate(floods.itertuples(), start=1):

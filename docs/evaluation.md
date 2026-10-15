@@ -43,7 +43,7 @@ Four expanding-window folds, fixed in code (`src/pegel/evaluation/contract.py`).
 
 ## Flood events
 
-**Proposed, not in the code yet.** The scorer (`src/pegel/evaluation/events.py`) still uses the old rule: a time above 95 cm, with spells whose peaks are less than 24 hours apart merged. That gave 8 events. The new rule below replaces it once confirmed.
+Found by `flood_events` in `src/pegel/evaluation/events.py`. The scorer's peak scores still use spells above 95 cm until the flood forecast scoring lands.
 
 A flood event is one rise of the river and its fall back, with a peak above 75 cm (`evaluation.high_water_cm`). It is found on the hourly cleaned level:
 
@@ -81,26 +81,16 @@ The events are not sensitive to the numbers. Changing one at a time:
 | 12 | F4 | 2026-01-12 12:30 | 2026-01-17 10:30 | 65.4 | 93.5 | 2026-01-14 11:30 | 25.1 |
 | 13 | F4 | 2026-02-21 17:30 | 2026-02-26 03:30 | 69.9 | 90.7 | 2026-02-22 18:30 | 35.2 |
 
-**What changed from the old 8 events.**
+**Six of the 13 events pass 95 cm** (1, 2, 3, 4, 6, 7), and each holds one first crossing of 95 cm. Only event 2 crosses the first category bound, 145 cm. The other seven count for peak errors only.
 
-- Old events 5 and 6 are now event 6. The 95.4 cm on 8 Jan 2025 was a small bump in the fall after the 125 cm peak.
-- Old events 7 and 8 are now event 7. The level stayed above 90 cm between the two peaks.
-- Events 6 and 7 stay apart, so old events 5 to 8 become two events, not one. From 14 to 23 January the level was back at 56 to 67 cm, at or below the 64 cm event 6 started from. No rule that ends an event at its pre-event level can join them.
-- New are the seven events that peak between 75 and 95 cm: 5 (2 Jan 2025), 8 (April 2025) and all five in F4.
-- Events 11 and 12 (January 2026) are two events: between them the level sat at 65 to 67 cm for a day and a half. Events 5 and 6 in January 2025 are split the same way.
+**Warnings don't use events.** First crossings of 95 cm and of each category bound are found on the level itself: 6 at 95 cm and 1 at 145 cm in the test folds. The per-lead hits diagnostic (`alarms.csv`) also keeps its own spells above each threshold.
 
-**13 events, 6 first crossings.** Six events pass 95 cm (1, 2, 3, 4, 6, 7), and each holds one first crossing of 95 cm. Only event 2 crosses the first category bound, 145 cm. The other seven count for peak errors only.
-
-**Warnings don't change.** First crossings of 95 cm and of each category bound are found on the level itself, not from events, so the warning tables keep their 6 crossings at 95 cm and 1 at 145 cm. The per-lead hits diagnostic (`alarms.csv`) also keeps its own spells above each threshold.
-
-Each plot shows the event from 36 hours before it starts to 48 hours after it ends. Top: the cleaned Kupferdreh level and the two upstream gauges, with the event shaded. Bottom: hourly radar rain in the wettest radar cell of the catchment (the dataset's `catchment` series is the cell maximum, not a mean). The figures are redrawn with:
+Each plot shows the event from 36 hours before it starts to 48 hours after it ends. Top: the cleaned Kupferdreh level and the two upstream gauges, with the event shaded and its pre-event level as a dash-dot line. Bottom: hourly radar rain in the wettest radar cell of the catchment (the dataset's `catchment` series is the cell maximum, not a mean). The figures are redrawn with:
 
 ```
 uv run --group analysis python analysis/model-evaluation/methodology_plots.py \
     ~/data/deilbach-pegel/eval/2026-10-14/eval.parquet docs/images/evaluation-methodology
 ```
-
-**The images below are still from the old rule** (time above 95 cm shaded, old numbers in the titles and in the split figure). They will be redrawn once the new rule is in the code. Events 5 and 8 to 13 get their figures then.
 
 ### Event 1 · 10 Oct 2024, 120.7 cm
 
@@ -124,11 +114,13 @@ The largest flood in the window and the only one above 145 cm. ICON-D2 badly und
 
 A small rise three days before event 6. The level then stayed at 64 to 66 cm for two days.
 
+![Event 5](images/evaluation-methodology/event-5-2025-01-02.png)
+
 ### Event 6 · 5 Jan 2025, 125.4 cm
 
 Above 95 cm for more than two days. The bump to 95.4 cm on 8 January is part of the fall.
 
-![Event 6](images/evaluation-methodology/event-5-2025-01-05.png)
+![Event 6](images/evaluation-methodology/event-6-2025-01-05.png)
 
 ### Event 7 · 26 Jan 2025, 105.0 cm
 
@@ -140,15 +132,27 @@ Two peaks: 98 cm on 25 January and 105 cm on 26 January, with a last bump to 96 
 
 The only event in the summer half, after 106 mm of radar rain in the wettest cell.
 
+![Event 8](images/evaluation-methodology/event-8-2025-04-24.png)
+
 ### Event 9 · 28 Oct 2025, 86.9 cm
+
+![Event 9](images/evaluation-methodology/event-9-2025-10-28.png)
 
 ### Event 10 · 9 Dec 2025, 92.4 cm
 
+![Event 10](images/evaluation-methodology/event-10-2025-12-09.png)
+
 ### Event 11 · 9 Jan 2026, 88.4 cm
+
+![Event 11](images/evaluation-methodology/event-11-2026-01-09.png)
 
 ### Event 12 · 14 Jan 2026, 93.5 cm
 
+![Event 12](images/evaluation-methodology/event-12-2026-01-14.png)
+
 ### Event 13 · 22 Feb 2026, 90.7 cm
+
+![Event 13](images/evaluation-methodology/event-13-2026-02-22.png)
 
 ## Metrics
 
