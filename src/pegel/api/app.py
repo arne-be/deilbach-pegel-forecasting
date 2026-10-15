@@ -12,6 +12,7 @@ from pegel.adapters.storage.connection import connect
 from pegel.adapters.storage.forecasts import newest_forecast
 from pegel.adapters.storage.observations import fetch_values
 from pegel.api.schemas import (
+    BandResponse,
     ForecastPointResponse,
     ForecastResponse,
     HistoryPoint,
@@ -75,8 +76,20 @@ def forecast(
         model=newest.model,
         issued_at=newest.issued_at,
         newest_observation_at=newest.newest_observation_at,
+        situation=newest.situation,
         points=[
-            ForecastPointResponse(valid_at=point.valid_at, level_cm=point.level_cm)
+            ForecastPointResponse(
+                valid_at=point.valid_at,
+                level_cm=point.level_cm,
+                bands=[
+                    BandResponse(
+                        coverage_percent=band.coverage_percent,
+                        lower_cm=band.lower_cm,
+                        upper_cm=band.upper_cm,
+                    )
+                    for band in point.bands
+                ],
+            )
             for point in newest.points
         ],
     )

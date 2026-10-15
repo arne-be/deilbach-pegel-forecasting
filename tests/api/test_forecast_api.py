@@ -11,7 +11,7 @@ from psycopg.rows import TupleRow
 from pegel.adapters.storage.forecasts import save_forecast
 from pegel.api.app import app, get_config, get_database_url
 from pegel.config import load_config
-from pegel.core.forecasts import Forecast, ForecastPoint
+from pegel.core.forecasts import Band, Forecast, ForecastPoint
 
 Conn = psycopg.Connection[TupleRow]
 STATION = "kupferdreh"
@@ -44,11 +44,24 @@ def test_returns_the_newest_forecast(client: TestClient, conn: Conn) -> None:
         "model": "persistence",
         "issued_at": "2026-10-12T15:30:00Z",
         "newest_observation_at": "2026-10-12T15:22:00Z",
+        "situation": None,
         "points": [
-            {"valid_at": "2026-10-12T16:22:00Z", "level_cm": -20.0},
-            {"valid_at": "2026-10-12T17:22:00Z", "level_cm": -10.0},
+            {"valid_at": "2026-10-12T16:22:00Z", "level_cm": -20.0, "bands": []},
+            {"valid_at": "2026-10-12T17:22:00Z", "level_cm": -10.0, "bands": []},
         ],
     }
+
+
+def test_returns_the_bands_and_situation(client: TestClient, conn: Conn) -> None:
+    bands = (Band(80, 40.0, 44.0), Band(95, 38.0, 47.0))
+    point = ForecastPoint(OBSERVED_AT + timedelta(hours=1), 42.0, bands)
+    save_forecast(conn, Forecast(STATION, "persistence", OBSERVED_AT, OBSERVED_AT, (point,), "dry"))
+    body = client.get("/api/forecast").json()
+    assert body["situation"] == "dry"
+    assert body["points"][0]["bands"] == [
+        {"coverage_percent": 80, "lower_cm": 40.0, "upper_cm": 44.0},
+        {"coverage_percent": 95, "lower_cm": 38.0, "upper_cm": 47.0},
+    ]
 
 
 def test_ignores_forecasts_of_other_models(client: TestClient, conn: Conn) -> None:

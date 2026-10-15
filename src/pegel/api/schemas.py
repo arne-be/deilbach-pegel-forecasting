@@ -10,9 +10,19 @@ class HistoryPoint(BaseModel):
     level_cm: float = Field(description="Centimetres relative to the gauge zero; never negative")
 
 
+class BandResponse(BaseModel):
+    coverage_percent: int = Field(description="The level should lie inside in this % of cases")
+    lower_cm: float = Field(description="Never negative")
+    upper_cm: float
+
+
 class ForecastPointResponse(BaseModel):
     valid_at: datetime = Field(description="UTC")
     level_cm: float = Field(description="Centimetres relative to the gauge zero; never negative")
+    bands: list[BandResponse] = Field(
+        description="Uncertainty bands, narrowest first; empty past the model's last lead or "
+        "for persistence"
+    )
 
 
 class ForecastResponse(BaseModel):
@@ -20,6 +30,9 @@ class ForecastResponse(BaseModel):
     model: str
     issued_at: datetime = Field(description="When the forecast was made, UTC")
     newest_observation_at: datetime = Field(description="Newest reading it used, UTC")
+    situation: str | None = Field(
+        description="The situation that picked the bands, e.g. 'dry'; null without bands"
+    )
     points: list[ForecastPointResponse] = Field(
         description="From one hour after the newest reading to the end of the horizon"
     )
