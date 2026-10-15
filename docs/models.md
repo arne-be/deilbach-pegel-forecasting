@@ -16,10 +16,11 @@ Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10
 | `rain_change`, `rain_change:split` | 7 named inputs, plain least squares | 2.4, 2.3 | 5.4, 5.2 | `models/rain_change.py` |
 | **`rain_change:v2:split`** | 14 named inputs | 2.1 | 5.1 | `models/curated.py` |
 | **`ridge:change:v2`** | 20 named inputs, ridge penalty | 2.1 | 4.8 | `models/curated.py` |
+| `ridge:level:no_icon`, `ridge:change:no_icon` | ridge without ICON-D2, kept for reference | 3.4, 3.1 | 8.4, 7.7 | `models/ridge.py` |
 
-The two v2 models are the current best. Both beat everything above them under the selection rule. They are level over all issue times, and `ridge:change:v2` is better at high water but has more false alarms (0.60 a month at 95 cm against 0.38).
+The two v2 models are the current best. Under the selection rule both win over `rain_change:split` and `ridge:change` (`rain_change:v2:split` ties `ridge:change` in F2 and wins on high water). They are level over all issue times, and `ridge:change:v2` is better at high water but has more false alarms (0.60 a month at 95 cm against 0.38).
 
-All learned models forecast the **change** from the last cleaned level, one fit per lead (1 to 24 hours), so the forecast is `last + change_k`. A row with a missing input gets persistence. They are all trained on day-old ICON-D2 (see [evaluation.md](evaluation.md#the-icon-d2-archive)).
+All learned models except `ridge:level` forecast the **change** from the last cleaned level, one fit per lead (1 to 24 hours), so the forecast is `last + change_k`. In the rain change models a missing upstream change (v2: also the Kupferdreh change and the recent rise) counts as 0; any other missing input gives persistence. Ridge fills gaps instead (below). They are all trained on day-old ICON-D2 (see [evaluation.md](evaluation.md#the-icon-d2-archive)).
 
 ## Simple models
 
@@ -31,7 +32,7 @@ No constant: with no distance to the base and no recent change the level should 
 
 ## Ridge
 
-`ridge:level` and `ridge:change` use the shared features in `core/features.py`: Kupferdreh's last level, 24 lags and base, upstream lags 0–6 and 1- and 3-hour changes, radar sums from 1 hour to 7 days per area, all 24 ICON-D2 hours (mean, p90, lead), time of year. Missing inputs are filled with the last known value plus a flag. The penalty is picked per fold from 1 to 10,000 on the newest 20 % of the training rows. The `:no_icon` variants drop ICON-D2. They are replaced by `ridge:change:v2`.
+`ridge:level` and `ridge:change` use the shared features in `core/features.py`: Kupferdreh's last level, 24 lags and base, upstream lags 0–6 and 1- and 3-hour changes, radar sums from 1 hour to 7 days per area, all 24 ICON-D2 hours (mean, p90, lead), time of year. Missing inputs are filled with the last known value plus a flag. The penalty is picked per fold from 1 to 10,000 on the newest 20 % of the training rows. The `:no_icon` variants drop ICON-D2. `ridge:level` and `ridge:change` are replaced by `ridge:change:v2`.
 
 ## Rain change
 
@@ -81,12 +82,13 @@ change_k = c0 + c1·(last − base_30d)
 | other, +6 h | −0.39 | −0.03 | 0.49 | 0.71 | 0.66 | 0.77 | 0.29 | −0.16 | −0.62 |
 | other, +24 h | −1.30 | −0.09 | 1.27 | 1.61 | −0.68 | 0.64 | 0.74 | −0.16 | −0.27 |
 
-**How the inputs were chosen.** On an inner time split inside each fold's training rows: fit on the older 80 %, validate on the newest 20 %, with a 24-hour gap. Version 1 came from about 20 candidates, version 2 from 68 (`analysis/model-evaluation/models-v2-candidates.csv`). Tried and dropped: ICON-D2 p90, the radar zones and the catchment maximum, radar beyond 24 hours, Kupferdreh and upstream level lags, a recession gated to after the peak, time constants of 6 to 48 hours for the 24-hour rise. The inner splits of later folds overlap earlier test periods, so this is not a clean hold-out; the live shadow run is.
+**How the inputs were chosen.** On an inner time split inside each fold's training rows: fit on the older 80 %, validate on the newest 20 %, with a 24-hour gap. Version 1 came from about 20 candidates, version 2 from 68 (`analysis/model-evaluation/models-v2-candidates.csv`). Tried and dropped: ICON-D2 p90, the radar zones and the catchment maximum, radar beyond 24 hours, Kupferdreh and upstream level lags, a recession gated to after the peak, other time constants (6, 8, 12, 36, 48 h) in place of the 24-hour one in `rain_change:v2:split`. The inner splits of later folds overlap earlier test periods, so this is not a clean hold-out; the live shadow run is.
 
 ## Known weaknesses of the current best
 
 - **No gain at +1 h.** About 0.67 cm, persistence 0.66, `upstream` 0.60.
 - **Too low at high water.** Bias about −1.5 to −1.7 cm at +6 h and −3.7 to −3.8 cm at +24 h. Rises are still caught late.
 - **Warnings.** 2 of 6 first crossings at 95 cm warned 3 hours or more ahead. The 145 cm crossing of 2024-11-19 is not warned 3 hours ahead.
+- **Fewer warnings than `ridge:change`**, which warns 3 of 6 at 95 cm and the 145 cm crossing 3 hours ahead.
 - **Chosen from many candidates** on inner splits that overlap earlier test periods.
 - **Trained on day-old ICON-D2.** How the fitted coefficients behave on fresh runs is unknown until the live shadow run.
