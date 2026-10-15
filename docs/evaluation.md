@@ -30,35 +30,62 @@ Four expanding-window folds, fixed in code (`src/pegel/evaluation/contract.py`).
 
 ![The cleaned Kupferdreh level from February 2024 to April 2026 with the test periods shaded, and the four folds below it](images/evaluation-methodology/split.png)
 
-| fold | test period | training issue times | test issue times | test issue times above 75 cm | flood events |
-|---|---|---|---|---|---|
-| F1 | 2024-10-01 – 2024-12-31 | 5,808 | 2,208 | 377 | 4 |
-| F2 | 2025-01-01 – 2025-03-31 | 8,016 | 2,160 | 276 | 4 |
-| F3 | 2025-04-01 – 2025-09-30 | 10,176 | 4,392 | 15 | 0 |
-| F4 | 2025-10-01 – 2026-04-12 | 14,568 | 4,656 | 297 | 0 |
+| fold | test period | training issue times | test issue times | test issue times above 75 cm | flood events | of them above 95 cm |
+|---|---|---|---|---|---|---|
+| F1 | 2024-10-01 – 2024-12-31 | 5,808 | 2,208 | 377 | 4 | 4 |
+| F2 | 2025-01-01 – 2025-03-31 | 8,016 | 2,160 | 276 | 3 | 2 |
+| F3 | 2025-04-01 – 2025-09-30 | 10,176 | 4,392 | 15 | 1 | 0 |
+| F4 | 2025-10-01 – 2026-04-12 | 14,568 | 4,656 | 297 | 5 | 0 |
 
-- **All eight flood events are in F1 and F2**, winter 2024/25. F3 is summer, with almost no high water. F4 has high water, but its peaks stop just below 95 cm.
-- **Training before F1 has only two floods**, both in February 2024 (104 cm and 122 cm).
+- **Every fold has flood events, but all six above 95 cm are in F1 and F2**, winter 2024/25. F3 is summer, with one event in April 2025 (86 cm). F4 has five events, all peaking between 86 and 94 cm.
+- **Training before F1 has nine events**, only one above 95 cm: February 2024, 122 cm, with an earlier peak of 104 cm in the same event.
 - **There is no hold-out period.** Every flood is needed in a test fold. The live shadow run is the check on overfitting.
 
 ## Flood events
 
-A flood event is a time above 95 cm. Spells whose peaks are less than 24 hours apart are merged into one event (`src/pegel/evaluation/events.py`).
+Found by `flood_events` in `src/pegel/evaluation/events.py`. The scorer's peak scores still use spells above 95 cm until the flood forecast scoring lands.
 
-| event | fold | above 95 cm from (UTC) | to (UTC) | peak (cm) | peak at (UTC) | radar, wettest cell, 48 h to peak (mm) |
-|---|---|---|---|---|---|---|
-| 1 | F1 | 2024-10-10 00:30 | 2024-10-10 08:30 | 120.7 | 2024-10-10 02:30 | 62.2 |
-| 2 | F1 | 2024-11-19 10:30 | 2024-11-20 20:30 | 165.0 | 2024-11-19 17:30 | 118.4 |
-| 3 | F1 | 2024-12-06 04:30 | 2024-12-06 05:30 | 97.3 | 2024-12-06 05:30 | 36.4 |
-| 4 | F1 | 2024-12-22 01:30 | 2024-12-22 15:30 | 97.8 | 2024-12-22 13:30 | 46.2 |
-| 5 | F2 | 2025-01-05 17:30 | 2025-01-08 01:30 | 125.4 | 2025-01-05 23:30 | 44.6 |
-| 6 | F2 | 2025-01-08 07:30 | 2025-01-08 07:30 | 95.4 | 2025-01-08 07:30 | 46.3 |
-| 7 | F2 | 2025-01-25 06:30 | 2025-01-26 22:30 | 105.0 | 2025-01-26 04:30 | 46.5 |
-| 8 | F2 | 2025-01-27 04:30 | 2025-01-27 06:30 | 96.2 | 2025-01-27 06:30 | 33.9 |
+A flood event is one rise of the river and its fall back, with a peak above 75 cm (`evaluation.high_water_cm`). It is found on the hourly cleaned level:
 
-**8 events, 6 first crossings.** Events 6 and 8 follow another event within hours. They count for peak errors, but not as first crossings for warnings (there was an hour above 95 cm in the 24 hours before). So the warning tables have 6 crossings at 95 cm. Only event 2 crosses the first category bound, 145 cm.
+- **Start.** An hour above 75 cm that is at least **15 cm** above the lowest level of the **24 hours** before it starts an event. The event starts at that lowest hour, and the level there is the **pre-event level**. The 24 hours never reach back before the end of the previous event.
+- **End.** The first hour after that where the level is back within **5 cm** of the pre-event level, or is below 75 cm and fell less than **2 cm** in the last 24 hours.
+- **One event.** A new rise before the end belongs to the same event. The event's peak is its highest level.
 
-Each plot shows the event from 36 hours before it starts to 48 hours after it ends. Top: the cleaned Kupferdreh level and the two upstream gauges, with the time above 95 cm shaded. Bottom: hourly radar rain in the wettest radar cell of the catchment (the dataset's `catchment` series is the cell maximum, not a mean). The figures are redrawn with:
+Hours without a level are skipped. The second end rule is needed in winter. The base level rises from storm to storm, so most winter events never get back to where they started; without it, one event would run from late September to November. Comparing with the level 24 hours earlier cancels the daily dip of 6 to 8 cm in summer, and 15 cm is about twice that dip.
+
+The events are not sensitive to the numbers. Changing one at a time:
+
+| setting | events in the test folds (F1, F2, F3, F4) | events in the whole window |
+|---|---|---|
+| rise 15 cm in 24 h, back within 5 cm, flat below 2 cm a day | 13 (4, 3, 1, 5) | 22 |
+| rise 10 cm instead of 15 | 14 (5, 3, 1, 5) | 26 |
+| rise 20 cm instead of 15 | 13 (4, 3, 1, 5) | 21 |
+| rise within 12 h instead of 24 | 13 (4, 3, 1, 5) | 22 |
+| back within 3 or 10 cm instead of 5 | 13 (4, 3, 1, 5) | 22 or 23 |
+| flat below 1 cm a day instead of 2 | 13 (4, 3, 1, 5) | 21 |
+| flat below 3 cm a day instead of 2 | 14 (5, 3, 1, 5) | 24 |
+
+| event | fold | start (UTC) | end (UTC) | pre-event level (cm) | peak (cm) | peak at (UTC) | radar, wettest cell, 48 h to peak (mm) |
+|---|---|---|---|---|---|---|---|
+| 1 | F1 | 2024-10-09 01:30 | 2024-10-18 00:30 | 37.1 | 120.7 | 2024-10-10 02:30 | 62.2 |
+| 2 | F1 | 2024-11-17 05:30 | 2024-11-23 10:30 | 48.1 | 165.0 | 2024-11-19 17:30 | 118.4 |
+| 3 | F1 | 2024-12-05 10:30 | 2024-12-08 07:30 | 51.8 | 97.3 | 2024-12-06 05:30 | 36.4 |
+| 4 | F1 | 2024-12-18 09:30 | 2024-12-27 11:30 | 57.6 | 97.8 | 2024-12-22 13:30 | 46.2 |
+| 5 | F2 | 2025-01-01 16:30 | 2025-01-03 22:30 | 53.3 | 78.9 | 2025-01-02 06:30 | 37.7 |
+| 6 | F2 | 2025-01-05 04:30 | 2025-01-12 07:30 | 64.0 | 125.4 | 2025-01-05 23:30 | 44.6 |
+| 7 | F2 | 2025-01-23 20:30 | 2025-01-31 14:30 | 66.0 | 105.0 | 2025-01-26 04:30 | 46.5 |
+| 8 | F3 | 2025-04-23 15:30 | 2025-04-30 09:30 | 27.5 | 85.9 | 2025-04-24 20:30 | 105.5 |
+| 9 | F4 | 2025-10-27 00:30 | 2025-11-01 14:30 | 49.6 | 86.9 | 2025-10-28 18:30 | 59.3 |
+| 10 | F4 | 2025-12-06 23:30 | 2025-12-15 07:30 | 47.7 | 92.4 | 2025-12-09 02:30 | 50.2 |
+| 11 | F4 | 2026-01-08 15:30 | 2026-01-12 11:30 | 32.3 | 88.4 | 2026-01-09 19:30 | 52.0 |
+| 12 | F4 | 2026-01-12 12:30 | 2026-01-17 10:30 | 65.4 | 93.5 | 2026-01-14 11:30 | 25.1 |
+| 13 | F4 | 2026-02-21 17:30 | 2026-02-26 03:30 | 69.9 | 90.7 | 2026-02-22 18:30 | 35.2 |
+
+**Six of the 13 events pass 95 cm** (1, 2, 3, 4, 6, 7), and each holds one first crossing of 95 cm. Only event 2 crosses the first category bound, 145 cm. The other seven count for peak errors only.
+
+**Warnings don't use events.** First crossings of 95 cm and of each category bound are found on the level itself: 6 at 95 cm and 1 at 145 cm in the test folds. The per-lead hits diagnostic (`alarms.csv`) also keeps its own spells above each threshold.
+
+Each plot shows the event from 36 hours before it starts to 48 hours after it ends. Top: the cleaned Kupferdreh level and the two upstream gauges, with the event shaded and its pre-event level as a dash-dot line. Bottom: hourly radar rain in the wettest radar cell of the catchment (the dataset's `catchment` series is the cell maximum, not a mean). The figures are redrawn with:
 
 ```
 uv run --group analysis python analysis/model-evaluation/methodology_plots.py \
@@ -83,27 +110,49 @@ The largest flood in the window and the only one above 145 cm. ICON-D2 badly und
 
 ![Event 4](images/evaluation-methodology/event-4-2024-12-22.png)
 
-### Event 5 · 5 Jan 2025, 125.4 cm
+### Event 5 · 2 Jan 2025, 78.9 cm
 
-Above 95 cm for more than two days.
+A small rise three days before event 6. The level then stayed at 64 to 66 cm for two days.
 
-![Event 5](images/evaluation-methodology/event-5-2025-01-05.png)
+![Event 5](images/evaluation-methodology/event-5-2025-01-02.png)
 
-### Event 6 · 8 Jan 2025, 95.4 cm
+### Event 6 · 5 Jan 2025, 125.4 cm
 
-A one-hour return above 95 cm, six hours after the last hour above 95 cm in event 5.
+Above 95 cm for more than two days. The bump to 95.4 cm on 8 January is part of the fall.
 
-![Event 6](images/evaluation-methodology/event-6-2025-01-08.png)
+![Event 6](images/evaluation-methodology/event-6-2025-01-05.png)
 
 ### Event 7 · 26 Jan 2025, 105.0 cm
 
+Two peaks: 98 cm on 25 January and 105 cm on 26 January, with a last bump to 96 cm on 27 January.
+
 ![Event 7](images/evaluation-methodology/event-7-2025-01-26.png)
 
-### Event 8 · 27 Jan 2025, 96.2 cm
+### Event 8 · 24 Apr 2025, 85.9 cm
 
-A second peak, six hours after the last hour above 95 cm in event 7.
+The only event in the summer half, after 106 mm of radar rain in the wettest cell.
 
-![Event 8](images/evaluation-methodology/event-8-2025-01-27.png)
+![Event 8](images/evaluation-methodology/event-8-2025-04-24.png)
+
+### Event 9 · 28 Oct 2025, 86.9 cm
+
+![Event 9](images/evaluation-methodology/event-9-2025-10-28.png)
+
+### Event 10 · 9 Dec 2025, 92.4 cm
+
+![Event 10](images/evaluation-methodology/event-10-2025-12-09.png)
+
+### Event 11 · 9 Jan 2026, 88.4 cm
+
+![Event 11](images/evaluation-methodology/event-11-2026-01-09.png)
+
+### Event 12 · 14 Jan 2026, 93.5 cm
+
+![Event 12](images/evaluation-methodology/event-12-2026-01-14.png)
+
+### Event 13 · 22 Feb 2026, 90.7 cm
+
+![Event 13](images/evaluation-methodology/event-13-2026-02-22.png)
 
 ## Metrics
 
@@ -126,6 +175,7 @@ A model wins over a simpler one when its mean MAE over leads 1 to 24 is lower in
 
 ## Limits
 
-- 8 flood events and 6 first crossings of 95 cm, all in winter, no summer thunderstorm. Differences of one or two warnings mean nothing.
+- 13 flood events, but only 6 above 95 cm and 6 first crossings of 95 cm, all in winter. One event is in April, no summer thunderstorm. Differences of one or two warnings mean nothing.
+- Seven events peak between 75 and 95 cm. They add peak errors, but only for moderate high water.
 - Training and test both use the day-old ICON-D2 archive. Live gets fresher rain forecasts.
 - Picking the best of many models on the same folds overfits them a little. The live shadow run checks both.

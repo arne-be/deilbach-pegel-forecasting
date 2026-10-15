@@ -56,12 +56,12 @@ How it works, with figures: [evaluation.md](../evaluation.md). The models: [mode
 
 **Four expanding-window folds.** Training always starts on 2024-02-01 and ends where the test starts. A 24-hour embargo drops the last training issue times, whose targets reach into the test.
 
-| Fold | Test period | Floods above 95 cm |
-|---|---|---|
-| F1 | 2024-10-01 to 2024-12-31 | 4 |
-| F2 | 2025-01-01 to 2025-03-31 | 4 |
-| F3 | 2025-04-01 to 2025-09-30 | 0 |
-| F4 | 2025-10-01 to 2026-04-12 | 0 |
+| Fold | Test period | Flood events (peak above 75 cm) | of them above 95 cm |
+|---|---|---|---|
+| F1 | 2024-10-01 to 2024-12-31 | 4 | 4 |
+| F2 | 2025-01-01 to 2025-03-31 | 3 | 2 |
+| F3 | 2025-04-01 to 2025-09-30 | 1 | 0 |
+| F4 | 2025-10-01 to 2026-04-12 | 5 | 0 |
 
 **No random splits, no `TimeSeriesSplit`.** The fold dates are fixed in code.
 
@@ -79,7 +79,7 @@ How it works, with figures: [evaluation.md](../evaluation.md). The models: [mode
 
 **Only the cleaned series.** Targets, the high water subset, events and warnings all use the cleaned Kupferdreh level (`kupferdreh:cleaned_kalman`). The raw series is only the input that cleaning is derived from.
 
-**Events.** A flood event is a peak above 95 cm. Two peaks less than 24 hours apart are one event. For each event: error in peak height and peak timing, from the forecasts issued before the peak.
+**Events.** A flood event is one rise of the river and its fall back, with a peak above 75 cm. It starts at the foot of a fast rise and lasts until the level is back near where it started, or has stopped falling below 75 cm; a new rise before then belongs to the same event. The exact rule is in [evaluation.md](../evaluation.md#flood-events). For each event: error in peak height and peak timing, from the forecasts issued before the peak. Warnings don't use events; they are scored on crossings.
 
 **Warnings are scored on crossings.** A warning only helps if it comes before the level crosses a threshold. Each threshold is its own warning: 95 cm and every category bound in config (145, 165, 185 and 225 cm).
 
@@ -165,7 +165,7 @@ Anything beyond that (other boosting setups, neural networks) only if LightGBM l
 ## Accepted
 
 - Training sees only rain forecasts with a 25 to 27 hour lead; live, short hours get much shorter leads. The archive scores are likely a bit pessimistic for rain-driven leads.
-- Only 8 flood events (6 first crossings of 95 cm) fall in the test folds, all in winter. There is no summer thunderstorm event to test on.
+- Only 13 flood events fall in the test folds, and only 6 of them pass 95 cm (6 first crossings of 95 cm), all in winter. One event is in April; there is no summer thunderstorm event to test on.
 - LANUV is sometimes later than the 25 minutes we assume (for example 2026-10-14 12:30). The backtest assumes 25 minutes; live may have one hour less upstream data now and then.
 - Picking the best of many models on the same folds is mild overfitting to those folds. The live shadow run checks it.
 - The Lambda image gets bigger with pandas, scikit-learn and lightgbm (and their numpy and scipy).
