@@ -53,7 +53,6 @@ def score_tables(
         "events": floods,
         "peaks": events.peak_errors(predictions, floods),
         "alarms": events.alarms(predictions, observed, thresholds),
-        "warnings": events.warning_lead_times(predictions, observed, thresholds),
         "crossings": crossings.crossing_warnings(
             predictions, observed, last_readings, warning_levels
         ),

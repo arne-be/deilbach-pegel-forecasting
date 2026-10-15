@@ -17,7 +17,6 @@ from pegel.evaluation.metrics import ALL_FOLDS, PERSISTENCE, SUBSET_ALL
 from pegel.evaluation.report_tables import (
     EARLY_HOURS,
     WARNED_HOURS,
-    first_crossings,
     model_order,
     observed_from_predictions,
 )
@@ -185,7 +184,7 @@ def _panel_places(panels: pd.DataFrame) -> tuple[list[tuple[int, int]], int]:
     return places, rows
 
 
-def warning_plot(crossings: pd.DataFrame, palette: Palette, path: Path, note: str = "") -> Path:
+def warning_plot(crossings: pd.DataFrame, palette: Palette, path: Path) -> Path:
     """A small panel per first crossing, grouped by threshold: a dot per model at its first
     warning, in hours before the crossing. No dot is a miss."""
     crossings = crossings.assign(crossing_at=pd.to_datetime(crossings["crossing_at"], utc=True))
@@ -221,8 +220,7 @@ def warning_plot(crossings: pd.DataFrame, palette: Palette, path: Path, note: st
         Patch(color="tab:red", alpha=0.25, label=f"< {WARNED_HOURS} h: too late to act"),
         Patch(color="tab:green", alpha=0.2, label=f">= {EARLY_HOURS} h ahead"),
     ]
-    title = "First warning before each first crossing (no dot: missed)"
-    figure.suptitle(f"{title}\n{note}" if note else title)
+    figure.suptitle("First warning before each first crossing (no dot: missed)")
     figure.tight_layout()
     figure.legend(handles=zones, loc="upper center", ncols=2, bbox_to_anchor=(0.5, 0.0))
     return _save(figure, path)
@@ -271,10 +269,8 @@ def write_plots(
         # Skill is 0 by definition for persistence, so a run of it alone has nothing to show.
         if set(scores["model"]) != {PERSISTENCE}:
             plots.append(skill_plot(scores, palette, plot_dir / "skill.png"))
-    crossings = first_crossings(tables)
-    if not crossings.empty:
-        note = "" if not tables["crossings"].empty else "old rule: warnings.csv, no crossings.csv"
-        plots.append(warning_plot(crossings, palette, plot_dir / "warnings.png", note))
+    if not tables["crossings"].empty:
+        plots.append(warning_plot(tables["crossings"], palette, plot_dir / "warnings.png"))
     if not tables["false_alarms"].empty:
         path = false_alarm_plot(tables["false_alarms"], palette, plot_dir / "false_alarms.png")
         plots += [path] if path else []

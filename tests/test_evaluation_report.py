@@ -43,19 +43,6 @@ def _alarms() -> pd.DataFrame:
     )
 
 
-def _warnings() -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "model": [PERSISTENCE, PERSISTENCE, "ridge"],
-            "threshold_cm": [95.0, 95.0, 95.0],
-            "crossing_at": ["2024-10-02T00:30Z"] * 3,
-            "first_warning_at": [None, None, "2024-10-01T18:30Z"],
-            "warning_hours": [float("nan"), float("nan"), 6.0],
-            "re_crossing": [False, False, False],
-        }
-    )
-
-
 def test_lead_table_takes_pooled_scores_and_means_over_all_leads() -> None:
     table = report_tables.lead_table(_scores(), "all")
     assert list(table.index) == [PERSISTENCE, "ridge"]
@@ -82,34 +69,6 @@ def test_alarm_table_puts_persistence_first() -> None:
         ("ridge", 145.0),
     ]
     assert table.loc[(PERSISTENCE, 95.0), "+12 h"] == "2 / 1 / 0"
-
-
-def test_warning_table_counts_warned_crossings() -> None:
-    table = report_tables.warning_table(_warnings())
-    assert table.loc[(PERSISTENCE, 95.0), "crossings"] == 2
-    assert table.loc[(PERSISTENCE, 95.0), "warned"] == 0
-    assert table.loc[("ridge", 95.0), "median hours ahead"] == 6.0
-
-
-def test_mark_re_crossings_flags_a_level_above_threshold_within_a_day() -> None:
-    observed = pd.Series(
-        [100.0, 90.0, 90.0, 100.0], index=pd.date_range(START, periods=4, freq="h")
-    )
-    warnings = pd.DataFrame(
-        {
-            "model": [PERSISTENCE, PERSISTENCE],
-            "threshold_cm": [95.0, 95.0],
-            "crossing_at": [str(START), str(START + pd.Timedelta(hours=3))],
-            "warning_hours": [float("nan"), 3.0],
-        }
-    )
-    marked = report_tables.mark_re_crossings(warnings, observed)
-    assert list(marked["re_crossing"]) == [False, True]
-    table = report_tables.warning_table(marked)
-    assert table.loc[(PERSISTENCE, 95.0), "crossings"] == 1
-    assert table.loc[(PERSISTENCE, 95.0), "warned"] == 0
-    assert table.loc[(PERSISTENCE, 95.0), "re-crossings warned"] == 1
-    assert pd.isna(table.loc[(PERSISTENCE, 95.0), "median hours ahead"])
 
 
 def test_peak_and_lag_tables_keep_leads_6_and_12() -> None:
@@ -265,14 +224,6 @@ def test_summary_names_the_best_model_and_the_warnings() -> None:
     ]
 
 
-def test_first_crossings_falls_back_to_warnings_without_re_crossings() -> None:
-    assert len(report_tables.first_crossings({"crossings": _crossings()})) == 4
-    warnings = _warnings().assign(re_crossing=[False, True, False])
-    fallback = report_tables.first_crossings({"crossings": pd.DataFrame(), "warnings": warnings})
-    assert len(fallback) == 2
-    assert report_tables.first_crossings({}).empty
-
-
 def test_warning_and_false_alarm_plots_are_written(tmp_path: Path) -> None:
     from pegel.evaluation.report_plots import colours, false_alarm_plot, warning_plot
 
@@ -329,16 +280,14 @@ def _predictions() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_main_writes_plots_falls_back_to_old_warnings_and_appends_once(tmp_path: Path) -> None:
+def test_main_writes_plots_and_appends_once(tmp_path: Path) -> None:
     run = tmp_path / "runs" / "2026-10-14-x"
     run.mkdir(parents=True)
     _predictions().to_parquet(run / "predictions.parquet")
     (run / "run.json").write_text(json.dumps(_run_info()))
     _scores().to_csv(run / "scores.csv", index=False)
     _alarms().to_csv(run / "alarms.csv", index=False)
-    # Above 145 cm, the rising test level has no earlier hour above it, so no re-crossing.
-    old_rule = _warnings().iloc[1:].drop(columns="re_crossing").assign(threshold_cm=145.0)
-    old_rule.to_csv(run / "warnings.csv", index=False)
+    _crossings().to_csv(run / "crossings.csv", index=False)
     (run / "bootstrap.csv").write_text("model,lead,n,mae_difference,low,high\n")
     events = {"start": START + pd.Timedelta(hours=20), "end": START + pd.Timedelta(hours=30)}
     pd.DataFrame([{**events, "peak_at": events["end"], "peak_cm": 110.0}]).to_csv(
@@ -360,7 +309,6 @@ def test_main_writes_plots_falls_back_to_old_warnings_and_appends_once(tmp_path:
         "warnings.png",
     ]
     text = log.read_text()
-    assert "_From the old `warnings.csv`: this run has no `crossings.csv`._" in text
     assert text.startswith("# Experiment log\n\n## 2026-10-14-x\n")
     assert "](plots/2026-10-14-x/event-1-2024-10-02.png)" in text
     with pytest.raises(ValueError, match="already has a section"):

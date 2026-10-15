@@ -18,8 +18,6 @@ PEAK_LEADS = (6, 12)
 WARNED_HOURS = 3
 # A warning this many hours ahead is early enough to prepare.
 EARLY_HOURS = 6
-# A crossing with the level above the threshold this long before it continues a flood.
-RE_CROSSING_WINDOW = pd.Timedelta(hours=24)
 
 
 def model_order(models: Sequence[str]) -> list[str]:
@@ -65,52 +63,6 @@ def observed_from_predictions(predictions: pd.DataFrame) -> pd.Series:
     known = predictions.dropna(subset=["target"])
     at = known[contract.ISSUED_AT] + known["lead"] * pd.Timedelta(hours=1)
     return known["target"].groupby(at).first().sort_index()
-
-
-def mark_re_crossings(warnings: pd.DataFrame, observed: pd.Series) -> pd.DataFrame:
-    """Adds `re_crossing`: the level was above the threshold within RE_CROSSING_WINDOW before
-    the crossing. A forecast that keeps a high level then shows the crossing without
-    foreseeing anything, so its warning hours are not a lead time."""
-    crossing_at = pd.to_datetime(warnings["crossing_at"], utc=True)
-    re_crossing = [
-        bool((observed[at - RE_CROSSING_WINDOW : at - pd.Timedelta(hours=1)] > threshold).any())
-        for at, threshold in zip(crossing_at, warnings["threshold_cm"], strict=True)
-    ]
-    return warnings.assign(re_crossing=re_crossing)
-
-
-def warning_table(warnings: pd.DataFrame) -> pd.DataFrame:
-    """Per model and threshold: observed crossings, how many any forecast showed, and how far
-    ahead the first warning came. Re-crossings (see `mark_re_crossings`) are counted apart
-    and left out of the hours ahead."""
-    first = warnings[~warnings["re_crossing"]].groupby(["model", "threshold_cm"])
-    again = warnings[warnings["re_crossing"]].groupby(["model", "threshold_cm"])
-    table = pd.DataFrame(
-        {
-            "crossings": first.size(),
-            "warned": first["warning_hours"].count(),
-            "median hours ahead": first["warning_hours"].median(),
-            "min hours ahead": first["warning_hours"].min(),
-            "re-crossings": again.size(),
-            "re-crossings warned": again["warning_hours"].count(),
-        }
-    )
-    table = table.fillna({"crossings": 0, "warned": 0, "re-crossings": 0, "re-crossings warned": 0})
-    counts = ["crossings", "warned", "re-crossings", "re-crossings warned"]
-    table[counts] = table[counts].astype(int)
-    return _by_model_and(table, list(warnings["model"]))
-
-
-def first_crossings(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """First crossings with their `warning_hours` (NaN when missed): from `crossings.csv`,
-    else from the old `warnings.csv` without its re-crossings, else empty."""
-    crossings = tables.get("crossings", pd.DataFrame())
-    if not crossings.empty:
-        return crossings
-    warnings = tables.get("warnings", pd.DataFrame())
-    if warnings.empty:
-        return warnings
-    return warnings[~warnings["re_crossing"]]
 
 
 def crossing_table(crossings: pd.DataFrame) -> pd.DataFrame:
