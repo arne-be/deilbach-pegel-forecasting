@@ -18,7 +18,6 @@ PEAK_LEADS = (6, 12)
 WARNED_HOURS = 3
 # A warning this many hours ahead is early enough to prepare.
 EARLY_HOURS = 6
-# A crossing with the level above the threshold this long before it continues a flood.
 
 
 def model_order(models: Sequence[str]) -> list[str]:
