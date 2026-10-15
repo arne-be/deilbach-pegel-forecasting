@@ -6,12 +6,13 @@ Retired models are listed in docs/models.md and stay in git history.
 from functools import partial
 
 from pegel.evaluation.harness import ModelFactory
+from pegel.evaluation.models.capped import capped
 from pegel.evaluation.models.curated import RAIN_CHANGE_V2, RIDGE_V2, RIDGE_V2_ALPHA, CuratedChange
 from pegel.evaluation.models.persistence import Persistence
 from pegel.evaluation.models.residual import ResidualTrees
 from pegel.evaluation.models.simple import Upstream
 
-MODELS: list[ModelFactory] = [
+_BEST: list[ModelFactory] = [
     Persistence,
     Upstream,
     partial(CuratedChange, name="rain_change:v2:split", inputs=RAIN_CHANGE_V2, split=True),
@@ -21,3 +22,5 @@ MODELS: list[ModelFactory] = [
     partial(ResidualTrees, name="lgbm_residual:v1"),
     partial(ResidualTrees, name="lgbm_residual:v1:linear", linear_tree=True),
 ]
+# Stress test, never a live candidate: trained without any issue time above 100 cm.
+MODELS: list[ModelFactory] = [*_BEST, *(capped(factory, 100.0) for factory in _BEST)]
