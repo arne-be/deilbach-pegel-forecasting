@@ -6,7 +6,7 @@ How we score forecast models for Kupferdreh: the data, the split into training a
 
 1. **Build the dataset once.** `pegel build-eval-set`, read-only from prod (command in `AGENTS.md`). Every input as of its issue time. Frozen as `eval.parquet` with a checksum in `eval.manifest.json`, outside the repo.
 2. **Fit and predict.** `python -m pegel.evaluation.predict <dataset> --out <dir>` trains every registered model on each fold's training rows and predicts its test rows. Writes `predictions.parquet`.
-3. **Score.** `python -m pegel.evaluation.score <predictions> <dataset> --out <dir>` writes `scores.csv`, `bootstrap.csv`, `events.csv`, `peaks.csv`, `crossings.csv`, `false_alarms.csv`, `lag.csv` and `alarms.csv` (per-lead hits, a diagnostic only).
+3. **Score.** `python -m pegel.evaluation.score <predictions> <dataset> --out <dir>` writes `scores.csv`, `bootstrap.csv`, `events.csv`, `peaks.csv`, `false_alarms.csv` and `lag.csv`, and a forecast replay page per run (see [Flood forecasts](#flood-forecasts); proposed, the code still writes the old `crossings.csv` and `alarms.csv`).
 4. **Log it.** `python -m pegel.evaluation.report <run dir>` appends a section with tables and plots to `analysis/model-evaluation/experiments.md`. Add what we learned to `learnings.md`.
 
 ## Data
@@ -14,7 +14,7 @@ How we score forecast models for Kupferdreh: the data, the split into training a
 - **Window:** issue times from 2024-02-01 to 2026-04-12, hourly at hh:30 UTC, 19,248 rows. It starts with the ICON-D2 archive and ends where the LANUV open data for Langenberg ends.
 - **One row per issue time**, holding only what was known then: Kupferdreh, Langenberg and Nierenhof levels for the last 24 hours, radar rain for the last 7 days, and the ICON-D2 rain forecast for the next 24 hours.
 - **Targets:** the Kupferdreh level 1 to 24 hours after the issue time. Training sees them; prediction never does.
-- **Only the cleaned Kupferdreh series** (`kupferdreh:cleaned_kalman`), for inputs, targets, high water, events and warnings.
+- **Only the cleaned Kupferdreh series** (`kupferdreh:cleaned_kalman`), for inputs, targets, high water, events and flood forecasts.
 
 ![One dataset row: 24 hourly lags of levels and radar before the issue time, 24 ICON-D2 hours after it, and 24 targets](images/evaluation-dataset-row.svg)
 
@@ -81,9 +81,7 @@ The events are not sensitive to the numbers. Changing one at a time:
 | 12 | F4 | 2026-01-12 12:30 | 2026-01-17 10:30 | 65.4 | 93.5 | 2026-01-14 11:30 | 25.1 |
 | 13 | F4 | 2026-02-21 17:30 | 2026-02-26 03:30 | 69.9 | 90.7 | 2026-02-22 18:30 | 35.2 |
 
-**Six of the 13 events pass 95 cm** (1, 2, 3, 4, 6, 7), and each holds one first crossing of 95 cm. Only event 2 crosses the first category bound, 145 cm. The other seven count for peak errors only.
-
-**Warnings don't use events.** First crossings of 95 cm and of each category bound are found on the level itself: 6 at 95 cm and 1 at 145 cm in the test folds. The per-lead hits diagnostic (`alarms.csv`) also keeps its own spells above each threshold.
+**13 events, 6 above 95 cm.** Only event 2 passes the first category bound, 145 cm. All 13 are scored the same way, in [Flood forecasts](#flood-forecasts).
 
 Each plot shows the event from 36 hours before it starts to 48 hours after it ends. Top: the cleaned Kupferdreh level and the two upstream gauges, with the event shaded and its pre-event level as a dash-dot line. Bottom: hourly radar rain in the wettest radar cell of the catchment (the dataset's `catchment` series is the cell maximum, not a mean). The figures are redrawn with:
 
@@ -160,14 +158,45 @@ Every score is computed for **all issue times** (mostly low, slowly falling wate
 
 - **MAE per lead time**, 1 to 24 hours, per model and fold. The main metric.
 - **Skill against persistence:** 1 − MAE / MAE of persistence (the last level held flat). Above 0 is better than doing nothing. A bootstrap over whole days gives a 90 % range for the difference to persistence.
-- **Peaks:** for each event and lead k, the forecast issued k hours before the peak: its highest value minus the observed peak (height), and the time of its highest value minus the peak time (timing).
-- **Warnings** at 95 cm and each category bound (145, 165, 185, 225 cm):
-  - A first crossing is an hour above the threshold with no hour above it in the 24 hours before.
-  - A forecast crosses when the last known level (at most 3 hours old) is not above the threshold and one of its 24 values is.
-  - A first crossing is warned by every forecast issued before it whose crossing time is at most 6 hours off. It counts as a hit at 3 or 6 hours if the first such forecast came that early.
-  - A forecast crossing with no observed crossing within 6 hours is a false alarm. A warning that stays up over several issue times counts once.
-  - Warnings are reported, not used to select models yet.
 - **Lag check:** on high water, the time shift that best fits the forecast to the observed level. If it equals the lead, the model is only a delayed persistence.
+
+## Flood forecasts
+
+**Proposed, not in the code yet.** The scorer still writes the old threshold warnings (`crossings.csv`, `false_alarms.csv` per threshold) and per-lead hits (`alarms.csv`). The rules below replace them.
+
+For each flood event we ask three questions of every model: did it see the peak coming, how big did it see it, and when. Each is answered at five leads: **24, 12, 6, 3 and 1 hour before the peak**. The peak is the event's highest level; an event with two peaks is scored on the higher one.
+
+### One forecast per event and lead
+
+For lead L, take the forecast issued L hours before the observed peak. It covers the 24 hours after its issue time, so the peak falls inside it. Its own peak is its highest value over all 24 hours, and the time of that value.
+
+- **Size** is how much of the rise the forecast saw, measured from the event's pre-event level:
+
+  ```
+  size = (forecast peak − pre-event level) / (observed peak − pre-event level)
+  ```
+
+  100 % is the right height, 50 % half the rise, 120 % too high. Measuring from the pre-event level matters: for a rise from 50 to 100 cm, a forecast of 80 cm saw 60 % of the rise, not 80 %.
+- **Timing** is the time of the forecast peak minus the time of the observed peak, in hours. Negative is early, positive is late. When the forecast is still rising at its last hour, its peak lies beyond the forecast, and the timing is shown as "at least x h late".
+- **Predicted** is yes when the size is more than 50 %: the forecast saw more than half the rise coming. Otherwise no. The bar is the same at every lead. At 1 hour the level is already close to the peak, so persistence is mostly a yes there; the leads that tell models apart are 6 to 24 hours.
+
+A missing forecast (no issue time, or a gap in the inputs) is shown as missing, not as no.
+
+### False alarms
+
+Without a counterweight, a model that forecasts a flood all the time would always be right. So we count false alarms: a forecast that shows a new event, its peak above 75 cm and at least 15 cm above the last known level, while no event is running at its issue time and none starts in the 24 hours after. A run of hourly issue times with such forecasts counts once. Reported per month of test issue times.
+
+### Tables
+
+1. **Summary, one row per model**: per lead, the events predicted (e.g. `9 of 13`), the median size and the median timing of the predicted events, and the false alarms per month. Persistence is the first row.
+2. **Per model, one row per event**: per lead, ✓ or ✗ with size and timing, e.g. `✓ 82 % −2 h`, coloured by size.
+
+### Plots
+
+- **Forecast replay**, one interactive HTML page per run. Pick an event and a set of models. The page steps through the issue times from 24 hours before the peak to the end of the event, with play, pause, a step of one hour back or forward, and a slider. It shows the observed level, solid up to the issue time and light after it, a vertical line at the issue time, each model's 24-hour forecast with the last few forecasts fading behind it, and the 75 cm line, the pre-event level and the peak.
+- **Peak track**, one static image per event for the experiment log. Top: each model's forecast peak height against its issue time, with the observed peak as a line. Bottom: each model's forecast peak time against its issue time. It shows when each model saw the flood and whether it held on to it.
+
+Flood forecasts are reported, not used to select models yet.
 
 ## Selection
 
@@ -175,7 +204,7 @@ A model wins over a simpler one when its mean MAE over leads 1 to 24 is lower in
 
 ## Limits
 
-- 13 flood events, but only 6 above 95 cm and 6 first crossings of 95 cm, all in winter. One event is in April, no summer thunderstorm. Differences of one or two warnings mean nothing.
-- Seven events peak between 75 and 95 cm. They add peak errors, but only for moderate high water.
+- 13 flood events, only 6 above 95 cm and one above 145 cm. All but one in winter, no summer thunderstorm. Differences of one or two predicted events mean nothing.
+- Seven events peak between 75 and 95 cm, so most of the flood scores are about moderate high water.
 - Training and test both use the day-old ICON-D2 archive. Live gets fresher rain forecasts.
 - Picking the best of many models on the same folds overfits them a little. The live shadow run checks both.

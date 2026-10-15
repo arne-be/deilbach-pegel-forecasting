@@ -1,7 +1,7 @@
 # 0008 · Model evaluation and selection
 
 - **Status:** accepted
-- **Date:** 2026-10-14
+- **Date:** 2026-10-14, flood events and flood forecasts revised 2026-10-15
 
 ## Goal
 
@@ -77,21 +77,19 @@ How it works, with figures: [evaluation.md](../evaluation.md). The models: [mode
 
 **Two subsets.** All issue times is the headline. High water (level above 75 cm at the issue time or at the target) is shown next to it, because calm days dominate the average.
 
-**Only the cleaned series.** Targets, the high water subset, events and warnings all use the cleaned Kupferdreh level (`kupferdreh:cleaned_kalman`). The raw series is only the input that cleaning is derived from.
+**Only the cleaned series.** Targets, the high water subset, events and flood forecasts all use the cleaned Kupferdreh level (`kupferdreh:cleaned_kalman`). The raw series is only the input that cleaning is derived from.
 
-**Events.** A flood event is one rise of the river and its fall back, with a peak above 75 cm. It starts at the foot of a fast rise and lasts until the level is back near where it started, or has stopped falling below 75 cm; a new rise before then belongs to the same event. The exact rule is in [evaluation.md](../evaluation.md#flood-events). For each event: error in peak height and peak timing, from the forecasts issued before the peak. Warnings don't use events; they are scored on crossings.
+**Events.** A flood event is one rise of the river and its fall back, with a peak above 75 cm. It starts at the foot of a fast rise and lasts until the level is back near where it started, or has stopped falling below 75 cm; a new rise before then belongs to the same event. The exact rule is in [evaluation.md](../evaluation.md#flood-events).
 
-**Warnings are scored on crossings.** A warning only helps if it comes before the level crosses a threshold. Each threshold is its own warning: 95 cm and every category bound in config (145, 165, 185 and 225 cm).
+**Flood forecasts are scored per event, at the peak.** For each event, model and lead of 24, 12, 6, 3 and 1 hour, we take the forecast issued that many hours before the peak and ask three things: did it see more than half the rise (predicted, yes or no), what share of the rise did it see (size, from the pre-event level), and how many hours off was its peak (timing). An event with two peaks is scored on the higher one. The exact rules are in [evaluation.md](../evaluation.md#flood-forecasts).
 
-- A crossing is an hour above the threshold after an hour that was not. Only first crossings count: no hour above the threshold in the 24 hours before. Re-crossings during a flood are left out.
-- A forecast crosses the threshold when the last known level at its issue time is not above it and any of its 24 values is. Its crossing time is the first hour above. The last reading must be known and at most 3 hours old; with a stale reading we can't tell whether the forecast rises from below.
-- A first crossing is warned by every forecast issued before it whose crossing time is at most 6 hours from it. The warning time is the crossing minus the first such issue time.
-- A crossing is a hit at 3 hours if it was warned at least 3 hours ahead, and the same for 6 hours. `crossings.csv` has one row per model, threshold and crossing.
-- A forecast crossing with no observed crossing within 6 hours is a false alarm. A run of hourly issue times with false alarms counts once, so a warning that stays up counts once. A warning that comes more than 6 hours too early is one false alarm, even if later forecasts warn of the crossing in time. `false_alarms.csv` gives the count per model and threshold, and per month of test issue times.
+Why: a model should be judged on what matters on a flood day, whether and how early it sees the peak coming, and the scores should be readable at a glance. The earlier rules, warnings per threshold crossing with a ±6 hour match and per-lead hits, were hard to follow and left out every flood that stays below 95 cm.
 
-**Hits, misses and false alarms per lead stay as a diagnostic only.** They count overlaps of forecast and observed episodes, so a forecast issued during a flood scores a hit by staying high. Persistence gets all its hits that way.
+**False alarms are the counterweight.** A forecast that shows a new event while none is running or starting within 24 hours is a false alarm; a run of such forecasts counts once. Reported per month.
 
-**Few crossings.** With 6 crossings at 95 cm and 1 at 145 cm in the test folds, warning counts can't rank models on differences of one or two.
+**A forecast replay per run.** An interactive page steps through the forecasts of each event, from 24 hours before the peak to its end, so models can be compared by eye. A static peak track per event goes into the experiment log.
+
+**Few events.** With 13 events in the test folds, differences of one or two predicted events can't rank models.
 
 **Lag check.** On high water, the time shift that best fits the forecast to the observed level. If that shift equals the lead, the model is only a delayed persistence.
 
@@ -150,7 +148,7 @@ Anything beyond that (other boosting setups, neural networks) only if LightGBM l
 
 **A model wins over a simpler one** when its mean MAE over leads 1 to 24 is lower in at least 3 of 4 folds, and its high-water MAE, pooled over all folds, is not worse. Otherwise the simpler model stays.
 
-**Warnings are reported, not used to select yet.** For every model and threshold we report the crossings warned at least 3 and 6 hours ahead and the false alarms per month. They don't decide between models until we have analysed them and agreed on how many false alarms are acceptable. Per-lead hit counts never decide, because they credit forecasts issued during a flood.
+**Flood forecasts are reported, not used to select yet.** They don't decide between models until we have analysed them and agreed on how many false alarms are acceptable.
 
 **Ties go to the simpler model.**
 
@@ -165,7 +163,7 @@ Anything beyond that (other boosting setups, neural networks) only if LightGBM l
 ## Accepted
 
 - Training sees only rain forecasts with a 25 to 27 hour lead; live, short hours get much shorter leads. The archive scores are likely a bit pessimistic for rain-driven leads.
-- Only 13 flood events fall in the test folds, and only 6 of them pass 95 cm (6 first crossings of 95 cm), all in winter. One event is in April; there is no summer thunderstorm event to test on.
+- Only 13 flood events fall in the test folds, and only 6 of them pass 95 cm. All but one are in winter. One event is in April; there is no summer thunderstorm event to test on.
 - LANUV is sometimes later than the 25 minutes we assume (for example 2026-10-14 12:30). The backtest assumes 25 minutes; live may have one hour less upstream data now and then.
 - Picking the best of many models on the same folds is mild overfitting to those folds. The live shadow run checks it.
 - The Lambda image gets bigger with pandas, scikit-learn and lightgbm (and their numpy and scipy).
@@ -173,6 +171,7 @@ Anything beyond that (other boosting setups, neural networks) only if LightGBM l
 ## Rejected
 
 - **Training from 2023-03 with ICON-D2 left empty.** More calm data, but two input regimes in one model.
+- **Warnings per threshold crossing** (95 cm and each category bound, matched within ±6 hours) and **per-lead hits.** Used in the first runs, replaced on 2026-10-15 by flood forecasts per event: hard to read, and blind to floods below 95 cm.
 - **Probabilistic forecasts and CRPS now.** First get the point forecast right.
 - **Forecasting libraries** (skforecast, sktime, darts, Nixtla). The models are simple enough without them, and the harness is a few functions.
 - **Random or shuffled splits.** They leak the future.
