@@ -6,7 +6,7 @@ How we score forecast models for Kupferdreh: the data, the split into training a
 
 1. **Build the dataset once.** `pegel build-eval-set`, read-only from prod (command in `AGENTS.md`). Every input as of its issue time. Frozen as `eval.parquet` with a checksum in `eval.manifest.json`, outside the repo.
 2. **Fit and predict.** `python -m pegel.evaluation.predict <dataset> --out <dir>` trains every registered model on each fold's training rows and predicts its test rows. Writes `predictions.parquet`.
-3. **Score.** `python -m pegel.evaluation.score <predictions> <dataset> --out <dir>` writes `scores.csv`, `bootstrap.csv`, `events.csv`, `peaks.csv` (size, timing and predicted per event, model and lead), `false_alarms.csv` (count and rate per model) and `lag.csv`, and a forecast replay page per run (see [Flood forecasts](#flood-forecasts); proposed, the code still writes the old `crossings.csv` and `alarms.csv`).
+3. **Score.** `python -m pegel.evaluation.score <predictions> <dataset> --out <dir>` writes `scores.csv`, `bootstrap.csv`, `lag.csv`, `events.csv` (the test events), `peaks.csv` (size, timing and predicted per model, event and lead, in `src/pegel/evaluation/flood_scores.py`) and `false_alarms.csv` (count and rate per model). The forecast replay page will come from a separate command.
 4. **Log it.** `python -m pegel.evaluation.report <run dir>` appends a section with tables and plots to `analysis/model-evaluation/experiments.md`. Add what we learned to `learnings.md`.
 
 ## Data
@@ -43,7 +43,7 @@ Four expanding-window folds, fixed in code (`src/pegel/evaluation/contract.py`).
 
 ## Flood events
 
-Found by `flood_events` in `src/pegel/evaluation/events.py`. The scorer's peak scores still use spells above 95 cm until the flood forecast scoring lands.
+Found by `flood_events` in `src/pegel/evaluation/events.py`.
 
 A flood event is one rise of the river and its fall back, with a peak above 75 cm (`evaluation.high_water_cm`). It is found on the hourly cleaned level:
 
@@ -161,8 +161,6 @@ Every score is computed for **all issue times** (mostly low, slowly falling wate
 - **Lag check:** on high water, the time shift that best fits the forecast to the observed level. If it equals the lead, the model is only a delayed persistence.
 
 ## Flood forecasts
-
-**Proposed, not in the code yet.** The scorer still writes the old threshold warnings (`crossings.csv`, `false_alarms.csv` per threshold) and per-lead hits (`alarms.csv`). The rules below replace them.
 
 For each flood event we ask three questions of every model: did it see the peak coming, how big did it see it, and when. Each is answered at five leads: **24, 12, 6, 3 and 1 hour before the peak**. The peak is the event's highest level; an event with two peaks is scored on the higher one. A lead whose issue time falls before the end of the previous event is shown as missing, and the replay starts no earlier than that end.
 

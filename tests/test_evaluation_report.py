@@ -32,17 +32,6 @@ def _scores() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _alarms() -> pd.DataFrame:
-    return pd.DataFrame(
-        [
-            {"model": m, "lead": lead, "threshold_cm": t, "hits": 2, "misses": 1, "false_alarms": 0}
-            for m in ("ridge", PERSISTENCE)
-            for lead in range(1, LEADS + 1)
-            for t in (95.0, 145.0)
-        ]
-    )
-
-
 def test_lead_table_takes_pooled_scores_and_means_over_all_leads() -> None:
     table = report_tables.lead_table(_scores(), "all")
     assert list(table.index) == [PERSISTENCE, "ridge"]
@@ -60,32 +49,7 @@ def test_lead_table_takes_pooled_scores_and_means_over_all_leads() -> None:
     assert table.loc["ridge", "mean skill"] == pytest.approx(0.5)
 
 
-def test_alarm_table_puts_persistence_first() -> None:
-    table = report_tables.alarm_table(_alarms())
-    assert list(table.index) == [
-        (PERSISTENCE, 95.0),
-        (PERSISTENCE, 145.0),
-        ("ridge", 95.0),
-        ("ridge", 145.0),
-    ]
-    assert table.loc[(PERSISTENCE, 95.0), "+12 h"] == "2 / 1 / 0"
-
-
-def test_peak_and_lag_tables_keep_leads_6_and_12() -> None:
-    peaks = pd.DataFrame(
-        {
-            "event": [1, 2, 1, 1],
-            "model": ["ridge", "ridge", "ridge", PERSISTENCE],
-            "lead": [6, 6, 1, 6],
-            "height_error_cm": [-10.0, 4.0, 0.0, -20.0],
-            "at_peak_error_cm": [-10.0, 2.0, 0.0, -20.0],
-            "timing_error_hours": [1.0, 3.0, 0.0, float("nan")],
-        }
-    )
-    table = report_tables.peak_table(peaks)
-    assert list(table.index) == [(PERSISTENCE, 6), ("ridge", 6)]
-    assert table.loc[("ridge", 6), "mean abs height error (cm)"] == 7.0
-    assert table.loc[("ridge", 6), "mean timing error (h)"] == 2.0
+def test_lag_table_keeps_leads_6_and_12() -> None:
     lag = pd.DataFrame(
         {"model": [PERSISTENCE] * 3, "lead": [1, 6, 12], "n": 5, "shift_hours": [1, 6, 12]}
     )
@@ -148,101 +112,39 @@ def _run_info() -> dict[str, object]:
     }
 
 
-def _crossings() -> pd.DataFrame:
-    """Two first crossings of 95 cm: persistence misses both, ridge warns 6 h and 1 h ahead."""
-    return pd.DataFrame(
-        {
-            "model": [PERSISTENCE, PERSISTENCE, "ridge", "ridge"],
-            "threshold_cm": [95.0] * 4,
-            "crossing_at": ["2024-10-02 00:30:00+00:00", "2024-10-03 00:30:00+00:00"] * 2,
-            "first_warning_at": [
-                None,
-                None,
-                "2024-10-01 18:30:00+00:00",
-                "2024-10-02 23:30:00+00:00",
-            ],
-            "warning_hours": [float("nan"), float("nan"), 6.0, 1.0],
-            "hit_3h": [False, False, True, False],
-            "hit_6h": [False, False, True, False],
-        }
-    )
-
-
-def _false_alarms() -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "model": [PERSISTENCE, "ridge", PERSISTENCE, "ridge"],
-            "threshold_cm": [95.0, 95.0, 145.0, 145.0],
-            "count": [0, 3, 0, 0],
-            "months": [6.0] * 4,
-            "per_month": [0.0, 0.5, 0.0, 0.0],
-        }
-    )
-
-
 def test_headline_table_has_one_formatted_row_per_model() -> None:
-    table = report_tables.headline_table(_scores(), _crossings(), _false_alarms(), 95.0)
+    table = report_tables.headline_table(_scores())
     assert list(table.columns) == [
         "mean MAE all (cm)",
         "mean MAE high water (cm)",
         "MAE +24 h high water (cm)",
         "skill +24 h high water",
-        "95 cm crossings warned >= 3 h",
-        "false alarms per month at 95 cm",
     ]
-    assert list(table.loc[PERSISTENCE]) == ["12.5", "12.5", "24.0", "0.00", "0 of 2", "0.00"]
-    assert list(table.loc["ridge"]) == ["6.2", "6.2", "12.0", "0.50", "1 of 2", "0.50"]
+    assert list(table.loc[PERSISTENCE]) == ["12.5", "12.5", "24.0", "0.00"]
+    assert list(table.loc["ridge"]) == ["6.2", "6.2", "12.0", "0.50"]
 
 
-def test_headline_table_leaves_out_warning_columns_without_their_files() -> None:
-    table = report_tables.headline_table(_scores(), pd.DataFrame(), pd.DataFrame(), 95.0)
-    assert len(table.columns) == 4
-
-
-def test_summary_names_the_best_model_and_the_warnings() -> None:
-    lines = report_tables.summary(_scores(), _crossings(), _false_alarms(), 95.0)
-    assert lines == [
+def test_summary_names_the_best_model() -> None:
+    assert report_tables.summary(_scores()) == [
         "Lowest mean MAE over leads 1-24 h: ridge over all issue times (6.2 cm; persistence"
-        " 12.5 cm), ridge at high water (6.2 cm; persistence 12.5 cm).",
-        "First crossings of 95 cm warned at least 3 h ahead: ridge 1 of 2, persistence 0 of 2.",
-        "False alarms at 95 cm: 0.00 to 0.50 per month.",
+        " 12.5 cm), ridge at high water (6.2 cm; persistence 12.5 cm)."
     ]
     zeta_scores = _scores().query("model == 'ridge'").assign(model="zeta")
-    zeta_crossings = _crossings().query("model == 'ridge'").assign(model="zeta", warning_hours=0.0)
-    scores = pd.concat([_scores(), zeta_scores])
-    crossings = pd.concat([_crossings(), zeta_crossings])
-    three = report_tables.summary(scores, crossings, _false_alarms(), 95.0)
+    three = report_tables.summary(pd.concat([_scores(), zeta_scores]))
     # zeta scores the same as ridge, so both are named.
     assert three[0].startswith(
         "Lowest mean MAE over leads 1-24 h: ridge and zeta over all issue times (6.2 cm;"
     )
-    assert three[1] == lines[1]
     alone = _scores()[_scores()["model"] == PERSISTENCE]
-    assert report_tables.summary(alone, pd.DataFrame(), pd.DataFrame(), 95.0) == [
+    assert report_tables.summary(alone) == [
         "Mean MAE of persistence over leads 1-24 h: 12.5 cm over all issue times, 12.5 cm at"
         " high water."
     ]
 
 
-def test_warning_and_false_alarm_plots_are_written(tmp_path: Path) -> None:
-    from pegel.evaluation.report_plots import colours, false_alarm_plot, warning_plot
-
-    palette = colours([PERSISTENCE, "ridge"], [PERSISTENCE, "ridge"])
-    assert warning_plot(_crossings(), palette, tmp_path / "w.png").stat().st_size > 0
-    written = false_alarm_plot(_false_alarms(), palette, tmp_path / "f.png")
-    assert written is not None and written.exists()
-    calm = _false_alarms().assign(count=0, per_month=0.0)
-    assert false_alarm_plot(calm, palette, tmp_path / "calm.png") is None
-
-
 def test_section_puts_summary_and_headline_first_and_folds_the_details() -> None:
-    tables = {
-        "scores": _scores(),
-        "alarms": _alarms(),
-        "crossings": _crossings(),
-        "false_alarms": _false_alarms(),
-    }
-    plots = [Path("plots/x/mae.png"), Path("plots/x/warnings.png"), Path("plots/x/event-1-a.png")]
+    tables = {"scores": _scores()}
+    plots = [Path("plots/x/mae.png"), Path("plots/x/event-1-a.png")]
     text = report.section("2026-10-14-x", _run_info(), tables, plots, "n")
     assert text.startswith("## 2026-10-14-x\n\nLowest mean MAE")
     notes, headline, image = (
@@ -251,11 +153,8 @@ def test_section_puts_summary_and_headline_first_and_folds_the_details() -> None
         text.index("![mae](plots/x/mae.png)"),
     )
     assert notes < headline < image < text.index("<details>")
-    assert "no `crossings.csv`" not in text
     assert "<summary>Flood events: observed level and forecasts (1 plots)</summary>" in text
     assert "Subset `high_water`" in text
-    assert "<summary>Alarms per lead (diagnostic)</summary>" in text
-    assert "| ridge | 95 | 2 | 1 | 1 | 3.50 |" in text
     assert "commit `0123456789ab` (dirty)" in text
     assert "Models: persistence, ridge" in text
     assert text.count("<details>") == text.count("</details>")
@@ -286,8 +185,6 @@ def test_main_writes_plots_and_appends_once(tmp_path: Path) -> None:
     _predictions().to_parquet(run / "predictions.parquet")
     (run / "run.json").write_text(json.dumps(_run_info()))
     _scores().to_csv(run / "scores.csv", index=False)
-    _alarms().to_csv(run / "alarms.csv", index=False)
-    _crossings().to_csv(run / "crossings.csv", index=False)
     (run / "bootstrap.csv").write_text("model,lead,n,mae_difference,low,high\n")
     events = {"start": START + pd.Timedelta(hours=20), "end": START + pd.Timedelta(hours=30)}
     pd.DataFrame([{**events, "peak_at": events["end"], "peak_cm": 110.0}]).to_csv(
@@ -306,7 +203,6 @@ def test_main_writes_plots_and_appends_once(tmp_path: Path) -> None:
         "mae-folds.png",
         "mae.png",
         "skill.png",
-        "warnings.png",
     ]
     text = log.read_text()
     assert text.startswith("# Experiment log\n\n## 2026-10-14-x\n")

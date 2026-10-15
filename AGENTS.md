@@ -34,7 +34,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Evaluation harness, persistence model, model registry and runner (`python -m pegel.evaluation.predict <dataset> --out <dir>`, writes `predictions.parquet`): `src/pegel/evaluation/harness.py`, `registry.py`, `predict.py`, `models/`
 - Model inputs shared by training and the live job: `src/pegel/core/features.py`
 - Evaluation metrics, flood events and the scoring runner (`python -m pegel.evaluation.score`): `src/pegel/evaluation/metrics.py`, `events.py`, `score.py`
-- Crossing warnings at every threshold and false alarms (`crossings.csv`, `false_alarms.csv`): `src/pegel/evaluation/crossings.py`
+- Flood forecasts scored per event and lead, and false alarms (`events.csv`, `peaks.csv`, `false_alarms.csv`): `src/pegel/evaluation/flood_scores.py`
 - Upstream model, model 4 of the ladder (`upstream`), fitted per lead on the change: `src/pegel/evaluation/models/simple.py`
 - Curated change models v2 `rain_change:v2:split` and `ridge:change:v2` (named physical inputs per lead, inner-split candidate list): `src/pegel/evaluation/models/curated.py`, `analysis/model-evaluation/models-v2-candidates.csv`
 - Learnings about models and evaluation, append-only: `analysis/model-evaluation/learnings.md`
