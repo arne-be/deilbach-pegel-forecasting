@@ -39,7 +39,9 @@ def test_with_the_trees_at_zero_it_is_ridge_change_v2(
     ridge = ridge_v2(SETTINGS)
     ridge.fit(train)
     assert not np.allclose(model.predict(rows), ridge.predict(rows))
-    monkeypatch.setattr(model, "correction", lambda rows: np.zeros((len(rows), 1)))
+    monkeypatch.setattr(
+        model, "correction", lambda rows: np.zeros((len(rows), SETTINGS.leads_hours))
+    )
     np.testing.assert_allclose(model.predict(rows), ridge.predict(rows))
 
 

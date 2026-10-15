@@ -6,7 +6,7 @@ residuals it trained on, so that cap limits only the correction, not the forecas
 
 The trees learn out-of-fold residuals: the training rows are cut into time blocks, and each
 block's residual comes from ridge fitted on the other blocks. In-sample ridge residuals were
-8 to 30 % smaller than out-of-fold ones on the inner splits, so trees fitted on them would
+8 to 33 % smaller than out-of-fold ones on the inner splits, so trees fitted on them would
 learn too small a correction. The final ridge is fitted on all training rows. Explained in
 docs/models.md.
 """
@@ -48,6 +48,8 @@ PARAMETERS: dict[str, Any] = {
     "feature_fraction": 0.8,
     "seed": SEED,
     "deterministic": True,
+    # deterministic needs a fixed histogram layout, or a timing test picks one per machine.
+    "force_row_wise": True,
     "num_threads": 4,
     "verbosity": -1,
 }
@@ -102,14 +104,18 @@ class ResidualTrees:
 
     def out_of_fold_residuals(self, train: pd.DataFrame) -> Array:
         """Target minus ridge, each time block predicted by ridge fitted on the other blocks."""
-        order = np.argsort(train[contract.ISSUED_AT].to_numpy(), kind="stable")
+        issued_at = train[contract.ISSUED_AT]
+        order = np.argsort(issued_at.to_numpy(), kind="stable")
         targets = _targets(train, self._leads)
         residuals: Array = np.full(targets.shape, np.nan)
         for block in np.array_split(order, RESIDUAL_BLOCKS):
             inside = np.zeros(len(train), dtype=bool)
             inside[block] = True
+            # Rows just before the block have targets inside it: leave them out of the fit.
+            start = issued_at.iloc[block[0]]
+            embargo = (issued_at >= start - pd.Timedelta(hours=self._leads)) & (issued_at < start)
             ridge = ridge_v2(self._settings)
-            ridge.fit(train[~inside])
+            ridge.fit(train[~inside & ~embargo.to_numpy()])
             residuals[inside] = targets[inside] - ridge.predict(train[inside])
         return residuals
 
