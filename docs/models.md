@@ -4,7 +4,7 @@ Every model the evaluation runs, what it does and why. How models are scored is 
 
 ## Ladder
 
-Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10-15-flood-scores](../analysis/model-evaluation/experiments.md#2026-10-15-flood-scores). High water: above 75 cm at the issue time or at the target. Floods seen 24 h ahead: of the 13 flood events, how many the forecast issued 24 hours before the peak saw more than half the rise of ([evaluation.md](evaluation.md#flood-forecasts)).
+Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10-15-flood-scores](../analysis/model-evaluation/experiments.md#2026-10-15-flood-scores). High water: above 75 cm at the issue time or at the target. The two `rain_response` rows are from run [2026-10-15-rain-response](../analysis/model-evaluation/experiments.md#2026-10-15-rain-response), where the other models scored the same. Floods seen 24 h ahead: of the 13 flood events, how many the forecast issued 24 hours before the peak saw more than half the rise of ([evaluation.md](evaluation.md#flood-forecasts)).
 
 | Model | Idea | All | High water | Floods seen 24 h ahead | Code |
 |---|---|---|---|---|---|
@@ -12,6 +12,8 @@ Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10
 | `upstream` | Langenberg and Nierenhof 3-hour changes, no constant; the best at +1 h | 2.7 | 7.8 | 5 | `models/simple.py` |
 | **`rain_change:v2:split`** | 14 named inputs | 2.1 | 5.1 | 8 | `models/curated.py` |
 | **`ridge:change:v2`** | 20 named inputs, ridge penalty | 2.1 | 4.8 | 9 | `models/curated.py` |
+| `rain_response:v1:offset` | radar through a fitted hydrograph as a fixed part, ridge on the rest; ruled out | 2.2 | 5.1 | 9 | `models/rain_response.py` |
+| `rain_response:v1:ridge` | radar and ICON-D2 through the hydrograph as ridge inputs; base for a residual model | 2.1 | 4.7 | 10 | `models/rain_response.py` |
 
 The two v2 models are the current best. Under the selection rule both win over `rain_change:split` and `ridge:change` (`rain_change:v2:split` ties `ridge:change` in F2 and wins on high water). They are level over all issue times, and `ridge:change:v2` is better at high water and sees one flood more a day ahead, but has one false alarm more (3 against 2 in 18 test months).
 
@@ -77,6 +79,19 @@ change_k = c0 + c1·(last − base_30d)
 | other, +24 h | −1.30 | −0.09 | 1.27 | 1.61 | −0.68 | 0.64 | 0.74 | −0.16 | −0.27 |
 
 **How the inputs were chosen.** On an inner time split inside each fold's training rows: fit on the older 80 %, validate on the newest 20 %, with a 24-hour gap. Version 1 (retired) came from about 20 candidates, version 2 from 68 (`analysis/model-evaluation/models-v2-candidates.csv`). Tried and dropped: ICON-D2 p90, the radar zones and the catchment maximum, radar beyond 24 hours, Kupferdreh and upstream level lags, a recession gated to after the peak, other time constants (6, 8, 12, 36, 48 h) in place of the 24-hour one in `rain_change:v2:split`. The inner splits of later folds overlap earlier test periods, so this is not a clean hold-out; the live shadow run is.
+
+## Rain response
+
+Idea: a unit hydrograph turns rain into the level change it causes, so floods come out at their true size and on time, and the ridge only fits what is left. It didn't work out that way ([run](../analysis/model-evaluation/experiments.md#2026-10-15-rain-response)).
+
+**The hydrograph.** 1 mm of catchment-mean rain fills a routing store, which feeds a fast and a slow linear store; the level rise is `a_fast · S(t; τ_fast) + a_slow · S(t; τ_slow)` (`features.Hydrograph`). It is fitted per fold on that fold's training rows only: rows with at least 1 mm of radar in the last day and at most 0.6 mm in the next three, target the level change over the next 72 hours. The time constants come from a grid (routing 0–6 h, fast 2–16 h, slow 24–480 h), the two amplitudes by least squares. Typical fit: fast store 4–6 h, slow 96–144 h, routing 3 h, a peak of about 2 cm per mm 4–5 hours after the rain.
+
+**The two responses** (`features.response_change`): the last 168 hours of radar, with the change from the issue time to each lead, including the decay of rain that fell before; and ICON-D2 hours ahead with the same shape. Radar and ICON stay separate, because half of ICON's wet hours are false and its weight has to be able to fall below the radar gain.
+
+- `rain_response:v1:offset`: change = radar response at the fitted gain + ridge (as `ridge:change:v2`, split, penalty 100) on the rest, with the ICON response and the v2 inputs without the radar sums and the ICON sum. Ruled out: worse than `ridge:change:v2` in all four folds, 6 false alarms in 18 months.
+- `rain_response:v1:ridge`: both responses are ridge inputs in place of the radar sums and the ICON sum. Picked by the inner splits. Level with `ridge:change:v2` over all issue times, slightly better at high water, the same false alarms; the big floods get no bigger a day ahead. The ridge gives the ICON response about half the radar gain and the radar response almost none at +24 h.
+
+**As a base for a residual model.** `rain_response:v1:ridge` is meant as the base of a stacked LightGBM model on its residual. Its per-row forecast is `model.predict(rows)` after `model.fit(train)`, or the `prediction` column of `predictions.parquet` (one row per issue time, lead, model and fold); the residual is `target − prediction`. The two responses alone are `model.radar_response(rows)` and `model.icon_response(rows)`, the fitted hydrograph `model.hydrograph`.
 
 ## Known weaknesses of the current best
 
