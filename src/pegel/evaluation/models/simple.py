@@ -1,11 +1,13 @@
-"""Models 2 to 4 of the ladder (docs/decisions/0008): the last level plus a linear change.
+"""Model 4 of the ladder (docs/decisions/0008): the last level plus the upstream wave.
 
-Each model forecasts the change from the last cleaned level, `target_k - kd_last_cm`, as a
-linear function of a few inputs, with one set of factors per lead fitted by least squares.
-- Fit: per lead, only on rows where every input and that lead's target exist.
-- No intercept: with no distance to the base level and no recent change, the level should stay
-  where it is. An intercept would only learn the mean change of the training period.
-- Predict: a row with a missing input gets the persistence forecast (`kd_last_cm`), so every
+    change_k = c_k · Langenberg 3 h change + d_k · Nierenhof 3 h change   (lag 0 minus lag 3)
+
+One set of factors per lead fitted by least squares on the change from the last cleaned level,
+`target_k - kd_last_cm`.
+- Fit: per lead, only on rows where both inputs and that lead's target exist.
+- No intercept: with no recent upstream change, the level should stay where it is. An intercept
+  would only learn the mean change of the training period.
+- Predict: a row with a missing input gets the persistence forecast (`kd_last_cm`), so the
   model is scored on the same rows as persistence.
 """
 
@@ -14,18 +16,14 @@ import numpy.typing as npt
 import pandas as pd
 
 from pegel.config import EvaluationSettings
-from pegel.core.features import features, kupferdreh_change
 from pegel.evaluation import contract
-from pegel.evaluation.targets import from_target, to_target
 
 Array = npt.NDArray[np.float64]
 CHANGE_HOURS = 3
 
 
-class _LinearChange:
-    """The shared fit and predict; a subclass names itself and builds its inputs."""
-
-    name: str
+class Upstream:
+    name = "upstream"
 
     def __init__(self, settings: EvaluationSettings) -> None:
         self._leads = settings.leads_hours
@@ -33,12 +31,20 @@ class _LinearChange:
         self.coefficients: Array = np.empty((0, self._leads))
 
     def inputs(self, rows: pd.DataFrame) -> Array:
-        """Shape (len(rows), inputs); NaN where an input is missing."""
-        raise NotImplementedError
+        """Shape (len(rows), 2); NaN where a level is missing."""
+        changes = [
+            rows[f"{prefix}_lag_0"] - rows[f"{prefix}_lag_{CHANGE_HOURS}"]
+            for prefix in (
+                contract.GAUGE_PREFIXES["langenberg"],
+                contract.GAUGE_PREFIXES["nierenhof"],
+            )
+        ]
+        return np.column_stack(changes).astype(np.float64)
 
     def fit(self, train: pd.DataFrame) -> None:
         inputs = self.inputs(train)
-        change = to_target(train, "change", self._leads)
+        targets = train[contract.lead_columns(contract.TARGET, self._leads)].to_numpy(np.float64)
+        change = targets - _last_level(train)
         complete = np.isfinite(inputs).all(axis=1)
         factors = []
         for lead in range(self._leads):
@@ -53,38 +59,9 @@ class _LinearChange:
         inputs = self.inputs(rows)
         change = inputs @ self.coefficients
         change[~np.isfinite(inputs).all(axis=1)] = 0.0
-        return from_target(change, rows, "change")
+        prediction: Array = _last_level(rows) + change
+        return prediction
 
 
-class Recession(_LinearChange):
-    """`base + a_k * (last - base)`, base the 30-day median; coefficients hold `a_k - 1`."""
-
-    name = "recession"
-
-    def inputs(self, rows: pd.DataFrame) -> Array:
-        distance = rows[contract.KD_LAST_CM] - rows[contract.KD_BASE_30D_CM]
-        return distance.to_numpy(dtype=np.float64)[:, np.newaxis]
-
-
-class DampedTrend(_LinearChange):
-    """`last + b_k * change_3h`, see `kupferdreh_change_3h`."""
-
-    name = "damped_trend"
-
-    def inputs(self, rows: pd.DataFrame) -> Array:
-        return kupferdreh_change_3h(rows)[:, np.newaxis]
-
-
-class Upstream(_LinearChange):
-    """`last + c_k * Langenberg change_3h + d_k * Nierenhof change_3h`, lag 0 minus lag 3."""
-
-    name = "upstream"
-
-    def inputs(self, rows: pd.DataFrame) -> Array:
-        upstream = features(rows, with_icon=False)[["lb_change_3h", "nh_change_3h"]]
-        return upstream.to_numpy(dtype=np.float64)
-
-
-def kupferdreh_change_3h(rows: pd.DataFrame) -> Array:
-    """The last level minus the level about 3 hours older; see `features.kupferdreh_change`."""
-    return kupferdreh_change(rows, CHANGE_HOURS)
+def _last_level(rows: pd.DataFrame) -> Array:
+    return rows[[contract.KD_LAST_CM]].to_numpy(np.float64)
