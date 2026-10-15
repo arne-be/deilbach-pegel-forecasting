@@ -89,6 +89,10 @@ Step 6 of the ladder, in a form that keeps ridge's flood size: `ridge:change:v2`
 - **Settings:** learning rate 0.05, 15 leaves, depth 4, L2 penalty 10, 80 % of the inputs per tree, seeded and deterministic. 10 rounds and `min_data_in_leaf` 200 were chosen on the inner splits; more rounds made them worse. `lgbm_residual:v1:linear` fits a linear model in each leaf (`linear_tree`).
 - **Ruled out.** Over all issue times both lose to `ridge:change:v2` in 2 (plain) and 3 (linear) of 4 folds. Flood size holds, false alarms are 4 (plain) and 3 (linear) against 3, and the high-water bias at +24 h shrinks from −3.8 to −3.2 cm. The trees mostly learned season, which 8 to 20 months of training can't support.
 
+## Capped training (stress test)
+
+`<model>:cap100` is the same model trained without any issue time whose cleaned level at the issue time or any target is above 100 cm (`models/capped.py`). Test rows are not filtered, so the four test floods above 100 cm lie beyond the levels and targets it learned from (lag and upstream inputs aren't capped). It shows how much flood size a model family loses on a flood bigger than its training range. It is a stress test only, never a live candidate: the variants sit in `STRESS_TESTS` in the registry and run only when named, e.g. `--models persistence,upstream:cap100`. Results: run [2026-10-15-capped-training](../analysis/model-evaluation/experiments.md#2026-10-15-capped-training).
+
 ## Known weaknesses of the current best
 
 - **No gain at +1 h.** About 0.67 cm, persistence 0.66, `upstream` 0.60.
