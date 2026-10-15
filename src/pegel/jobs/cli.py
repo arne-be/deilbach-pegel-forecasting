@@ -24,7 +24,7 @@ from pegel.config import PegelConfig, config_file, load_config
 from pegel.core.forecasts import Forecast
 from pegel.core.schedule import issue_time
 from pegel.core.summary import summarize
-from pegel.jobs import rain_forecast
+from pegel.jobs import eval_set, rain_forecast
 from pegel.jobs.pipeline import (
     Conn,
     FetchLevels,
@@ -62,9 +62,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Backfill {start:%Y-%m-%d} to {end:%Y-%m-%d %H:%M} UTC: {changed} rows stored")
         return 0
     if arguments.command == "build-eval-set":
-        # Lazy: the Lambda imports this module, and the dataset build isn't part of it.
-        from pegel.jobs import eval_set
-
         database_url = _required_env("JOBS_DATABASE_URL")
         eval_set.run(config, database_url, arguments.start, arguments.end, arguments.out)
         return 0
