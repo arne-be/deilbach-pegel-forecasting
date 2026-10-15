@@ -25,8 +25,6 @@ CSV_TABLES = (
     "bootstrap",
     "events",
     "peaks",
-    "alarms",
-    "crossings",
     "false_alarms",
     "lag",
 )
@@ -62,28 +60,6 @@ def _table_details(summary: str, text: str, table: pd.DataFrame) -> list[str]:
     return details(summary, [text, "", report_tables.markdown_table(table)])
 
 
-def _warning_details(tables: dict[str, pd.DataFrame]) -> list[str]:
-    crossings, false_alarms = (tables.get(name, EMPTY) for name in ("crossings", "false_alarms"))
-    body: list[str] = []
-    if not crossings.empty:
-        body += [
-            "First crossings per threshold (no hour above it in the 24 hours before) and how"
-            " far ahead the first forecast showed them.",
-            "",
-            report_tables.markdown_table(report_tables.crossing_table(crossings)),
-            "",
-        ]
-    if not false_alarms.empty:
-        body += [
-            "False alarms: forecast crossings with no observed crossing within 6 hours; a"
-            " warning that stays up counts once.",
-            "",
-            report_tables.markdown_table(report_tables.false_alarm_table(false_alarms)),
-            "",
-        ]
-    return details("Warnings and false alarms per threshold", body) if body else []
-
-
 def _plot_lines(plots: Sequence[Path]) -> list[str]:
     """The overview plots in the open, the event plots folded."""
     events = [plot for plot in plots if plot.stem.startswith("event-")]
@@ -110,15 +86,12 @@ def section(
     Summary, notes and one headline table first, then the plots; the detail tables folded.
     """
     scores = tables.get("scores", EMPTY)
-    crossings = tables.get("crossings", EMPTY)
-    false_alarms = tables.get("false_alarms", EMPTY)
-    flood_cm = float(run_info["settings"]["flood_cm"])
     lines = [f"## {run_name}", ""]
     if not scores.empty:
-        lines += [*report_tables.summary(scores, crossings, false_alarms, flood_cm), ""]
+        lines += [*report_tables.summary(scores), ""]
     lines.append(f"**Notes:** {notes}")
     if not scores.empty:
-        headline = report_tables.headline_table(scores, crossings, false_alarms, flood_cm)
+        headline = report_tables.headline_table(scores)
         lines += ["", report_tables.markdown_table(headline)]
     lines += _plot_lines(plots)
     if not scores.empty:
@@ -127,24 +100,7 @@ def section(
             table = report_tables.lead_table(scores, subset)
             body += [f"Subset `{subset}`:", "", report_tables.markdown_table(table), ""]
         lines += details("MAE in cm per lead and subset, pooled over folds", body)
-    lines += _warning_details(tables)
-    alarms, peaks, lag = (tables.get(name, EMPTY) for name in ("alarms", "peaks", "lag"))
-    if not alarms.empty:
-        lines += _table_details(
-            "Alarms per lead (diagnostic)",
-            "Flood episodes per threshold: hits / misses / false alarms of the lead-k"
-            " forecasts, counted as overlapping episodes per lead. A different rule from the"
-            " crossings and false alarms in the headline: a forecast issued during a flood"
-            " scores a hit by staying high. A diagnostic only.",
-            report_tables.alarm_table(alarms),
-        )
-    if not peaks.empty:
-        lines += _table_details(
-            "Peaks",
-            "Forecasts issued k hours before each flood peak: highest value minus peak, value"
-            " at the peak minus peak, and timing of the highest value (positive is late).",
-            report_tables.peak_table(peaks),
-        )
+    lag = tables.get("lag", EMPTY)
     if not lag.empty:
         lines += _table_details(
             "Lag check",

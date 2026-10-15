@@ -122,7 +122,7 @@ class EvaluationSettings(_Frozen):
     leads_hours: int = Field(gt=0)
     # High water: the level is above this at the issue time or at the target.
     high_water_cm: float = Field(gt=0)
-    # The lowest warning threshold. The scorer's peak scores still take spells above it as events.
+    # The 95 cm line in the methodology figures. Kept so frozen dataset manifests still load.
     flood_cm: float = Field(gt=0)
     # A target is the reading closest to its time, at most this far off; otherwise missing.
     target_tolerance_minutes: int = Field(ge=0)
