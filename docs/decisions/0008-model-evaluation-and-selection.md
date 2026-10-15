@@ -107,6 +107,8 @@ Why: a model should be judged on what matters on a flood day, whether and how ea
 
 **Simple first.** We start with five simple models. A more complex model is only tried when the simple ones are scored and understood.
 
+**2026-10-15:** models 2 and 3, ridge v1 (`ridge:level`, `ridge:change` and their `:no_icon` runs) and `rain_change` v1 were retired after the v2 models (`rain_change:v2:split`, `ridge:change:v2`) beat them; the hourly-step target went with them. Model 4 (upstream) stays as the best model at +1 h. The ladder below stays as the record of the plan; [models.md](../models.md#retired) lists the retired models and their last numbers.
+
 1. **Persistence.** The last cleaned level, for every lead.
 2. **Recession to base.** The level moves back towards a base level with one fitted factor per lead. The base level is the median of the cleaned hourly levels of the last 30 days, as of the issue time.
 3. **Damped trend.** The last level plus the change over the last 3 hours, with one fitted factor per lead. A 1-hour change is too noisy.
