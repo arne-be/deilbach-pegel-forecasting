@@ -137,7 +137,11 @@ def forecast_peaks(predictions: pd.DataFrame, peak_at: pd.Timestamp) -> pd.DataF
     value and its time, both relative to the observed peak (hours, first of tied hours)."""
     issued = predictions[contract.ISSUED_AT]
     window = predictions[(issued >= peak_at - TRACK_HOURS * _HOUR) & (issued <= peak_at)]
-    window = window.dropna(subset=["prediction"])
+    # Only complete forecasts, as in flood_scores: a missing hour could hide the peak.
+    complete = window.groupby(["model", contract.ISSUED_AT])["prediction"].transform(
+        lambda values: values.notna().all()
+    )
+    window = window[complete.astype(bool)]
     highest = window.loc[window.groupby(["model", contract.ISSUED_AT])["prediction"].idxmax()]
     issued_at = highest[contract.ISSUED_AT]
     return pd.DataFrame(
