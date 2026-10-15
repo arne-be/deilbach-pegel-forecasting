@@ -32,7 +32,8 @@
   ],
   "forecast": {
     "station_id": "kupferdreh",
-    "model": "persistence",
+    "model": "ridge:change:v2",
+    "model_file": "models/ridge-change-v2-20261015T1702Z.json",
     "horizon_hours": 48,
     "summary_horizons_hours": [3, 24, 48],
     "issue_minute": 30,
