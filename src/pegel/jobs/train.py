@@ -29,7 +29,10 @@ S3_PREFIX = "models/"
 
 def trainable_model(name: str, settings: EvaluationSettings) -> CuratedChange:
     """The registered model with this name, set up as in the evaluation; only these can be saved."""
-    (factory,) = selected_models([name], settings)
+    try:
+        (factory,) = selected_models([name], settings)
+    except ValueError as error:
+        raise SystemExit(f"error: {error}") from None
     model = factory(settings)
     if not isinstance(model, CuratedChange):
         raise SystemExit(f"error: {name} can't be saved; only curated change models can")
