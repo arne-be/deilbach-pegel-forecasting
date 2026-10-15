@@ -52,8 +52,6 @@ A walkthrough with figures, including the ICON-D2 stitch: [model-evaluation.md](
 
 **We accept the stitch and measure its effect.** A model trained on old forecasts will trust short-lead rain less than it could. We check the size of this with the full runs from Open-Meteo Single Runs (2026-04 to 2026-10) and with a live shadow run from 2026-10-12.
 
-**Every learned model also runs without ICON-D2.** Because of the stitch, the backtest undervalues ICON-D2. The live shadow run then shows what ICON-D2 really adds.
-
 ### Folds
 
 **Four expanding-window folds.** Training always starts on 2024-02-01 and ends where the test starts. A 24-hour embargo drops the last training issue times, whose targets reach into the test.
