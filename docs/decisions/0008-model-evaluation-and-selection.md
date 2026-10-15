@@ -101,7 +101,7 @@ Why: a model should be judged on what matters on a flood day, whether and how ea
 
 ### Experiment log
 
-**Every scored run is appended to `analysis/model-evaluation/experiments.md`.** One section per run: date, code commit, dataset checksum, the models with their targets and feature sets, the mean MAE and skill per subset, the plots (MAE per lead for both subsets, skill per lead, and the event plots), and a short note on what was tried and what we learned. The plots are PNG files in `analysis/model-evaluation/plots/<run>/`, committed and embedded in the section. Nothing in it is edited afterwards; a later run that changes a conclusion says so in its own section. This keeps every comparison of models, features and approaches in one place.
+**Every scored run is appended to `analysis/model-evaluation/experiments.md`.** One section per run: date, code commit, dataset checksum, the models with their targets and feature sets, the mean MAE and skill per subset, the plots (MAE per lead for both subsets, skill per lead, and the event plots), and a short note on what was tried and what we learned. The plots are PNG files in `analysis/model-evaluation/plots/<run>/`, committed and embedded in the section. The log holds runs of the current evaluation method only. Within a method nothing in it is edited afterwards; a later run that changes a conclusion says so in its own section. When the method changes, the log starts again with a fresh run, and older runs stay in git history. This keeps one comparable set of runs in one place.
 
 ### Model ladder
 

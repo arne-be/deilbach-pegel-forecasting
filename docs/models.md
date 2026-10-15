@@ -4,7 +4,7 @@ Every model the evaluation runs, what it does and why. How models are scored is 
 
 ## Ladder
 
-Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10-15-models-v2](../analysis/model-evaluation/experiments.md#2026-10-15-models-v2). High water: above 75 cm at the issue time or at the target. Detail per lead, fold, event and warning is in that run's section, not here.
+Mean MAE in cm over leads 1 to 24, pooled over the four folds, from run [2026-10-15-models-v2](https://github.com/arne-be/deilbach-pegel-prediction/blob/fcca364/analysis/model-evaluation/experiments.md#2026-10-15-models-v2), the last run before the evaluation method changed (it is in git history, not in the current log). High water: above 75 cm at the issue time or at the target. MAE doesn't depend on the flood events, so these numbers hold; flood forecast scores follow with the first run of the new method.
 
 | Model | Idea | All | High water | Code |
 |---|---|---|---|---|
