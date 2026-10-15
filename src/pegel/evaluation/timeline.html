@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead timeline</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; color: #222; background: #fff; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  #models label, #leads label { margin-right: 12px; white-space: nowrap; }
+  .swatch { display: inline-block; width: 12px; height: 3px; vertical-align: middle; margin-right: 4px; }
+  h2 { font-size: 14px; margin: 12px 0 2px; }
+  canvas { display: block; width: 100%; touch-action: none; }
+  .panel { height: 280px; cursor: grab; }
+  .panel.dragging { cursor: grabbing; }
+  #overview { height: 48px; cursor: pointer; margin-top: 8px; }
+  #tip { position: fixed; pointer-events: none; background: #fff; border: 1px solid #ccc; border-radius: 4px;
+    padding: 6px 8px; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.15); display: none;
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #tip td { padding: 0 4px; } #tip td:last-child { text-align: right; }
+  #tip th { text-align: left; padding-top: 4px; }
+  .help { color: #666; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Lead timeline: forecasts 1 to 24 h ahead</h1>
+<div id="models" class="controls" role="group" aria-label="Models"></div>
+<div id="leads" class="controls" role="group" aria-label="Leads shown">Leads shown:</div>
+<div class="controls">
+  <button type="button" id="zoom-in">Zoom in</button>
+  <button type="button" id="zoom-out">Zoom out</button>
+  <button type="button" id="left" aria-label="Pan left">&larr;</button>
+  <button type="button" id="right" aria-label="Pan right">&rarr;</button>
+  <button type="button" id="reset">Reset</button>
+  <label>Jump to <select id="event"><option value="">event &hellip;</option></select></label>
+  <label><input type="checkbox" id="same-y"> same y axis in all panels</label>
+  <span id="range" aria-live="polite"></span>
+</div>
+<canvas id="overview" role="img" aria-label="Overview of the observed level; click or drag to move the view"></canvas>
+<div id="panels"></div>
+<div id="tip"></div>
+<p class="help">Times in Europe/Berlin. Each forecast is drawn at its target time, so a model that
+only follows the observed level shows up shifted right by the lead. Mouse wheel zooms, drag pans.
+Shaded: flood events. Dashed vertical lines: fold starts. Red dashed: high water.</p>
+<script id="timeline-data" type="application/json">/*TIMELINE_DATA*/</script>
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("timeline-data").textContent);
+const HOUR = 3600000, DAY = 24 * HOUR, MIN_SPAN = 12 * HOUR, PAD_CM = 5;
+// Same order as the replay page, so a model keeps its colour. No black or grey: observed level.
+const COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+  "#e377c2", "#17becf", "#bcbd22", "#aec7e8", "#ffbb78", "#98df8a"];
+const M = { left: 52, right: 12, top: 8, bottom: 22 };
+const N = DATA.observed.length;
+const T0 = DATA.start, T1 = DATA.start + (N - 1) * HOUR;
+const el = (id) => document.getElementById(id);
+const colorOf = (model) => COLORS[DATA.models.indexOf(model) % COLORS.length];
+
+const berlinParts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin",
+  year: "numeric", month: "short", day: "numeric", hour: "numeric", hourCycle: "h23" });
+const berlinLong = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin",
+  weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const berlinDate = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", day: "numeric", month: "short", year: "numeric" });
+// Berlin calendar parts per grid hour, once, so drawing ticks needs no formatter.
+const CAL = Array.from({ length: N }, (_, i) => {
+  const p = Object.fromEntries(berlinParts.formatToParts(T0 + i * HOUR).map((x) => [x.type, x.value]));
+  return { year: p.year, month: p.month, day: Number(p.day), hour: Number(p.hour) };
+});
+
+const selected = new Set([DATA.default_model]);
+const shown = new Set(DATA.shown_leads);
+const shownLeads = () => DATA.leads.filter((lead) => shown.has(lead));
+let view = [T0, T1], hoverIndex = null, frame = 0;
+
+function setView(a, b) {
+  let span = Math.min(Math.max(b - a, MIN_SPAN), T1 - T0);
+  a = Math.max(T0, Math.min(a, T1 - span));
+  view = [a, a + span];
+  schedule();
+}
+function zoom(factor, at) {
+  const center = at ?? (view[0] + view[1]) / 2;
+  setView(center - (center - view[0]) * factor, center + (view[1] - center) * factor);
+}
+function pan(fraction) { const d = (view[1] - view[0]) * fraction; setView(view[0] + d, view[1] + d); }
+function schedule() { if (!frame) frame = requestAnimationFrame(() => { frame = 0; drawAll(); }); }
+
+function sized(canvas) {
+  const ratio = window.devicePixelRatio || 1, w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.round(w * ratio)) { canvas.width = Math.round(w * ratio); canvas.height = Math.round(h * ratio); }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+
+const visibleRange = () => [Math.max(0, Math.floor((view[0] - T0) / HOUR)), Math.min(N - 1, Math.ceil((view[1] - T0) / HOUR))];
+function seriesOf(lead) {
+  return [DATA.observed, ...DATA.models.filter((m) => selected.has(m)).map((m) => DATA.forecasts[lead][m])];
+}
+function yRange(leads) {
+  const [i0, i1] = visibleRange();
+  let lo = Infinity, hi = -Infinity;
+  for (const lead of leads) for (const values of seriesOf(lead)) {
+    for (let i = i0; i <= i1; i++) { const v = values[i]; if (v !== null) { if (v < lo) lo = v; if (v > hi) hi = v; } }
+  }
+  if (lo > hi) return [0, 100];
+  return [Math.floor(lo - PAD_CM), Math.ceil(hi + PAD_CM)];
+}
+
+function timeTicks() {
+  const span = (view[1] - view[0]) / HOUR, [i0, i1] = visibleRange();
+  const ticks = [];
+  for (let i = i0; i <= i1; i++) {
+    const c = CAL[i], first = i === 0 || CAL[i - 1].month !== c.month;
+    let label = null;
+    if (span <= 48) { if (c.hour % 3 === 0) label = c.day + " " + c.month + " " + String(c.hour).padStart(2, "0") + ":00"; }
+    else if (span <= 6 * 24) { if (c.hour % 12 === 0) label = c.day + " " + c.month + (c.hour ? " 12:00" : ""); }
+    else if (span <= 16 * 24) { if (c.hour === 0) label = c.day + " " + c.month; }
+    else if (span <= 70 * 24) { if (c.hour === 0 && [1, 8, 15, 22].includes(c.day)) label = c.day + " " + c.month; }
+    else if (span <= 400 * 24) { if (first) label = c.month + " " + c.year; }
+    else if (first && ["Jan", "Apr", "Jul", "Oct"].includes(c.month)) label = c.month + " " + c.year;
+    if (label) ticks.push([T0 + i * HOUR, label]);
+  }
+  return ticks;
+}
+
+function line(ctx, values, x, y, i0, i1) {
+  ctx.beginPath();
+  let pen = false;
+  for (let i = i0; i <= i1; i++) {
+    const v = values[i];
+    if (v === null) { pen = false; continue; }
+    pen ? ctx.lineTo(x(T0 + i * HOUR), y(v)) : ctx.moveTo(x(T0 + i * HOUR), y(v));
+    pen = true;
+  }
+  ctx.stroke();
+}
+
+function drawPanel(index, lead, yr, ticks) {
+  const { ctx, w, h } = sized(el("panel-" + index));
+  const [y0, y1] = yr, [i0, i1] = visibleRange();
+  const x = (t) => M.left + (t - view[0]) / (view[1] - view[0]) * (w - M.left - M.right);
+  const y = (v) => h - M.bottom - (v - y0) / (y1 - y0) * (h - M.top - M.bottom);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(M.left, M.top, w - M.left - M.right, h - M.top - M.bottom); ctx.clip();
+  ctx.fillStyle = "rgba(30, 120, 220, 0.08)";
+  for (const e of DATA.events) ctx.fillRect(x(e.start), M.top, x(e.end) - x(e.start), h - M.top - M.bottom);
+  ctx.strokeStyle = "#eee"; ctx.lineWidth = 1;
+  const span = y1 - y0, step = span > 150 ? 25 : span > 60 ? 10 : span > 25 ? 5 : 2;
+  for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) { ctx.beginPath(); ctx.moveTo(M.left, y(v)); ctx.lineTo(w - M.right, y(v)); ctx.stroke(); }
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = "#999";
+  for (const f of DATA.folds) { ctx.beginPath(); ctx.moveTo(x(f.start), M.top); ctx.lineTo(x(f.start), h - M.bottom); ctx.stroke(); }
+  ctx.setLineDash([6, 4]); ctx.strokeStyle = "#c00";
+  ctx.beginPath(); ctx.moveTo(M.left, y(DATA.high_water_cm)); ctx.lineTo(w - M.right, y(DATA.high_water_cm)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
+  line(ctx, DATA.observed, x, y, i0, i1);
+  ctx.lineWidth = 1.5;
+  for (const model of DATA.models) {
+    if (!selected.has(model)) continue;
+    ctx.strokeStyle = colorOf(model);
+    line(ctx, DATA.forecasts[lead][model], x, y, i0, i1);
+  }
+  if (hoverIndex !== null) {
+    const hx = x(T0 + hoverIndex * HOUR);
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(hx, M.top); ctx.lineTo(hx, h - M.bottom); ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle = "#555"; ctx.font = "11px system-ui, sans-serif";
+  ctx.textAlign = "right";
+  for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) ctx.fillText(v + " cm", M.left - 6, y(v) + 4);
+  ctx.textAlign = "left";
+  // A fold starting just before the data (F1 starts at midnight, the grid at 03:30) is labelled at the edge.
+  for (const f of DATA.folds) if (f.start >= view[0] - DAY && f.start <= view[1]) ctx.fillText(f.name, Math.max(x(f.start), M.left) + 3, M.top + 10);
+  ctx.textAlign = "center";
+  let lastRight = -Infinity;
+  for (const [t, label] of ticks) {
+    const tx = x(t), half = ctx.measureText(label).width / 2;
+    if (tx - half < lastRight + 8 || tx - half < M.left - 20 || tx + half > w) continue;
+    ctx.fillText(label, tx, h - 6);
+    lastRight = tx + half;
+  }
+  el("panel-" + index).setAttribute("aria-label", "Observed level and forecasts " + lead + " hours ahead, " + y0 + " to " + y1 + " cm");
+}
+
+function drawOverview() {
+  const { ctx, w, h } = sized(el("overview"));
+  let lo = Infinity, hi = -Infinity;
+  for (const v of DATA.observed) if (v !== null) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  const x = (t) => (t - T0) / (T1 - T0) * w;
+  const y = (v) => h - 2 - (v - lo) / (hi - lo || 1) * (h - 4);
+  ctx.fillStyle = "rgba(30, 120, 220, 0.12)";
+  for (const e of DATA.events) ctx.fillRect(x(e.start), 0, Math.max(1, x(e.end) - x(e.start)), h);
+  ctx.strokeStyle = "#555"; ctx.lineWidth = 1;
+  line(ctx, DATA.observed, x, y, 0, N - 1);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
+  ctx.fillRect(0, 0, x(view[0]), h); ctx.fillRect(x(view[1]), 0, w - x(view[1]), h);
+  ctx.strokeStyle = "#000"; ctx.strokeRect(x(view[0]) + 0.5, 0.5, Math.max(2, x(view[1]) - x(view[0]) - 1), h - 1);
+}
+
+function drawAll() {
+  const leads = shownLeads(), all = el("same-y").checked ? yRange(leads) : null;
+  const ticks = timeTicks();
+  DATA.leads.forEach((lead, i) => {
+    el("section-" + i).hidden = !shown.has(lead);
+    if (shown.has(lead)) drawPanel(i, String(lead), all ?? yRange([lead]), ticks);
+  });
+  drawOverview();
+  el("range").textContent = berlinDate.format(view[0]) + " – " + berlinDate.format(view[1]);
+}
+
+function fmt(v) { return v === null || v === undefined ? "–" : v.toFixed(1) + " cm"; }
+function showTip(event) {
+  if (hoverIndex === null) { el("tip").style.display = "none"; return; }
+  const rows = [`<b>${berlinLong.format(T0 + hoverIndex * HOUR)}</b>`, "<table>",
+    `<tr><td><span class="swatch" style="background:#000"></span>observed</td><td>${fmt(DATA.observed[hoverIndex])}</td></tr>`];
+  for (const lead of shownLeads()) {
+    rows.push(`<tr><th colspan="2">${lead} h ahead</th></tr>`);
+    for (const model of DATA.models) if (selected.has(model)) {
+      rows.push(`<tr><td><span class="swatch" style="background:${colorOf(model)}"></span>${escapeHtml(model)}</td>`
+        + `<td>${fmt(DATA.forecasts[lead][model][hoverIndex])}</td></tr>`);
+    }
+  }
+  const tip = el("tip");
+  tip.innerHTML = rows.join("") + "</table>";
+  tip.style.display = "block";
+  const left = event.clientX + 16 + tip.offsetWidth > window.innerWidth ? event.clientX - 16 - tip.offsetWidth : event.clientX + 16;
+  tip.style.left = Math.max(0, left) + "px";
+  tip.style.top = Math.max(0, Math.min(event.clientY + 16, window.innerHeight - tip.offsetHeight - 4)) + "px";
+}
+function escapeHtml(text) { return text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+
+function timeAt(canvas, clientX) {
+  const r = canvas.getBoundingClientRect();
+  return view[0] + (clientX - r.left - M.left) / (r.width - M.left - M.right) * (view[1] - view[0]);
+}
+
+let drag = null;
+DATA.leads.forEach((lead, i) => {
+  const section = Object.assign(document.createElement("section"), { id: "section-" + i });
+  const title = document.createElement("h2");
+  title.textContent = lead + " h ahead: forecasts made " + lead + " hours before each time";
+  const canvas = Object.assign(document.createElement("canvas"), { id: "panel-" + i, className: "panel" });
+  canvas.setAttribute("role", "img");
+  section.append(title, canvas);
+  el("panels").append(section);
+  const label = document.createElement("label");
+  const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: shown.has(lead) });
+  box.addEventListener("change", () => { box.checked ? shown.add(lead) : shown.delete(lead); schedule(); });
+  label.append(box, " " + lead + " h");
+  el("leads").append(label);
+  canvas.addEventListener("wheel", (e) => { e.preventDefault(); if (!e.deltaY) return; zoom(e.deltaY > 0 ? 1.25 : 0.8, timeAt(canvas, e.clientX)); }, { passive: false });
+  canvas.addEventListener("pointerdown", (e) => {
+    drag = { x: e.clientX, view: view.slice(), width: canvas.getBoundingClientRect().width - M.left - M.right };
+    canvas.setPointerCapture(e.pointerId); canvas.classList.add("dragging");
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (drag) {
+      const shift = (drag.x - e.clientX) / drag.width * (drag.view[1] - drag.view[0]);
+      setView(drag.view[0] + shift, drag.view[1] + shift);
+    }
+    const at = timeAt(canvas, e.clientX);
+    const index = Math.round((at - T0) / HOUR);
+    hoverIndex = at >= view[0] && at <= view[1] && index >= 0 && index < N ? index : null;
+    showTip(e); schedule();
+  });
+  const end = () => { drag = null; canvas.classList.remove("dragging"); };
+  canvas.addEventListener("pointerup", end);
+  canvas.addEventListener("pointercancel", end);
+  canvas.addEventListener("pointerleave", () => { if (!drag) { hoverIndex = null; el("tip").style.display = "none"; schedule(); } });
+});
+const overview = el("overview");
+function jumpTo(e) {
+  const r = overview.getBoundingClientRect(), center = T0 + (e.clientX - r.left) / r.width * (T1 - T0);
+  const half = (view[1] - view[0]) / 2;
+  setView(center - half, center + half);
+}
+overview.addEventListener("pointerdown", (e) => { overview.setPointerCapture(e.pointerId); jumpTo(e); });
+overview.addEventListener("pointermove", (e) => { if (e.buttons) jumpTo(e); });
+
+DATA.models.forEach((model) => {
+  const label = document.createElement("label");
+  const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: selected.has(model) });
+  box.addEventListener("change", () => { box.checked ? selected.add(model) : selected.delete(model); schedule(); });
+  const swatch = Object.assign(document.createElement("span"), { className: "swatch" });
+  swatch.style.background = colorOf(model);
+  label.append(box, swatch, model);
+  el("models").append(label);
+});
+DATA.events.forEach((e, i) => el("event").append(new Option("Event " + e.number + " · " + berlinDate.format(e.peak_at) + " · " + e.peak_cm + " cm", i)));
+el("event").addEventListener("change", (e) => {
+  if (e.target.value === "") return;
+  const ev = DATA.events[Number(e.target.value)];
+  setView(ev.start - 2 * DAY, ev.end + 2 * DAY);
+  e.target.value = "";  // so the same event can be picked again
+});
+el("zoom-in").addEventListener("click", () => zoom(0.5));
+el("zoom-out").addEventListener("click", () => zoom(2));
+el("left").addEventListener("click", () => pan(-0.25));
+el("right").addEventListener("click", () => pan(0.25));
+el("reset").addEventListener("click", () => { el("event").value = ""; setView(T0, T1); });
+el("same-y").addEventListener("change", schedule);
+window.addEventListener("resize", schedule);
+drawAll();
+</script>
+</body>
+</html>

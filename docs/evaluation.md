@@ -6,7 +6,8 @@ How we score forecast models for Kupferdreh: the data, the split into training a
 
 1. **Build the dataset once.** `pegel build-eval-set`, read-only from prod (command in `AGENTS.md`). Every input as of its issue time. Frozen as `eval.parquet` with a checksum in `eval.manifest.json`, outside the repo.
 2. **Fit and predict.** `python -m pegel.evaluation.predict <dataset> --out <dir>` trains every registered model on each fold's training rows and predicts its test rows. Writes `predictions.parquet`.
-3. **Score.** `python -m pegel.evaluation.score <predictions> <dataset> --out <dir>` writes `scores.csv`, `bootstrap.csv`, `lag.csv`, `events.csv` (the test events), `peaks.csv` (size, timing and predicted per model, event and lead, in `src/pegel/evaluation/flood_scores.py`) and `false_alarms.csv` (count and rate per model). The forecast replay page will come from a separate command.
+3. **Score.** `python -m pegel.evaluation.score <predictions> <dataset> --out <dir>` writes `scores.csv`, `bootstrap.csv`, `lag.csv`, `events.csv` (the test events), `peaks.csv` (size, timing and predicted per model, event and lead, in `src/pegel/evaluation/flood_scores.py`) and `false_alarms.csv` (count and rate per model).
+   Then `python -m pegel.evaluation.replay <run dir> <dataset>` writes the forecast replay page and `python -m pegel.evaluation.timeline <run dir> <dataset>` the lead timeline page into the run folder.
 4. **Log it.** `python -m pegel.evaluation.report <run dir>` appends a section with tables and plots to `analysis/model-evaluation/experiments.md`. Add what we learned to `learnings.md`.
 
 ## Data
@@ -192,6 +193,7 @@ Without a counterweight, a model that forecasts a flood all the time would alway
 ### Plots
 
 - **Forecast replay**, one interactive HTML page per run. Pick an event and a set of models. The page steps through the issue times from 24 hours before the peak to the end of the event, with play, pause, a step of one hour back or forward, and a slider. It shows the observed level, solid up to the issue time and light after it, a vertical line at the issue time, each model's 24-hour forecast with the last few forecasts fading behind it, and the 75 cm line, the pre-event level and the peak.
+- **Lead timeline**, one interactive HTML page per run. Panels over the whole test period on one time axis: the observed level with each model's forecast made 1, 3, 6, 12 or 24 hours earlier, drawn at the time it forecast. 3 and 24 hours are shown at first; 1, 6 and 12 can be switched on. Fold starts, flood events and the 75 cm line are marked. Zoom and pan move all panels, an overview strip jumps to any time, a menu zooms to an event, and hovering shows every value at that hour. It shows how much worse each model gets from 1 to 24 hours ahead, also outside the flood events.
 - **Three static plots per run** in the experiment log. Each answers one question and says the answer in its title, computed from the run. They show persistence in grey and the two best models by the [selection rule](#selection) that beat it; the tables show all models.
   1. **How fast does the forecast get worse?** Average error (MAE) per hour ahead, all issue times and high water side by side on one scale.
   2. **Does it see the floods coming?** Events predicted per lead before the peak, the earliest lead on the left.
