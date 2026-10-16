@@ -3,6 +3,7 @@
 import {
   type KeyboardEvent,
   type PointerEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -84,11 +85,10 @@ const zoneColor = (number: number, colored: boolean) =>
 
 export default function ForecastChart({
   history,
-  points,
+  points: givenPoints,
   nowMs,
   onHover,
 }: ForecastChartProps) {
-  const boxRef = useRef<HTMLDivElement>(null);
   const lineRef = useRef<SVGLineElement>(null);
   const dotRef = useRef<SVGCircleElement>(null);
   const shownMsRef = useRef<number | null>(null);
@@ -100,14 +100,15 @@ export default function ForecastChart({
     following: boolean;
   } | null>(null);
   const [width, setWidth] = useState(360);
-  const [picked, setPicked] = useState<number | null>(null);
+  // The picked hour as a time, so a refresh that slides the window keeps the same hour.
+  const [pickedMs, setPickedMs] = useState<number | null>(null);
 
-  useEffect(() => {
-    const box = boxRef.current;
+  // A callback ref, so the observer attaches whenever the box mounts (e.g. once data arrives).
+  const observeWidth = useCallback((box: HTMLDivElement | null) => {
     if (!box) return;
-    const observer = new ResizeObserver(() =>
-      setWidth(Math.max(240, Math.round(box.clientWidth))),
-    );
+    const observer = new ResizeObserver(() => {
+      if (box.clientWidth) setWidth(Math.round(box.clientWidth));
+    });
     observer.observe(box);
     return () => observer.disconnect();
   }, []);
@@ -117,6 +118,9 @@ export default function ForecastChart({
   const newestMs = lastObservation
     ? Date.parse(lastObservation.observed_at)
     : nowMs;
+  // Grey once the newest reading is too old to call current; no forecast is drawn then.
+  const stale = nowMs - newestMs > freshness.observation_max_age_minutes * 60e3;
+  const points = stale ? null : givenPoints;
   const recent = useMemo(
     () =>
       history.filter(
@@ -141,8 +145,6 @@ export default function ForecastChart({
     () => [...measured, ...forecast],
     [measured, forecast],
   );
-  // Grey once the newest reading is too old to call current (the forecast is then hidden too).
-  const stale = nowMs - newestMs > freshness.observation_max_age_minutes * 60e3;
 
   const phone = width < 500;
   const W = width;
@@ -165,8 +167,7 @@ export default function ForecastChart({
     [t0, t1, W, H, yMax],
   );
   const homeIdx = measured.length - 1;
-  // A picked hour that a data refresh removed falls back to the newest reading.
-  const shownIdx = picked !== null && picked < series.length ? picked : homeIdx;
+  const shownIdx = pickedMs === null ? homeIdx : nearestIndex(series, pickedMs);
   const away = shownIdx !== homeIdx;
 
   // The cursor glides to the picked hour along the line; set on the DOM so a frame costs no render.
@@ -209,14 +210,14 @@ export default function ForecastChart({
   const pick = (idx: number) => {
     clearTimeout(holdRef.current);
     const clamped = Math.max(0, Math.min(series.length - 1, idx));
-    if (clamped === picked) return;
-    setPicked(clamped);
+    if (series[clamped].ms === pickedMs) return;
+    setPickedMs(series[clamped].ms);
     onHover(series[clamped].ms);
   };
   const release = () => {
+    // No early return on "nothing picked": the hold timer runs a release from an older render.
     clearTimeout(holdRef.current);
-    if (picked === null) return;
-    setPicked(null);
+    setPickedMs(null);
     onHover(null);
   };
   const holdThenRelease = () => {
@@ -318,7 +319,7 @@ export default function ForecastChart({
   return (
     <div className="fc">
       <div
-        ref={boxRef}
+        ref={observeWidth}
         className="fc-chart"
         role="slider"
         tabIndex={0}
