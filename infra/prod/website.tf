@@ -1,6 +1,22 @@
-# The static website: a private bucket, served only through CloudFront.
-# Custom domain (alias + ACM certificate in us-east-1) comes in a later PR; until
-# then the site runs on its *.cloudfront.net address.
+# The static website: a private bucket, served only through CloudFront, on a
+# subdomain whose DNS stays at GoDaddy (docs/setup-domain.md).
+
+locals {
+  site_domain = "deilbach-pegel.energiekonzepte-ruhr.de"
+  # CloudFront rejects a certificate that isn't issued yet. Set to true once ACM
+  # shows it as issued, after the validation CNAME is in GoDaddy.
+  site_certificate_issued = false
+}
+
+resource "aws_acm_certificate" "site" {
+  provider          = aws.us_east_1
+  domain_name       = local.site_domain
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
 
 resource "aws_s3_bucket" "site" {
   bucket = "deilbach-pegel-site-${data.aws_caller_identity.current.account_id}"
@@ -44,6 +60,7 @@ resource "aws_cloudfront_distribution" "site" {
   price_class         = "PriceClass_100"
   http_version        = "http2and3"
   is_ipv6_enabled     = true
+  aliases             = local.site_certificate_issued ? [local.site_domain] : []
 
   origin {
     origin_id                = "site"
@@ -67,7 +84,10 @@ resource "aws_cloudfront_distribution" "site" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = !local.site_certificate_issued
+    acm_certificate_arn            = local.site_certificate_issued ? aws_acm_certificate.site.arn : null
+    ssl_support_method             = local.site_certificate_issued ? "sni-only" : null
+    minimum_protocol_version       = local.site_certificate_issued ? "TLSv1.2_2021" : null
   }
 }
 
@@ -103,6 +123,11 @@ output "site_bucket" {
 
 output "site_distribution_id" {
   value = aws_cloudfront_distribution.site.id
+}
+
+output "site_certificate_validation" {
+  description = "The CNAME to add at GoDaddy so ACM issues the certificate"
+  value       = aws_acm_certificate.site.domain_validation_options
 }
 
 output "site_url" {
