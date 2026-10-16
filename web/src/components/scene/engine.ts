@@ -98,10 +98,11 @@ export class SceneEngine {
 
   /** Eases to the level in LEVEL_MS; the first call jumps there with barriers and sandbags already in place. */
   setLevel(cm: number, label: string, range: [number, number] | null): void {
+    if (!Number.isFinite(cm)) return; // a NaN would blank every path; keep the last good picture
     const to = Math.max(0, cm);
     const instant = !this.placed;
     this.placed = true;
-    this.label = label;
+    this.label = label || `${Math.round(to)} cm`;
     this.range = range;
     this.anim = { from: instant ? to : this.shown, to, t0: null };
     if (instant) {
