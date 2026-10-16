@@ -1,0 +1,132 @@
+---
+// Page shell: header and footer mirror energiekonzepte-ruhr.de, links absolute to the main site.
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const site = "https://energiekonzepte-ruhr.de";
+const nav = [
+  { href: `${site}/energieberatung`, label: "Energieberatung" },
+  { href: `${site}/mieterstrom`, label: "Mieterstrom" },
+  { href: `${site}/about`, label: "Team" },
+  { href: `${site}/wissen`, label: "Wissen" },
+  { href: `${site}/kontakt`, label: "Kontakt" },
+];
+const services = [
+  { href: `${site}/energieberatung`, label: "Energieberatung" },
+  { href: `${site}/quick-check`, label: "Quick-Check Beratung" },
+  { href: `${site}/sanierungsfahrplan`, label: "Sanierungsfahrplan" },
+  { href: `${site}/zuschussbegleitung-beg`, label: "Zuschussbegleitung BEG" },
+  { href: `${site}/zuschuesse-beg`, label: "Zuschuss vom BAFA" },
+  { href: `${site}/photovoltaik`, label: "Photovoltaik" },
+  { href: `${site}/mieterstrom`, label: "Mieterstrom" },
+  { href: `${site}/stromabrechnung`, label: "Stromabrechnung MFH" },
+];
+const footerNav = [
+  { href: `${site}/about`, label: "Team" },
+  { href: `${site}/kontakt`, label: "Kontakt" },
+  { href: `${site}/impressum`, label: "Impressum" },
+];
+---
+
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="preload" href="/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap bar">
+        <a class="brand" href={`${site}/`}>
+          <img src="/logo.jpg" alt="Energiekonzepte Ruhr" width="40" height="40" /><span>Energiekonzepte Ruhr</span>
+        </a>
+        <nav class="topnav" aria-label="Hauptmenü">
+          {nav.map((link) => <a href={link.href}>{link.label}</a>)}
+        </nav>
+        <a class="cta" href={`${site}/kontakt`}>Kontakt aufnehmen</a>
+        <button type="button" class="burger" id="burger" aria-label="Menü" aria-expanded="false" aria-controls="mobilenav">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+        </button>
+      </div>
+      <nav class="mobilenav" id="mobilenav" aria-label="Menü" hidden>
+        <div class="wrap">
+          <a href={`${site}/`}>Home</a>
+          {nav.map((link) => <a href={link.href}>{link.label}</a>)}
+        </div>
+      </nav>
+    </header>
+
+    <main class="wrap">
+      <slot />
+    </main>
+
+    <footer class="site">
+      <div class="wrap cols">
+        <div>
+          <img class="logo" src="/logo-and-type-light.svg" alt="Energiekonzepte Ruhr" width="160" height="80" />
+          <p class="addr">Jörg Berresheim<br />Langmannskamp 11<br />45276 Essen, Deutschland</p>
+          <div class="social">
+            <a href="https://www.linkedin.com/in/jorgberresheim/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn-Profil von Jörg Berresheim">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path
+                  d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.063 2.063 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"
+                ></path>
+              </svg>
+            </a>
+            <a href="https://www.xing.com/profile/Joerg_Berresheim" target="_blank" rel="noopener noreferrer" aria-label="Xing-Profil von Jörg Berresheim">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path
+                  d="M18.188 0c-.517 0-.741.325-.927.66 0 0-7.455 13.224-7.702 13.657.015.024 4.919 9.023 4.919 9.023.17.308.436.66.967.66h3.454c.211 0 .375-.078.463-.22.089-.151.089-.346-.009-.536l-4.879-8.916c-.004-.006-.004-.016 0-.022L21.235.756c.095-.191.097-.387.006-.535C21.151.078 20.987 0 20.775 0h-3.454l.867 0zM3.648 4.74c-.211 0-.39.07-.478.22-.09.152-.075.347.02.538l2.335 4.05c.005.009.005.014 0 .023L1.86 16.51c-.099.188-.093.381 0 .536.087.144.244.236.456.236h3.34c.5 0 .746-.341.916-.65l3.708-6.557-2.354-4.137c-.171-.305-.421-.65-.929-.65H3.648z"
+                ></path>
+              </svg>
+            </a>
+          </div>
+        </div>
+        <div>
+          <h3>Kontakt</h3>
+          <p>
+            Tel.: <a href="tel:+4915738993484">+49 157 38993484</a><br />E-Mail: <a href="mailto:info@energiekonzepte-ruhr.de"
+              >info@energiekonzepte-ruhr.de</a
+            >
+          </p>
+        </div>
+        <div>
+          <h3>Leistungen</h3>
+          <ul>
+            {services.map((link) => <li><a href={link.href}>{link.label}</a></li>)}
+          </ul>
+        </div>
+        <div>
+          <h3>Navigation</h3>
+          <ul>
+            {footerNav.map((link) => <li><a href={link.href}>{link.label}</a></li>)}
+          </ul>
+        </div>
+      </div>
+      <div class="copy">©2026 Energiekonzepte Ruhr</div>
+    </footer>
+
+    <script>
+      const burger = document.getElementById("burger");
+      const mobileNav = document.getElementById("mobilenav");
+      burger?.addEventListener("click", () => {
+        if (!mobileNav) return;
+        const open = mobileNav.hidden;
+        mobileNav.hidden = !open;
+        burger.setAttribute("aria-expanded", String(open));
+        burger.querySelector("path")?.setAttribute("d", open ? "M6 6l12 12M6 18L18 6" : "M4 7h16M4 12h16M4 17h16");
+      });
+    </script>
+  </body>
+</html>

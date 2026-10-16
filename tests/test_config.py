@@ -20,12 +20,25 @@ def _config_with(path: Path, **changes: object) -> Path:
 
 
 def test_descending_category_bounds_are_rejected(tmp_path: Path) -> None:
+    texts = {"description": "d", "actions": "a"}
     categories = [
-        {"number": 1, "name": "a", "above_cm": None},
-        {"number": 2, "name": "b", "above_cm": 120.0},
-        {"number": 3, "name": "c", "above_cm": 100.0},
+        {"number": 1, "name": "a", "above_cm": None} | texts,
+        {"number": 2, "name": "b", "above_cm": 120.0} | texts,
+        {"number": 3, "name": "c", "above_cm": 100.0} | texts,
     ]
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="ascending"):
+        load_config(_config_with(tmp_path / "pegel.json", categories=categories))
+
+
+def test_site_scale_below_the_highest_category_is_rejected(tmp_path: Path) -> None:
+    site = {"history_hours": 24, "scale_top_cm": 225}
+    with pytest.raises(ValidationError, match="site scale"):
+        load_config(_config_with(tmp_path / "pegel.json", site=site))
+
+
+def test_a_category_needs_its_website_texts(tmp_path: Path) -> None:
+    categories = [c.model_dump(exclude={"actions"}) for c in load_config().categories]
+    with pytest.raises(ValidationError, match="actions"):
         load_config(_config_with(tmp_path / "pegel.json", categories=categories))
 
 

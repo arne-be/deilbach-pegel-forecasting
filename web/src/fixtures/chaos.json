@@ -1,0 +1,594 @@
+{
+  "forecast": {
+    "station_id": "kupferdreh",
+    "model": "ridge:change:v2",
+    "issued_at": "2026-11-19T15:30:00Z",
+    "newest_observation_at": "2026-11-19T15:22:02Z",
+    "situation": "strong",
+    "points": [
+      {
+        "valid_at": "2026-11-19T16:22:00Z",
+        "level_cm": 193.7,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 187.5,
+            "upper_cm": 199.9
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 185.6,
+            "upper_cm": 201.8
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-19T17:22:00Z",
+        "level_cm": 198.7,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 190.3,
+            "upper_cm": 207.1
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 187.8,
+            "upper_cm": 209.6
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-19T18:22:00Z",
+        "level_cm": 205.8,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 195.2,
+            "upper_cm": 216.4
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 192.0,
+            "upper_cm": 219.6
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-19T19:22:00Z",
+        "level_cm": 214.4,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 201.6,
+            "upper_cm": 227.2
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 197.8,
+            "upper_cm": 231.0
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-19T20:22:00Z",
+        "level_cm": 223.1,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 208.1,
+            "upper_cm": 238.1
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 203.6,
+            "upper_cm": 242.6
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-19T21:22:00Z",
+        "level_cm": 229.6,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 212.4,
+            "upper_cm": 246.8
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 207.2,
+            "upper_cm": 252.0
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-19T22:22:00Z",
+        "level_cm": 232.0,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 212.6,
+            "upper_cm": 251.4
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 206.8,
+            "upper_cm": 257.2
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-19T23:22:00Z",
+        "level_cm": 228.0,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 206.4,
+            "upper_cm": 249.6
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 199.9,
+            "upper_cm": 256.1
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T00:22:00Z",
+        "level_cm": 219.9,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 196.1,
+            "upper_cm": 243.7
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 189.0,
+            "upper_cm": 250.8
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T01:22:00Z",
+        "level_cm": 209.6,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 183.6,
+            "upper_cm": 235.6
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 175.8,
+            "upper_cm": 243.4
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T02:22:00Z",
+        "level_cm": 199.4,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 171.2,
+            "upper_cm": 227.6
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 162.7,
+            "upper_cm": 236.1
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T03:22:00Z",
+        "level_cm": 190.7,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 160.3,
+            "upper_cm": 221.1
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 151.2,
+            "upper_cm": 230.2
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T04:22:00Z",
+        "level_cm": 184.1,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 151.5,
+            "upper_cm": 216.7
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 141.7,
+            "upper_cm": 226.5
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T05:22:00Z",
+        "level_cm": 179.5,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 144.7,
+            "upper_cm": 214.3
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 134.3,
+            "upper_cm": 224.7
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T06:22:00Z",
+        "level_cm": 176.4,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 139.4,
+            "upper_cm": 213.4
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 128.3,
+            "upper_cm": 224.5
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T07:22:00Z",
+        "level_cm": 174.0,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 134.8,
+            "upper_cm": 213.2
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 123.0,
+            "upper_cm": 225.0
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T08:22:00Z",
+        "level_cm": 172.2,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 130.8,
+            "upper_cm": 213.6
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 118.4,
+            "upper_cm": 226.0
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T09:22:00Z",
+        "level_cm": 170.4,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 126.8,
+            "upper_cm": 214.0
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 113.7,
+            "upper_cm": 227.1
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T10:22:00Z",
+        "level_cm": 168.8,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 123.0,
+            "upper_cm": 214.6
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 109.3,
+            "upper_cm": 228.3
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T11:22:00Z",
+        "level_cm": 167.2,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 119.2,
+            "upper_cm": 215.2
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 104.8,
+            "upper_cm": 229.6
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T12:22:00Z",
+        "level_cm": 165.6,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 115.4,
+            "upper_cm": 215.8
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 100.3,
+            "upper_cm": 230.9
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T13:22:00Z",
+        "level_cm": 164.0,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 111.6,
+            "upper_cm": 216.4
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 95.9,
+            "upper_cm": 232.1
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T14:22:00Z",
+        "level_cm": 162.4,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 107.8,
+            "upper_cm": 217.0
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 91.4,
+            "upper_cm": 233.4
+          }
+        ]
+      },
+      {
+        "valid_at": "2026-11-20T15:22:00Z",
+        "level_cm": 160.8,
+        "bands": [
+          {
+            "coverage_percent": 80,
+            "lower_cm": 104.0,
+            "upper_cm": 217.6
+          },
+          {
+            "coverage_percent": 90,
+            "lower_cm": 87.0,
+            "upper_cm": 234.6
+          }
+        ]
+      }
+    ]
+  },
+  "history": {
+    "station_id": "kupferdreh",
+    "from": "2026-11-17",
+    "to": "2026-11-19",
+    "observations": [
+      {
+        "observed_at": "2026-11-17T16:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-17T17:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-17T18:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-17T19:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-17T20:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-17T21:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-17T22:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-17T23:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-18T00:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-18T01:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-18T02:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-18T03:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-18T04:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-18T05:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-18T06:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-18T07:22:02Z",
+        "level_cm": 95.0
+      },
+      {
+        "observed_at": "2026-11-18T08:22:02Z",
+        "level_cm": 95.1
+      },
+      {
+        "observed_at": "2026-11-18T09:22:02Z",
+        "level_cm": 95.1
+      },
+      {
+        "observed_at": "2026-11-18T10:22:02Z",
+        "level_cm": 95.1
+      },
+      {
+        "observed_at": "2026-11-18T11:22:02Z",
+        "level_cm": 95.2
+      },
+      {
+        "observed_at": "2026-11-18T12:22:02Z",
+        "level_cm": 95.2
+      },
+      {
+        "observed_at": "2026-11-18T13:22:02Z",
+        "level_cm": 95.3
+      },
+      {
+        "observed_at": "2026-11-18T14:22:02Z",
+        "level_cm": 95.4
+      },
+      {
+        "observed_at": "2026-11-18T15:22:02Z",
+        "level_cm": 95.6
+      },
+      {
+        "observed_at": "2026-11-18T16:22:02Z",
+        "level_cm": 95.9
+      },
+      {
+        "observed_at": "2026-11-18T17:22:02Z",
+        "level_cm": 96.2
+      },
+      {
+        "observed_at": "2026-11-18T18:22:02Z",
+        "level_cm": 96.7
+      },
+      {
+        "observed_at": "2026-11-18T19:22:02Z",
+        "level_cm": 97.3
+      },
+      {
+        "observed_at": "2026-11-18T20:22:02Z",
+        "level_cm": 98.2
+      },
+      {
+        "observed_at": "2026-11-18T21:22:02Z",
+        "level_cm": 99.4
+      },
+      {
+        "observed_at": "2026-11-18T22:22:02Z",
+        "level_cm": 101.0
+      },
+      {
+        "observed_at": "2026-11-18T23:22:02Z",
+        "level_cm": 103.2
+      },
+      {
+        "observed_at": "2026-11-19T00:22:02Z",
+        "level_cm": 106.1
+      },
+      {
+        "observed_at": "2026-11-19T01:22:02Z",
+        "level_cm": 109.8
+      },
+      {
+        "observed_at": "2026-11-19T02:22:02Z",
+        "level_cm": 114.4
+      },
+      {
+        "observed_at": "2026-11-19T03:22:02Z",
+        "level_cm": 120.0
+      },
+      {
+        "observed_at": "2026-11-19T04:22:02Z",
+        "level_cm": 126.5
+      },
+      {
+        "observed_at": "2026-11-19T05:22:02Z",
+        "level_cm": 133.8
+      },
+      {
+        "observed_at": "2026-11-19T06:22:02Z",
+        "level_cm": 141.5
+      },
+      {
+        "observed_at": "2026-11-19T07:22:02Z",
+        "level_cm": 149.2
+      },
+      {
+        "observed_at": "2026-11-19T08:22:02Z",
+        "level_cm": 156.5
+      },
+      {
+        "observed_at": "2026-11-19T09:22:02Z",
+        "level_cm": 163.0
+      },
+      {
+        "observed_at": "2026-11-19T10:22:02Z",
+        "level_cm": 168.6
+      },
+      {
+        "observed_at": "2026-11-19T11:22:02Z",
+        "level_cm": 173.2
+      },
+      {
+        "observed_at": "2026-11-19T12:22:02Z",
+        "level_cm": 176.9
+      },
+      {
+        "observed_at": "2026-11-19T13:22:02Z",
+        "level_cm": 179.8
+      },
+      {
+        "observed_at": "2026-11-19T14:22:02Z",
+        "level_cm": 182.0
+      },
+      {
+        "observed_at": "2026-11-19T15:22:02Z",
+        "level_cm": 188.0
+      }
+    ]
+  }
+}

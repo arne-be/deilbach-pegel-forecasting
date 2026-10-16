@@ -54,6 +54,18 @@ class Category(_Frozen):
     number: int
     name: str
     above_cm: float | None
+    # Shown on the website (German): what happens at the gauge, and what to do.
+    description: str
+    actions: str
+
+
+class SiteSettings(_Frozen):
+    """Settings the website reads at build time (web/src/lib/config.ts)."""
+
+    # Hours of measured levels the chart shows before the forecast.
+    history_hours: int = Field(gt=0)
+    # Top of the fixed chart and scene scale; it grows only if a value goes higher.
+    scale_top_cm: float = Field(gt=0)
 
 
 class CleaningSettings(_Frozen):
@@ -166,6 +178,7 @@ class PegelConfig(_Frozen):
     stations: tuple[Station, ...]
     forecast: ForecastSettings
     categories: tuple[Category, ...]
+    site: SiteSettings
     cleaning: CleaningSettings
     freshness: Freshness
     api: ApiSettings
@@ -187,6 +200,8 @@ class PegelConfig(_Frozen):
         set_bounds = [bound for bound in bounds if bound is not None]
         if len(set_bounds) != len(bounds) or set_bounds != sorted(set_bounds):
             raise ValueError("category bounds must be set and ascending after the first one")
+        if set_bounds and self.site.scale_top_cm <= set_bounds[-1]:
+            raise ValueError("the site scale must reach above the highest category bound")
         if self.api.history_default_days > self.api.history_max_days:
             raise ValueError("the default history range must not exceed the maximum")
         evaluation = self.evaluation

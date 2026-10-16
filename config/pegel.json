@@ -41,12 +41,46 @@
     "upstream_ingest_lookback_hours": 24
   },
   "categories": [
-    { "number": 1, "name": "unkritisch", "above_cm": null },
-    { "number": 2, "name": "kritisch", "above_cm": 145 },
-    { "number": 3, "name": "sehr kritisch", "above_cm": 165 },
-    { "number": 4, "name": "extrem kritisch", "above_cm": 185 },
-    { "number": 5, "name": "Chaos", "above_cm": 225 }
+    {
+      "number": 1,
+      "name": "unkritisch",
+      "above_cm": null,
+      "description": "Der Deilbach bleibt im Ufer.",
+      "actions": "Keine Maßnahmen nötig."
+    },
+    {
+      "number": 2,
+      "name": "kritisch",
+      "above_cm": 145,
+      "description": "Der Deilbach tritt am Parkplatz Kupferdreh über das Ufer.",
+      "actions": "Mobile Hochwasserbarrieren aufbauen."
+    },
+    {
+      "number": 3,
+      "name": "sehr kritisch",
+      "above_cm": 165,
+      "description": "Wasser geht über die Mauer.",
+      "actions": "Rückstauventil schließen, Pumpe anschließen, Sandsäcke auslegen."
+    },
+    {
+      "number": 4,
+      "name": "extrem kritisch",
+      "above_cm": 185,
+      "description": "Wasser geht über die Barrieren.",
+      "actions": "Die Sandsäcke halten das Wasser vom Haus fern."
+    },
+    {
+      "number": 5,
+      "name": "Chaos",
+      "above_cm": 225,
+      "description": "Wasser fließt ins Haus.",
+      "actions": "EG-Wohnung räumen, Strom abschalten."
+    }
   ],
+  "site": {
+    "history_hours": 24,
+    "scale_top_cm": 250
+  },
   "cleaning": {
     "gate_sigmas": 4,
     "min_deviation_cm": 15,
