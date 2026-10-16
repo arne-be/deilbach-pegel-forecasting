@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 from psycopg.rows import TupleRow
 
+from pegel.adapters.api_files import WriteFile
 from pegel.adapters.storage.forecasts import save_forecast
 from pegel.adapters.storage.observations import (
     delete_values,
@@ -30,6 +31,7 @@ from pegel.core.series import (
     level_series_id,
 )
 from pegel.jobs.model_forecast import ModelLoader, model_forecast
+from pegel.jobs.publish import publish_forecast, publish_recent
 
 logger = logging.getLogger(__name__)
 
@@ -199,18 +201,25 @@ def run_hourly(
     issued_at: datetime,
     extra_steps: Sequence[tuple[str, HourlyStep]] = (),
     load_model: ModelLoader | None = None,
+    publish: WriteFile | None = None,
 ) -> Forecast:
     """Ingests the recent hours of every station and the extra inputs, cleans the forecast
     station's levels, then forecasts. Returns the forecast the page shows.
 
-    Only uses readings up to the issue time. A failing upstream station or extra step is logged
-    and skipped, so it can't block the forecast; a failing forecast station fails the run.
+    With `publish`, also writes the API's recent history (after cleaning) and forecast (at the
+    end) as files.
+
+    Only uses readings up to the issue time. A failing upstream station, extra step or publish
+    is logged and skipped, so it can't block the forecast; a failing forecast station fails
+    the run.
     """
     forecast_station = config.station(config.forecast.station_id)
     start = issued_at - timedelta(hours=config.forecast.ingest_lookback_hours)
     issue_minute = config.forecast.issue_minute
     ingest(fetch, conn, forecast_station, start, issued_at, issue_minute, live=True)
     clean(conn, config, forecast_station, start, issued_at)
+    if publish is not None:
+        publish_recent(conn, config, publish)
     upstream_start = issued_at - timedelta(hours=config.forecast.upstream_ingest_lookback_hours)
     for station in config.stations:
         if station.id == forecast_station.id:
@@ -237,9 +246,13 @@ def run_hourly(
             )
     # Always saved, and first: it is the baseline and the page's fallback.
     persistence = forecast(conn, config, issued_at)
-    if config.forecast.model == PERSISTENCE:
-        return persistence
-    return save_model_forecast(conn, config, issued_at, load_model) or persistence
+    result = persistence
+    if config.forecast.model != PERSISTENCE:
+        result = save_model_forecast(conn, config, issued_at, load_model) or persistence
+    if publish is not None:
+        # Rebuilt from storage with the API's own rule, so the file is what the API would serve.
+        publish_forecast(conn, config, publish)
+    return result
 
 
 def save_model_forecast(

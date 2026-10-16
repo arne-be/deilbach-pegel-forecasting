@@ -8,8 +8,9 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
+from pegel.adapters.api_files import FORECAST_KEY
 from pegel.adapters.storage.forecasts import save_forecast
-from pegel.api.app import app, get_config, get_database_url
+from pegel.api.app import app, get_config, get_database_url, get_read_file
 from pegel.config import load_config
 from pegel.core.forecasts import Band, Forecast, ForecastPoint
 
@@ -20,8 +21,14 @@ OBSERVED_AT = datetime(2026, 10, 12, 15, 22, tzinfo=UTC)
 
 
 @pytest.fixture
-def client(database_url: str) -> Iterator[TestClient]:
-    app.dependency_overrides[get_database_url] = lambda: database_url
+def files() -> dict[str, bytes]:
+    return {}
+
+
+@pytest.fixture
+def client(database_url: str, files: dict[str, bytes]) -> Iterator[TestClient]:
+    app.dependency_overrides[get_database_url] = lambda: lambda: database_url
+    app.dependency_overrides[get_read_file] = lambda: files.__getitem__
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -103,3 +110,29 @@ def test_falls_back_to_a_newer_persistence_forecast(
         save_forecast(conn, forecast(observed_at, [12.0], model=RIDGE))
     body = ridge_client.get("/api/forecast").json()
     assert (body["model"], body["points"][0]["level_cm"]) == ("persistence", 10.0)
+
+
+def no_database() -> str:
+    raise AssertionError("the database was asked")
+
+
+def test_serves_the_file_without_the_database(client: TestClient, files: dict[str, bytes]) -> None:
+    files[FORECAST_KEY] = b'{"model": "from-file"}'
+    app.dependency_overrides[get_database_url] = lambda: no_database
+    response = client.get("/api/forecast")
+    assert (response.status_code, response.json()) == (200, {"model": "from-file"})
+    assert response.headers["content-type"] == "application/json"
+
+
+def test_missing_file_falls_back_to_the_database(client: TestClient, conn: Conn) -> None:
+    save_forecast(conn, forecast(OBSERVED_AT, [10.0]))
+    assert client.get("/api/forecast").json()["points"][0]["level_cm"] == 10.0
+
+
+def test_failing_reader_falls_back_to_the_database(client: TestClient, conn: Conn) -> None:
+    def broken(key: str) -> bytes:
+        raise OSError("s3 down")
+
+    app.dependency_overrides[get_read_file] = lambda: broken
+    save_forecast(conn, forecast(OBSERVED_AT, [10.0]))
+    assert client.get("/api/forecast").json()["points"][0]["level_cm"] == 10.0
