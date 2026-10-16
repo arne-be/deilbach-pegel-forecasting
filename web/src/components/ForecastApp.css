@@ -1,0 +1,230 @@
+/* Verdict, level now, stage and category cards, from docs/website/mockup-kombi.html. */
+
+/* Verdict left, level now right on desktop; stacked on the phone. */
+.hero {
+  display: grid;
+  gap: 14px 32px;
+}
+@media (min-width: 900px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  .hero .level {
+    text-align: right;
+  }
+  .hero .nowrow {
+    justify-content: flex-end;
+  }
+}
+.verdict {
+  font-weight: 600;
+  font-size: clamp(17px, 4.6vw, 22px);
+  line-height: 1.5;
+  margin: 0;
+}
+.verdict .line {
+  display: block;
+}
+.verdict .when {
+  white-space: nowrap;
+}
+.chip {
+  display: inline-block;
+  padding: 1px 10px;
+  border-radius: 99px;
+  background: var(--chip);
+  font:
+    700 0.8em / 1.5 Manrope,
+    sans-serif;
+  color: oklch(18% 0.025 215);
+  vertical-align: 0.08em;
+  white-space: nowrap;
+}
+.chip.dark {
+  color: #fff;
+}
+.chip.ghost {
+  background: transparent;
+  color: var(--foreground);
+  border: 2px dashed var(--chip);
+  padding: 0 8px;
+}
+.chip.off {
+  background: var(--grey);
+  color: var(--foreground);
+}
+.badge {
+  display: inline-block;
+  padding: 2px 12px;
+  border-radius: 99px;
+  border: 2px solid var(--foreground);
+  font-weight: 700;
+  font-size: 16px;
+}
+/* 44 px tall tap target without moving the text. */
+.verdict .portal {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 16px;
+  color: var(--accent);
+  font-weight: 500;
+}
+.verdict .portal:hover {
+  text-decoration: underline;
+}
+.nowrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  margin: 0;
+}
+.nowrow .big {
+  font:
+    700 34px / 1.1 "Space Grotesk",
+    sans-serif;
+}
+.nowrow .chip {
+  font-size: 14px;
+}
+.nowrow .sub {
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+.dist {
+  font-size: 16px;
+  margin: 2px 0 0;
+}
+.dist b {
+  font-size: 18px;
+}
+.is-old .nowrow .big {
+  color: var(--muted-foreground);
+}
+
+.stage {
+  margin: 24px 0 0;
+  display: grid;
+  gap: 12px;
+}
+
+.levels {
+  margin: 64px 0 0;
+}
+.levels ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+}
+@media (min-width: 900px) {
+  .levels ol {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.levels li {
+  border-left: 6px solid var(--tone);
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 10px 12px;
+}
+.levels li.maybe {
+  border-left-style: dashed;
+}
+.levels li.now {
+  outline: 2px solid var(--foreground);
+  outline-offset: -1px;
+}
+.levels li.off {
+  border-left-color: var(--grey);
+  color: var(--muted-foreground);
+}
+.levels .head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.levels .chip {
+  font-size: 13px;
+}
+.levels li.off .chip {
+  filter: grayscale(1);
+}
+.levels .range {
+  font-size: 14px;
+  font-weight: 600;
+}
+/* Body text: 16 px (the mockup had 14), readable on a phone outdoors. */
+.levels p {
+  font-size: 16px;
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+.levels .tag {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1.5px solid var(--foreground);
+}
+.levels .tag.maybe {
+  border-style: dashed;
+}
+
+.skeleton .bone {
+  display: block;
+  background: var(--muted);
+  border-radius: 0.5rem;
+}
+.skeleton .line-a {
+  height: 30px;
+  width: min(100%, 520px);
+}
+.skeleton .line-b {
+  height: 38px;
+  width: 200px;
+}
+.skeleton .scene-box {
+  aspect-ratio: 16 / 9;
+  max-height: 520px;
+}
+.skeleton .chart-box {
+  height: 300px;
+}
+
+.testdata {
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border: 2px dashed var(--destructive);
+  border-radius: 0.5rem;
+  font-weight: 700;
+}
+
+/* The bottom line; also used by the <noscript> note in index.astro. */
+.legal {
+  margin: 48px 0 0;
+  font-size: 16px;
+  color: var(--muted-foreground);
+}
+/* Inline, so it wraps as text; the padding gives a 44 px tap height without moving the line. */
+.legal a {
+  padding-block: 12px;
+  white-space: nowrap;
+  color: var(--accent);
+  font-weight: 500;
+}
+/* On phones the link wraps to its own line; a "·" would dangle there. */
+@media (max-width: 639px) {
+  .legal .sep {
+    display: none;
+  }
+}
+.legal a:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,196 @@
+/* The site scene's moving layer: water, flow, foam, the skip, the range and the level tag. */
+.sc-water-t {
+  fill: var(--sc-water-t);
+}
+.sc-water-l {
+  fill: var(--sc-water-l);
+}
+.sc-water-hi {
+  fill: none;
+  stroke: var(--sc-water-hi);
+  stroke-width: 1px;
+  stroke-linecap: round;
+}
+.sc-ripple path {
+  fill: none;
+  stroke: var(--sc-water-hi);
+  stroke-width: 1.1px;
+  stroke-linecap: round;
+}
+.sc-flow-a {
+  opacity: 0.6;
+}
+.sc-flow-b {
+  opacity: 0.4;
+}
+.sc-foam path {
+  fill: none;
+  stroke: var(--sc-foam);
+  stroke-width: 2.4px;
+  stroke-linecap: round;
+}
+.sc-foam-thin path {
+  stroke-width: 1.2px;
+}
+.sc-rim {
+  fill: none;
+  stroke: var(--sc-foam);
+  stroke-width: 2px;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+/* The flow: each layer slides one dash period downstream and loops (compositor-friendly, no JS per frame). */
+@keyframes sc-flow {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(var(--fx), var(--fy));
+  }
+}
+.sc-flow {
+  animation: sc-flow 1s linear infinite;
+}
+.sc-flow-a {
+  animation-duration: 1.1s;
+}
+.sc-flow-b {
+  animation-duration: 2.2s;
+}
+.sc-flow-c {
+  animation-duration: 1.5s;
+}
+.sc-stale .sc-flow {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sc-flow {
+    animation: none;
+  }
+}
+.sc-mud-t {
+  fill: var(--sc-mud-t);
+}
+.sc-mud-f {
+  fill: url(#sc-mgrad);
+}
+.sc-mgrad-top {
+  stop-color: var(--sc-mud-top);
+}
+.sc-mgrad-bot {
+  stop-color: var(--sc-mud-bot);
+}
+.sc-skip-l {
+  fill: var(--sc-skip-l);
+}
+.sc-skip-f {
+  fill: var(--sc-skip-f);
+}
+.sc-skip-t {
+  fill: var(--sc-skip-t);
+}
+.sc-skip-in {
+  fill: var(--sc-skip-in);
+}
+.sc-skip-in2 {
+  fill: var(--sc-skip-f);
+}
+.sc-skip-rust {
+  fill: var(--sc-skip-rust);
+}
+.sc-skip-red {
+  fill: oklch(58% 0.2 27);
+}
+.sc-skip-white {
+  fill: oklch(96% 0.005 90);
+}
+.sc-skip-patch {
+  fill: oklch(84% 0.15 92);
+}
+.sc-skip-foam {
+  fill: none;
+  stroke: var(--sc-foam);
+  stroke-width: 3px;
+  stroke-opacity: 0.75;
+}
+.sc-skip-wake {
+  fill: var(--sc-foam);
+  opacity: 0.55;
+}
+.sc-skip-floor {
+  fill: var(--sc-skip-f);
+  filter: brightness(0.75);
+}
+.sc-skip-churn {
+  fill: var(--sc-foam);
+  opacity: 0.22;
+}
+.sc-skip-line {
+  fill: none;
+  stroke: var(--sc-foam);
+  stroke-width: 2.4px;
+  stroke-linecap: round;
+}
+.sc-tag {
+  transition: opacity 0.25s ease;
+}
+.sc-tag.sc-behind {
+  opacity: 0.1;
+}
+.sc-range {
+  fill: var(--sc-ink);
+  fill-opacity: 0.08;
+  stroke: var(--sc-ink);
+  stroke-opacity: 0.8;
+  stroke-width: 1.2px;
+  stroke-dasharray: 4 2.5;
+}
+.sc-tag-box {
+  fill: var(--sc-card);
+  stroke: var(--sc-ink);
+  stroke-opacity: 0.2;
+  stroke-width: 1px;
+}
+.sc-tag-text {
+  font-family: Manrope, system-ui, sans-serif;
+  font-weight: 600;
+  fill: var(--sc-ink);
+  dominant-baseline: central;
+  text-anchor: middle;
+}
+.sc-tag-lead {
+  stroke: var(--sc-ink);
+  stroke-opacity: 0.6;
+  stroke-width: 1px;
+  fill: none;
+}
+.sc-tag-dot {
+  fill: var(--sc-ink);
+}
+.sc-stale .sc-tag-text {
+  fill: var(--sc-ink-muted);
+}
+.sc-stale .sc-tag-box {
+  stroke-dasharray: 3 2;
+}
+.sc-stale .sc-ripple {
+  opacity: 0.2;
+}
+.sc-wgrad-top {
+  stop-color: var(--sc-water-top);
+}
+.sc-wgrad-bot {
+  stop-color: var(--sc-water-bot);
+}
+.sc-water-f {
+  fill: url(#sc-wgrad);
+  opacity: 0.93;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sc-scene:not(.sc-stale) .sc-water-t {
+    filter: url(#sc-glow);
+  }
+}
+:root[data-theme="dark"] .sc-scene:not(.sc-stale) .sc-water-t {
+  filter: url(#sc-glow);
+}

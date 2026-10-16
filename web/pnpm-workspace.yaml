@@ -1,0 +1,5 @@
+# Transitive versions held back: newer releases were too young for the local minimum
+# package age check (safe-chain). Drop an entry once its newer release is old enough.
+overrides:
+  unstorage: 1.17.5
+  es-module-lexer@^3: 3.0.2

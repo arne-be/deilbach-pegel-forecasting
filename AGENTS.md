@@ -49,7 +49,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Uncertainty bands (80/90/95 %) and situation tag per model forecast, fitted by `pegel train-model`, scored in `bands.csv`, served by `GET /api/forecast`: `src/pegel/core/bands.py`, `src/pegel/evaluation/bands.py`, `forecast_bands` table
 - Forecast and recent history published to S3 (`api/forecast.json`, `api/recent.json`) by the hourly run, read by the API with Neon fallback: `src/pegel/api/responses.py`, `src/pegel/adapters/api_files.py`, `src/pegel/jobs/publish.py`
 - API on Lambda behind CloudFront `/api/*`: `Dockerfile` (api target), `infra/prod/api.tf`, `infra/prod/website.tf`, `.github/workflows/infra.yml`
-- Placeholder website on S3 + CloudFront on `deilbach-pegel.energiekonzepte-ruhr.de`, built and synced by the deploy job: `web/`, `infra/prod/website.tf`, `.github/workflows/web.yml`, `docs/setup-domain.md`
+- Website on S3 + CloudFront on `deilbach-pegel.energiekonzepte-ruhr.de`, built and synced by the deploy job: `web/`, `infra/prod/website.tf`, `.github/workflows/web.yml`, `docs/setup-domain.md`. The forecast page: verdict, level now, site scene, chart with hover, category cards, freshness and fallback states, `?fixture=<name>[&hover=<iso>]` for screenshots: `web/src/pages/index.astro`, `web/src/components/` (`ForecastApp.tsx` is the one island), `web/src/lib/` (forecast logic, formatting, config, API types), `web/src/fixtures/`
 
 ## Layout
 

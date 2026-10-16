@@ -1,0 +1,283 @@
+/* Base, header, footer, page type and the shared card. They mirror energiekonzepte-ruhr.de
+   (Tailwind build: max-w-6xl, md = 768px). Fonts and colour tokens: tokens.css. */
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font:
+    16px / 1.5 Manrope,
+    system-ui,
+    sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+/* 16 px gutter on the phone, and clear of notches in landscape. */
+.wrap {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Page type and the shared card (scene, chart, category and how-it-works cards). */
+main.wrap {
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+h1 {
+  font:
+    600 36px / 40px "Space Grotesk",
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.025em;
+  margin: 0 0 24px;
+}
+@media (min-width: 640px) {
+  h1 {
+    font-size: 48px;
+    line-height: 1;
+  }
+}
+.label {
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  font:
+    500 30px / 36px "Space Grotesk",
+    system-ui,
+    sans-serif;
+  color: var(--foreground);
+  margin: 0 0 24px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow:
+    0 1px 3px 0 #0000001a,
+    0 1px 2px -1px #0000001a;
+}
+header.site {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  background: color-mix(in oklab, var(--background) 85%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+header.site .bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.brand img {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  display: block;
+}
+.brand span {
+  font:
+    600 14px / 20px "Space Grotesk",
+    system-ui,
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--foreground);
+}
+.topnav {
+  display: none;
+  align-items: center;
+  gap: 32px;
+}
+.topnav a {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--foreground) 70%, transparent);
+  transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.topnav a:hover {
+  color: var(--foreground);
+}
+.cta {
+  display: none;
+  border-radius: 9999px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  padding: 8px 16px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: filter 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cta:hover {
+  filter: brightness(1.1);
+}
+.burger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0; /* stays 44 px wide at 320 px */
+  width: 44px;
+  height: 44px;
+  margin-right: -2px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--foreground);
+  padding: 0;
+  cursor: pointer;
+}
+.mobilenav {
+  border-top: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  background: var(--background);
+}
+.mobilenav[hidden] {
+  display: none;
+}
+.mobilenav .wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.mobilenav a {
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--foreground) 80%, transparent);
+}
+.mobilenav a:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+@media (min-width: 768px) {
+  .topnav {
+    display: flex;
+  }
+  .cta {
+    display: inline-flex;
+  }
+  .burger,
+  .mobilenav {
+    display: none;
+  }
+}
+
+footer.site {
+  background: var(--brand-deep);
+  color: color-mix(in oklab, var(--brand-foreground) 95%, transparent);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+footer.site .cols {
+  display: grid;
+  gap: 32px;
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+@media (min-width: 768px) {
+  footer.site .cols {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+footer.site .logo {
+  display: block;
+  height: 80px;
+  width: auto;
+}
+footer.site p {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+footer.site p.addr {
+  margin-top: 16px;
+  line-height: 1.625;
+}
+/* 44 px tap targets around 24 px icons; the negative margin keeps the icons aligned. */
+footer.site .social {
+  margin: 6px 0 0 -10px;
+  display: flex;
+  align-items: center;
+}
+footer.site .social a {
+  padding: 10px;
+  color: color-mix(in oklab, var(--brand-foreground) 80%, transparent);
+  transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+footer.site .social svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+footer.site h3 {
+  margin: 0;
+  font:
+    500 20px / 28px "Space Grotesk",
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.01em;
+  color: var(--brand-foreground);
+}
+footer.site ul {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+footer.site li + li {
+  margin-top: 4px;
+}
+/* 44 px tap height on phones (the main site has 20 px). */
+@media (max-width: 767px) {
+  footer.site ul a,
+  footer.site p a {
+    display: inline-block;
+    min-width: 44px;
+    padding-block: 12px;
+  }
+  footer.site li + li {
+    margin-top: 0;
+  }
+}
+footer.site a:hover {
+  color: var(--accent);
+}
+footer.site .copy {
+  border-top: 1px solid
+    color-mix(in oklab, var(--brand-foreground) 15%, transparent);
+  padding: 16px 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 16px;
+}

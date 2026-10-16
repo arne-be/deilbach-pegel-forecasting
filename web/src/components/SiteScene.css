@@ -1,0 +1,263 @@
+/* The site scene's solid parts, from docs/website/mockup-kombi.html. Every class is prefixed sc-; colours in SiteScene.tokens.css, water and tags in SiteScene.water.css. */
+.sc-scene path {
+  stroke-linejoin: round;
+}
+.sc-park-t {
+  fill: var(--sc-park-t);
+}
+.sc-park-l {
+  fill: var(--sc-park-l);
+}
+.sc-park-f {
+  fill: var(--sc-park-f);
+}
+.sc-line {
+  fill: var(--sc-line);
+}
+.sc-soil-l {
+  fill: var(--sc-soil-l);
+}
+.sc-soil-f {
+  fill: var(--sc-soil-f);
+}
+.sc-soil-d {
+  fill: var(--sc-soil-d);
+}
+.sc-bed-t {
+  fill: var(--sc-bed-t);
+}
+.sc-bank {
+  fill: var(--sc-bank);
+}
+.sc-strata {
+  fill: oklch(100% 0 0 / 0.06);
+}
+.sc-bed-f {
+  fill: var(--sc-bed-f);
+}
+.sc-con-t {
+  fill: var(--sc-con-t);
+}
+.sc-con-l {
+  fill: var(--sc-con-l);
+}
+.sc-con-f {
+  fill: var(--sc-con-f);
+}
+.sc-joint {
+  fill: var(--sc-con-f);
+  opacity: 0.35;
+}
+.sc-stain {
+  fill: var(--sc-stain);
+}
+.sc-grass-t {
+  fill: var(--sc-grass-t);
+}
+.sc-grass-f {
+  fill: var(--sc-grass-f);
+}
+.sc-pave-t {
+  fill: var(--sc-pave-t);
+}
+.sc-pave-l {
+  fill: var(--sc-pave-l);
+}
+.sc-pave-f {
+  fill: var(--sc-pave-f);
+}
+.sc-plinth-t {
+  fill: var(--sc-plinth-t);
+}
+.sc-plinth-l {
+  fill: var(--sc-plinth-l);
+}
+.sc-plinth-f {
+  fill: var(--sc-plinth-f);
+}
+.sc-house-l {
+  fill: var(--sc-house-l);
+}
+.sc-house-f {
+  fill: var(--sc-house-f);
+}
+.sc-house-t {
+  fill: var(--sc-house-l);
+}
+.sc-roof-l {
+  fill: var(--sc-roof-l);
+}
+.sc-roof-f {
+  fill: var(--sc-roof-f);
+}
+.sc-roof-t {
+  fill: var(--sc-ridge);
+}
+.sc-ridge {
+  fill: var(--sc-ridge);
+}
+.sc-win {
+  fill: var(--sc-win);
+}
+.sc-frame {
+  fill: var(--sc-frame);
+}
+.sc-door {
+  fill: var(--sc-door);
+}
+.sc-bar-t {
+  fill: var(--sc-bar-t);
+}
+.sc-bar-l {
+  fill: var(--sc-bar-l);
+}
+.sc-bar-f {
+  fill: var(--sc-bar-f);
+}
+.sc-rib {
+  fill: var(--sc-rib);
+}
+.sc-rib-hi {
+  fill: var(--sc-rib-hi);
+}
+.sc-bag-t,
+.sc-bag-l,
+.sc-bag-f {
+  stroke-width: 2.4px;
+}
+.sc-bag-t {
+  fill: var(--sc-bag-t);
+  stroke: var(--sc-bag-t);
+}
+.sc-bag-l {
+  fill: var(--sc-bag-l);
+  stroke: var(--sc-bag-l);
+}
+.sc-bag-f {
+  fill: var(--sc-bag-f);
+  stroke: var(--sc-bag-f);
+}
+.sc-tree-m {
+  fill: var(--sc-tree-m);
+}
+.sc-tree-l {
+  fill: var(--sc-tree-l);
+}
+.sc-tree-d {
+  fill: var(--sc-tree-d);
+}
+.sc-trunk-t,
+.sc-trunk-l,
+.sc-trunk-f {
+  fill: var(--sc-trunk);
+}
+.sc-trunk-f {
+  filter: brightness(0.8);
+}
+.sc-car1-t {
+  fill: var(--sc-car1-t);
+}
+.sc-car1-l {
+  fill: var(--sc-car1-l);
+}
+.sc-car1-f {
+  fill: var(--sc-car1-f);
+}
+.sc-car2-t {
+  fill: var(--sc-car2-t);
+}
+.sc-car2-l {
+  fill: var(--sc-car2-l);
+}
+.sc-car2-f {
+  fill: var(--sc-car2-f);
+}
+.sc-car3-t {
+  fill: var(--sc-car3-t);
+}
+.sc-car3-l {
+  fill: var(--sc-car3-l);
+}
+.sc-car3-f {
+  fill: var(--sc-car3-f);
+}
+.sc-glass {
+  fill: var(--sc-glass);
+}
+.sc-tyre {
+  fill: var(--sc-tyre);
+}
+.sc-tail {
+  fill: var(--sc-tail);
+}
+.sc-sign {
+  fill: var(--sc-sign);
+}
+.sc-sign-edge {
+  fill: var(--sc-sign-edge);
+}
+.sc-pole-t,
+.sc-pole-l {
+  fill: var(--sc-pole);
+}
+.sc-pole-f {
+  fill: var(--sc-pole);
+  filter: brightness(0.85);
+}
+.sc-post-t,
+.sc-post-l,
+.sc-post-f {
+  fill: oklch(40% 0.01 230);
+}
+.sc-shadow {
+  fill: var(--sc-shadow);
+}
+.sc-block-shadow {
+  fill: var(--sc-block-shadow);
+}
+.sc-c1 {
+  fill: var(--sc-c1);
+}
+.sc-c2 {
+  fill: var(--sc-c2);
+}
+.sc-c3 {
+  fill: var(--sc-c3);
+}
+.sc-c4 {
+  fill: var(--sc-c4);
+}
+.sc-c5 {
+  fill: var(--sc-c5);
+}
+.sc-board-edge {
+  fill: oklch(30% 0.02 215);
+}
+.sc-tick {
+  fill: var(--sc-tick);
+}
+.sc-stale .sc-c1,
+.sc-stale .sc-c2,
+.sc-stale .sc-c3,
+.sc-stale .sc-c4,
+.sc-stale .sc-c5 {
+  filter: saturate(0.25);
+}
+.sc-num {
+  font-family: Manrope, system-ui, sans-serif;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.sc-num-dark {
+  fill: oklch(18% 0.025 215);
+}
+.sc-num-light {
+  fill: #fff;
+}
+.sc-p {
+  font-family: Manrope, system-ui, sans-serif;
+  font-weight: 800;
+  fill: #fff;
+  text-anchor: middle;
+}

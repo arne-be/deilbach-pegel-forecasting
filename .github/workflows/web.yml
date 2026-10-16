@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "web/**"
+      # web/src/lib/config.ts reads it at build time.
+      - "config/pegel.json"
       - ".github/workflows/web.yml"
 
 permissions:

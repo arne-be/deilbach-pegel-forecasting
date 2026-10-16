@@ -1,37 +1,20 @@
-<!doctype html>
-<html lang="de">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta
-      name="description"
-      content="48-Stunden-Vorhersage des Wasserstands am Pegel Kupferdreh am Deilbach."
-    />
-    <title>Pegelvorhersage Deilbach</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        font-family: system-ui, sans-serif;
-        line-height: 1.5;
-      }
-      body {
-        margin: 0 auto;
-        max-width: 40rem;
-        padding: 2rem 1rem;
-      }
-      h1 {
-        font-size: 1.75rem;
-        line-height: 1.2;
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>Pegelvorhersage Deilbach</h1>
-      <p>
-        Hier entsteht eine Vorhersage des Wasserstands am Pegel Kupferdreh am
-        Deilbach für die nächsten 48 Stunden. Sie kommt bald.
-      </p>
-    </main>
-  </body>
-</html>
+---
+import ForecastApp from "../components/ForecastApp";
+import HowItWorks from "../components/HowItWorks.astro";
+import { PORTAL_URL } from "../components/Verdict";
+import Base from "../layouts/Base.astro";
+import { horizonHours } from "../lib/config";
+---
+
+<Base
+  title="Deilbach Pegel Vorhersage"
+  description={`${horizonHours}-Stunden-Vorhersage des Wasserstands am Pegel Kupferdreh am Deilbach, mit Hochwasser-Stufen.`}
+>
+  <h1>Deilbach Pegel Vorhersage</h1>
+  <noscript>
+    <p class="legal">Die Vorhersage braucht JavaScript. Aktuelle Pegel: <a href={PORTAL_URL}>Hochwasserportal NRW</a></p>
+  </noscript>
+  <ForecastApp client:load>
+    <HowItWorks />
+  </ForecastApp>
+</Base>
