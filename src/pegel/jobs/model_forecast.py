@@ -1,6 +1,7 @@
 """The forecast of a trained model (`forecast.model`), from the same input row as training,
 with its uncertainty bands."""
 
+import logging
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta
@@ -16,6 +17,8 @@ from pegel.core.forecasts import Band, Forecast, ForecastPoint
 from pegel.core.issue_inputs import TARGET_MINUTE
 from pegel.evaluation import contract
 from pegel.jobs import eval_set
+
+logger = logging.getLogger(__name__)
 
 # Loads the trained model, e.g. from S3. Passed in, so tests need no S3.
 ModelLoader = Callable[[], TrainedModel]
@@ -40,14 +43,22 @@ def model_forecast(
     points = model_points(issued_at, levels)
     situation = None
     if trained.bands is not None:
-        row_levels = levels[np.newaxis, :]
-        last_level = inputs[contract.KD_LAST_CM].to_numpy(np.float64)
-        icon_to_lead = features.icon_cumulative(inputs, leads)
-        bounds = bands.band_bounds(
-            trained.bands, row_levels, last_level, icon_to_lead, config.bands
-        )
-        [situation] = bands.situations(row_levels, last_level, icon_to_lead, config.bands)
-        points = with_bands(points, bounds)
+        # Bands are extra: a broken table or config costs the bands, never the forecast.
+        try:
+            row_levels = levels[np.newaxis, :]
+            last_level = inputs[contract.KD_LAST_CM].to_numpy(np.float64)
+            icon_to_lead = features.icon_cumulative(inputs, leads)
+            bounds = bands.band_bounds(
+                trained.bands, row_levels, last_level, icon_to_lead, config.bands
+            )
+            [situation] = bands.situations(row_levels, last_level, icon_to_lead, config.bands)
+            points = with_bands(points, bounds)
+        except Exception:
+            logger.exception(
+                "bands failed, saving the forecast without them",
+                extra={"job": "forecast", "model": model.name, "issued_at": issued_at.isoformat()},
+            )
+            situation = None
     return Forecast(
         station_id=config.forecast.station_id,
         model=model.name,

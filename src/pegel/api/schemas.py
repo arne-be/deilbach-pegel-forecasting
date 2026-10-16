@@ -31,7 +31,7 @@ class ForecastResponse(BaseModel):
     issued_at: datetime = Field(description="When the forecast was made, UTC")
     newest_observation_at: datetime = Field(description="Newest reading it used, UTC")
     situation: str | None = Field(
-        description="The situation that picked the bands, e.g. 'dry'; null without bands"
+        description="The situation that picked the bands, e.g. 'calm'; null without bands"
     )
     points: list[ForecastPointResponse] = Field(
         description="From one hour after the newest reading to the end of the horizon"

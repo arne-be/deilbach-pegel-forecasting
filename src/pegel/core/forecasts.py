@@ -41,7 +41,7 @@ class Forecast:
     issued_at: datetime
     newest_observation_at: datetime
     points: tuple[ForecastPoint, ...]
-    # The situation that picked the bands, e.g. "dry"; None without bands.
+    # The situation that picked the bands, e.g. "calm"; None without bands.
     situation: str | None = None
 
     def __post_init__(self) -> None:

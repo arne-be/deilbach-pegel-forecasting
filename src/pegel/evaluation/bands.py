@@ -1,6 +1,7 @@
 """Uncertainty bands in the evaluation: calibration rows from out-of-sample predictions, and
 scores of bands calibrated only on the folds before the one they are tested on."""
 
+import logging
 from dataclasses import dataclass
 
 import numpy as np
@@ -25,6 +26,8 @@ BAND_SCORE_COLUMNS = (
 )
 
 Array = npt.NDArray[np.float64]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -79,23 +82,28 @@ def band_scores(
 
     Each fold's bands are fitted on the folds before it, as a live table only knows the past;
     the first fold has none and is not scored. Fold and situation "all" pool the others.
-    Persistence is left out.
+    Persistence and its variants are left out; a model or fold too thin to fit is skipped
+    with a warning, so it can't stop the scoring of the others.
     """
     leads = config.evaluation.leads_hours
     fold_names = [fold.name for fold in contract.FOLDS]
     frames = []
     # Persistence never changes the level, so its band is only the fallback table.
-    scored_models = predictions[predictions["model"] != metrics.PERSISTENCE]
+    scored_models = predictions[~predictions["model"].str.startswith(metrics.PERSISTENCE)]
     for model, model_predictions in scored_models.groupby("model", sort=True):
         rows = calibration(model_predictions, dataset, leads)
         for position, fold in enumerate(fold_names[1:], start=1):
             test = rows.take(rows.folds == fold)
             if len(test.folds) == 0:
                 continue
-            table = bands.fit_band_table(
-                *_fit_inputs(rows.take(np.isin(rows.folds, fold_names[:position]))),
-                config.bands,
-            )
+            try:
+                table = bands.fit_band_table(
+                    *_fit_inputs(rows.take(np.isin(rows.folds, fold_names[:position]))),
+                    config.bands,
+                )
+            except ValueError as error:
+                logger.warning("no bands for %s on %s: %s", model, fold, error)
+                continue
             frames.append(_scored_rows(table, test, config).assign(model=model, fold=fold))
     if not frames:
         return pd.DataFrame(columns=list(BAND_SCORE_COLUMNS))

@@ -148,7 +148,9 @@ def degraded(levels: Array, last_level: Array, icon_to_lead: Array) -> npt.NDArr
     """(rows, leads): the model fell back to persistence there, or the rain is unknown.
 
     A curated model sets the change of a lead with any missing input to exactly 0; a real
-    forecast never lands exactly on the last level (0 of 13,416 test issue times did).
+    forecast never lands exactly on the last level (0 of 13,416 test issue times did). A model
+    whose fallback isn't exactly persistence (e.g. trees on top of ridge) isn't caught here.
+    Unknown rain alone also counts, which widens the band: the cautious side.
     """
     change = levels - last_level[:, np.newaxis]
     result: npt.NDArray[np.bool_] = (
@@ -178,9 +180,10 @@ def band_bounds(
         index = table.coverages_percent.index(coverage)
         lower = np.where(fallback, table.persistence_lower[index], table.z_lower[index] * scale)
         upper = np.where(fallback, table.persistence_upper[index], table.z_upper[index] * scale)
+        # Both edges at least 0 cm: a forecast below 0 still gives a valid band.
         bounds[coverage] = (
             np.maximum(levels + np.minimum(lower, -floor), 0.0),
-            levels + np.maximum(upper, floor),
+            np.maximum(levels + np.maximum(upper, floor), 0.0),
         )
     return bounds
 

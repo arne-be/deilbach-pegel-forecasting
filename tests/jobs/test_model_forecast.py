@@ -128,6 +128,28 @@ def test_model_forecast_carries_bands_and_situation(conn: Conn) -> None:
     assert (last.bands[0].lower_cm, last.bands[0].upper_cm) == (79.0 - 25.0, 79.0 + 25.0)
 
 
+def test_broken_band_table_keeps_the_forecast_without_bands(
+    conn: Conn, caplog: pytest.LogCaptureFixture
+) -> None:
+    full = band_table()
+    # Only 80 % while the config wants 80, 90 and 95 %: a table from another config.
+    only_80 = bands.BandTable(
+        (80,),
+        full.scale_coefficients,
+        full.scale_caps,
+        *(values[:1] for values in (full.z_lower, full.z_upper)),
+        *(values[:1] for values in (full.persistence_lower, full.persistence_upper)),
+    )
+    with caplog.at_level(logging.ERROR):
+        result = run_hourly(
+            source, conn, RIDGE_CONFIG, ISSUED_AT, load_model=lambda: rising(only_80)
+        )
+    assert result.model == RIDGE
+    assert result.situation is None
+    assert all(point.bands == () for point in result.points)
+    assert "bands failed" in caplog.text
+
+
 def test_unknown_rain_gives_persistence_bands_and_the_degraded_tag(conn: Conn) -> None:
     result = run_hourly(
         source, conn, RIDGE_CONFIG, ISSUED_AT, load_model=lambda: rising(band_table())

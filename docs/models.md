@@ -140,7 +140,7 @@ s_k = a_k + b_k · |forecast_k − last level| + c_k · ICON rain to hour k
 
 with a, b, c ≥ 0 fitted by least squares on the absolute errors, and capped at the 99th percentile of the scales seen in calibration. The band is the forecast plus the 5 % and 95 % quantiles (for 90 %) of error / s_k. It is never narrower than ±1.5 cm, and its lower edge never goes below 0 cm.
 
-**When an input is missing,** the model falls back to persistence (change exactly 0) and the band uses the quantiles of the persistence error instead. Missing ICON rain is never read as dry.
+**When an input is missing,** the model falls back to persistence (change exactly 0) and the band uses the quantiles of the persistence error instead. Missing ICON rain does the same even where the forecast still moves: never read as dry, the band only gets wider. If the bands fail for any other reason, the forecast is saved without them.
 
 **Situation tag.** Each forecast gets a tag for the page. It names the situation; it doesn't pick the band. The first that matches:
 

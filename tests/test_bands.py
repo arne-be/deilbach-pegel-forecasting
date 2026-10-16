@@ -47,6 +47,14 @@ def test_bands_keep_the_floor_and_never_go_below_zero() -> None:
     assert (levels[0, 1:] - lower[0, 1:] >= SETTINGS.min_half_width_cm).all()
 
 
+def test_a_forecast_below_zero_still_gives_a_valid_band() -> None:
+    table = bands.fit_band_table(*synthetic(), SETTINGS)
+    levels = np.array([[-5.0, -5.0, -5.0]])
+    bounds = bands.band_bounds(table, levels, np.array([-4.0]), np.zeros((1, LEADS)), SETTINGS)
+    for lower, upper in bounds.values():
+        assert (lower == 0).all() and (upper == 0).all()
+
+
 def test_missing_input_falls_back_to_the_persistence_errors() -> None:
     table = bands.fit_band_table(*synthetic(), SETTINGS)
     last_level = np.array([50.0, 50.0])

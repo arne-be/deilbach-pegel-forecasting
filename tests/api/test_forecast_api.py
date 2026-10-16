@@ -55,9 +55,11 @@ def test_returns_the_newest_forecast(client: TestClient, conn: Conn) -> None:
 def test_returns_the_bands_and_situation(client: TestClient, conn: Conn) -> None:
     bands = (Band(80, 40.0, 44.0), Band(95, 38.0, 47.0))
     point = ForecastPoint(OBSERVED_AT + timedelta(hours=1), 42.0, bands)
-    save_forecast(conn, Forecast(STATION, "persistence", OBSERVED_AT, OBSERVED_AT, (point,), "dry"))
+    save_forecast(
+        conn, Forecast(STATION, "persistence", OBSERVED_AT, OBSERVED_AT, (point,), "calm")
+    )
     body = client.get("/api/forecast").json()
-    assert body["situation"] == "dry"
+    assert body["situation"] == "calm"
     assert body["points"][0]["bands"] == [
         {"coverage_percent": 80, "lower_cm": 40.0, "upper_cm": 44.0},
         {"coverage_percent": 95, "lower_cm": 38.0, "upper_cm": 47.0},

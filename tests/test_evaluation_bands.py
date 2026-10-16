@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 from eval_factory import eval_dataset
 
 from pegel.config import load_config
@@ -18,7 +19,7 @@ def predictions(dataset: pd.DataFrame, models: tuple[str, ...] = ("m",)) -> pd.D
     frames = []
     for model in models:
         for lead in range(1, LEADS + 1):
-            change = 0.0 if model == "persistence" else rng.normal(0, 3, len(dataset))
+            change = 0.0 if model.startswith("persistence") else rng.normal(0, 3, len(dataset))
             frames.append(
                 pd.DataFrame(
                     {
@@ -50,7 +51,9 @@ def test_calibration_lines_up_forecasts_inputs_and_truth_per_issue_time() -> Non
 def test_scores_each_fold_with_a_table_fitted_on_the_folds_before() -> None:
     # Twelve days of F1, then four of F2: only F2 is scored.
     dataset = eval_dataset(first_issue="2024-12-20T00:30Z", hours=16 * 24)
-    scores = bands.band_scores(predictions(dataset, ("persistence", "m")), dataset, CONFIG)
+    scores = bands.band_scores(
+        predictions(dataset, ("persistence", "persistence:cap100", "m")), dataset, CONFIG
+    )
     assert list(scores.columns) == list(bands.BAND_SCORE_COLUMNS)
     assert set(scores["model"]) == {"m"}
     assert set(scores["fold"]) == {"F2", bands.ALL}
@@ -61,3 +64,11 @@ def test_scores_each_fold_with_a_table_fitted_on_the_folds_before() -> None:
     # Wider coverage, wider band.
     width = pooled.groupby("coverage_percent")["width"].mean()
     assert width.is_monotonic_increasing
+
+
+def test_a_fold_too_thin_to_fit_is_skipped(caplog: pytest.LogCaptureFixture) -> None:
+    # Two days of F1 can't fit a table for F2: no rows, a warning, no crash.
+    dataset = eval_dataset(first_issue="2024-12-30T00:30Z", hours=4 * 24)
+    scores = bands.band_scores(predictions(dataset), dataset, CONFIG)
+    assert scores.empty
+    assert "no bands for m on F2" in caplog.text

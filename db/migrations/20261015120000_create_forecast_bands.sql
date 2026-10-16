@@ -1,6 +1,6 @@
 -- migrate:up
 
--- The situation a model forecast was made in (e.g. 'dry'), which picks its uncertainty
+-- The situation a model forecast was made in (e.g. 'calm'), which picks its uncertainty
 -- bands. Null for persistence and for forecasts made before bands existed.
 ALTER TABLE forecasts ADD COLUMN situation text;
 
