@@ -45,7 +45,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Lead timeline page, 1, 3, 6, 12 and 24 h ahead over the whole test period (`python -m pegel.evaluation.timeline <run dir> <eval.parquet>`, writes `timeline.html`): `src/pegel/evaluation/timeline.py`, `timeline.html`
 - How the evaluation works (data, split, flood events, metrics) and every model on one page: `docs/evaluation.md`, `docs/models.md`, `analysis/model-evaluation/methodology_plots.py`
 - Capped-training stress test, `<model>:cap100` trained without issue times above 100 cm: `src/pegel/evaluation/models/capped.py`
-- `ridge:change:v2` in production: model file as JSON (`CuratedChange.to_dict`/`from_dict`), training script (`pegel train-model`), hourly forecast from the file on S3 (`forecast.model_file`), persistence as fallback: `src/pegel/jobs/train.py`, `src/pegel/jobs/pipeline.py`, `docs/decisions/0009-ridge-in-production.md`
+- `ridge:change:v2` in production: model file as JSON (`CuratedChange.to_dict`/`from_dict`), training script (`pegel train-model`), hourly forecast from the file on S3 (`forecast.model_file`), persistence as fallback: `src/pegel/evaluation/models/curated.py`, `src/pegel/jobs/train.py`, `src/pegel/jobs/model_forecast.py`, `src/pegel/adapters/model_files.py`, `src/pegel/jobs/pipeline.py`, `docs/decisions/0009-ridge-in-production.md`
 
 ## Layout
 

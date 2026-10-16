@@ -24,7 +24,7 @@
 ## Accepted
 
 - No live check before going public. A bad live behaviour shows on the website first.
-- The model was trained on day-old ICON-D2 rain; live runs are fresher, so rain-driven leads may come out higher than in the backtest.
+- The model was trained on day-old ICON-D2 rain; live runs are fresher, and a model that learned to trust day-old rain little may underuse them.
 - The website shows 24 hours instead of the planned 48 until the data supports more.
 - Each hourly run reads about 30 days of history to build its row.
 
