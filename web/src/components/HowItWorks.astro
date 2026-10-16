@@ -1,0 +1,103 @@
+---
+// "So entsteht die Vorhersage": four steps, static.
+---
+
+<section class="how" aria-labelledby="how-title">
+  <h2 class="label" id="how-title">So entsteht die Vorhersage</h2>
+  <ol>
+    <li class="card">
+      <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M14 4v32M14 8h6M14 14h4M14 20h6M14 26h4M14 32h6"></path>
+        <path d="M4 28c4 0 4-3 8-3s4 3 8 3 4-3 8-3 4 3 8 3"></path>
+      </svg>
+      <h3>Pegel messen</h3>
+      <p>Kupferdreh und drei Pegel flussaufwärts, stündlich</p>
+    </li>
+    <li class="card">
+      <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 24a7 7 0 0 1-.6-14A9 9 0 0 1 28.6 9 6.5 6.5 0 0 1 28 24Z"></path>
+        <path d="M14 29l-2 5M21 29l-2 5M28 29l-2 5"></path>
+      </svg>
+      <h3>Regen einbeziehen</h3>
+      <p>Radar und Vorhersage des Deutschen Wetterdienstes</p>
+    </li>
+    <li class="card">
+      <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M5 5v30h30"></path>
+        <path d="M10 28l7-8 6 4 10-13"></path>
+        <path d="M28 11h5v5"></path>
+      </svg>
+      <h3>Modell rechnet</h3>
+      <p>Lernt aus den Daten seit 2024</p>
+    </li>
+    <li class="card">
+      <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 22c8 0 12-8 18-8s9 4 14 4" stroke-dasharray="3 3"></path>
+        <path d="M4 22c8-4 12-14 18-14s9 2 14 2M4 22c8 4 12 2 18 2s9 4 14 6" opacity=".55"></path>
+      </svg>
+      <h3>Bereiche aus Erfahrung</h3>
+      <p>Aus den Fehlern früherer Vorhersagen</p>
+    </li>
+  </ol>
+  <p class="note">
+    Neue Vorhersage jede Stunde zur halben Stunde. Höchster gemessener Stand bisher: 168 cm (19.11.2024); darüber ist die
+    Vorhersage unsicherer.
+  </p>
+</section>
+
+<style>
+  .how {
+    margin: 64px 0 0;
+  }
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  }
+  li {
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 2px 12px;
+    align-items: start;
+  }
+  svg {
+    grid-row: span 2;
+    width: 40px;
+    height: 40px;
+    color: var(--brand);
+  }
+  h3 {
+    font:
+      500 20px / 28px "Space Grotesk",
+      system-ui,
+      sans-serif;
+    letter-spacing: -0.01em;
+    color: var(--brand);
+    margin: 0;
+  }
+  li p {
+    font-size: 16px;
+    line-height: 1.5;
+    color: color-mix(in oklab, var(--foreground) 80%, transparent);
+    margin: 4px 0 0;
+  }
+  .note {
+    font-size: 14px;
+    color: var(--muted-foreground);
+    margin: 12px 0 0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) svg,
+    :root:not([data-theme="light"]) h3 {
+      color: var(--brand-foreground);
+    }
+  }
+  :root[data-theme="dark"] svg,
+  :root[data-theme="dark"] h3 {
+    color: var(--brand-foreground);
+  }
+</style>

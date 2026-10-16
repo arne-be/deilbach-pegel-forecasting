@@ -11,20 +11,25 @@ import {
 } from "react";
 import {
   categories,
-  freshness,
   historyHours,
   horizonHours,
   scaleTopCm,
 } from "../lib/config";
+import { bandOf, levelAt, type State } from "../lib/forecast";
+import { berlinHourPhrase, formatCm } from "../lib/format";
 import type { ForecastPoint, HistoryPoint } from "../lib/types";
-import { bandOf, berlinHourPhrase, formatCm, levelAt } from "./chart.stub";
 import "./ForecastChart.css";
 
 export interface ForecastChartProps {
   history: HistoryPoint[];
+  /** Null unless `state` is "fresh". */
   points: ForecastPoint[] | null;
+  /** From `stateOf`; "stale" greys the chart and marks "jetzt". */
+  state: State;
   nowMs: number;
   onHover: (timeMs: number | null) => void;
+  /** Hour picked on mount (screenshots with `&hover=`). */
+  initialHoverMs?: number | null;
 }
 
 const HOUR = 3600e3;
@@ -85,9 +90,11 @@ const zoneColor = (number: number, colored: boolean) =>
 
 export default function ForecastChart({
   history,
-  points: givenPoints,
+  points,
+  state,
   nowMs,
   onHover,
+  initialHoverMs = null,
 }: ForecastChartProps) {
   const lineRef = useRef<SVGLineElement>(null);
   const dotRef = useRef<SVGCircleElement>(null);
@@ -101,7 +108,7 @@ export default function ForecastChart({
   } | null>(null);
   const [width, setWidth] = useState(360);
   // The picked hour as a time, so a refresh that slides the window keeps the same hour.
-  const [pickedMs, setPickedMs] = useState<number | null>(null);
+  const [pickedMs, setPickedMs] = useState<number | null>(initialHoverMs);
 
   // A callback ref, so the observer attaches whenever the box mounts (e.g. once data arrives).
   const observeWidth = useCallback((box: HTMLDivElement | null) => {
@@ -118,9 +125,7 @@ export default function ForecastChart({
   const newestMs = lastObservation
     ? Date.parse(lastObservation.observed_at)
     : nowMs;
-  // Grey once the newest reading is too old to call current; no forecast is drawn then.
-  const stale = nowMs - newestMs > freshness.observation_max_age_minutes * 60e3;
-  const points = stale ? null : givenPoints;
+  const stale = state === "stale";
   const recent = useMemo(
     () =>
       history.filter(
@@ -317,7 +322,7 @@ export default function ForecastChart({
   const shown = series[shownIdx];
 
   return (
-    <div className="fc">
+    <div className="card fc">
       <div
         ref={observeWidth}
         className="fc-chart"

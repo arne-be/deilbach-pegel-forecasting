@@ -111,6 +111,59 @@ a {
   white-space: nowrap;
 }
 
+/* Page type and the shared card (scene, chart, category and how-it-works cards). */
+main.wrap {
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+h1 {
+  font:
+    600 36px / 40px "Space Grotesk",
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.025em;
+  margin: 0 0 24px;
+}
+@media (min-width: 640px) {
+  h1 {
+    font-size: 48px;
+    line-height: 1;
+  }
+}
+.label {
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  font:
+    500 30px / 36px "Space Grotesk",
+    system-ui,
+    sans-serif;
+  color: var(--foreground);
+  margin: 0 0 24px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow:
+    0 1px 3px 0 #0000001a,
+    0 1px 2px -1px #0000001a;
+}
+.legal {
+  margin: 48px 0 0;
+  font-size: 16px;
+  color: var(--muted-foreground);
+}
+.legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent);
+  font-weight: 500;
+}
+.legal a:hover {
+  text-decoration: underline;
+}
+
 header.site {
   position: sticky;
   top: 0;
@@ -182,6 +235,7 @@ header.site .bar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0; /* stays 44 px wide at 320 px */
   width: 44px;
   height: 44px;
   margin-right: -2px;

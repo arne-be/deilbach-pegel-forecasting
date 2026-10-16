@@ -1,4 +1,7 @@
 ---
+import ForecastApp from "../components/ForecastApp";
+import HowItWorks from "../components/HowItWorks.astro";
+import { PORTAL_URL } from "../components/Verdict";
 import Base from "../layouts/Base.astro";
 import { horizonHours } from "../lib/config";
 ---
@@ -6,4 +9,12 @@ import { horizonHours } from "../lib/config";
 <Base
   title="Deilbach Pegel Vorhersage"
   description={`${horizonHours}-Stunden-Vorhersage des Wasserstands am Pegel Kupferdreh am Deilbach, mit Hochwasser-Stufen.`}
-/>
+>
+  <h1>Deilbach Pegel Vorhersage</h1>
+  <ForecastApp client:load />
+  <noscript>
+    <p class="legal">Die Vorhersage braucht JavaScript. Aktuelle Pegel: <a href={PORTAL_URL}>Hochwasserportal NRW</a></p>
+  </noscript>
+  <HowItWorks />
+  <p class="legal">Keine amtliche Warnung · <a href={PORTAL_URL}>Hochwasserportal NRW</a></p>
+</Base>

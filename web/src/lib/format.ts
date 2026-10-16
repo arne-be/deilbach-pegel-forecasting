@@ -44,16 +44,25 @@ function berlinDay(ms: number): number {
   return Date.parse(dateFormat.format(ms)) / DAY_MS;
 }
 
-/** "heute 21 Uhr", "morgen 3 Uhr", "gestern 23 Uhr", "Fr. 3 Uhr". */
-export function berlinHourPhrase(ms: number, nowMs: number): string {
+/** "heute", "morgen", "gestern" or the short weekday ("Fr."), by the Berlin calendar day. */
+export function berlinDayWord(ms: number, nowMs: number): string {
+  const daysAhead = berlinDay(ms) - berlinDay(nowMs);
+  if (daysAhead === 0) return "heute";
+  if (daysAhead === 1) return "morgen";
+  if (daysAhead === -1) return "gestern";
+  // Some ICU versions write "Fr", others "Fr.".
+  return weekdayFormat.format(ms).replace(/\.?$/, ".");
+}
+
+/** "heute 21 Uhr", "morgen 3 Uhr", "Fr. 3 Uhr"; with a word: "heute gegen 21 Uhr". */
+export function berlinHourPhrase(
+  ms: number,
+  nowMs: number,
+  word?: "gegen" | "ab",
+): string {
   const hourPart = hourFormat
     .formatToParts(ms)
     .find((part) => part.type === "hour");
   const hour = `${Number(hourPart?.value)} Uhr`;
-  const daysAhead = berlinDay(ms) - berlinDay(nowMs);
-  if (daysAhead === 0) return `heute ${hour}`;
-  if (daysAhead === 1) return `morgen ${hour}`;
-  if (daysAhead === -1) return `gestern ${hour}`;
-  // Some ICU versions write "Fr", others "Fr.".
-  return `${weekdayFormat.format(ms).replace(/\.?$/, ".")} ${hour}`;
+  return [berlinDayWord(ms, nowMs), word, hour].filter(Boolean).join(" ");
 }

@@ -1,5 +1,12 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { linePath, nearestIndex, scaleTop } from "./ForecastChart";
+import { fixtures } from "../fixtures";
+import type { State } from "../lib/forecast";
+import ForecastChart, {
+  linePath,
+  nearestIndex,
+  scaleTop,
+} from "./ForecastChart";
 
 const HOUR = 3600e3;
 const same = (value: number) => value;
@@ -33,5 +40,30 @@ describe("nearestIndex", () => {
     const samples = [0, 1, 2].map((hour) => ({ ms: hour * HOUR, cm: 0 }));
     expect(nearestIndex(samples, 1.4 * HOUR)).toBe(1);
     expect(nearestIndex(samples, 9 * HOUR)).toBe(2);
+  });
+});
+
+describe("ForecastChart state", () => {
+  const { forecast, history, now } = fixtures.flood;
+  const render = (state: State) =>
+    renderToStaticMarkup(
+      <ForecastChart
+        history={history.observations}
+        points={state === "fresh" ? forecast.points : null}
+        state={state}
+        nowMs={Date.parse(now)}
+        onHover={() => {}}
+      />,
+    );
+
+  it("draws the forecast and its legend only when fresh", () => {
+    expect(render("fresh")).toContain("Prognose");
+    expect(render("fallback")).not.toContain("Prognose");
+  });
+  it("greys out and marks jetzt only when stale, whatever the clock says", () => {
+    expect(render("stale")).toContain(">jetzt<");
+    expect(render("stale")).not.toContain(">Jetzt<");
+    expect(render("fallback")).toContain(">Jetzt<");
+    expect(render("fresh")).not.toContain(">jetzt<");
   });
 });

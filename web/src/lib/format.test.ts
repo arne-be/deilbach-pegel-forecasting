@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { berlinClock, berlinHourPhrase, formatCm } from "./format";
+import {
+  berlinClock,
+  berlinDayWord,
+  berlinHourPhrase,
+  formatCm,
+} from "./format";
 
 const now = Date.parse("2026-11-19T15:41:00Z"); // Thursday, 16:41 in Berlin
 
@@ -48,5 +53,22 @@ describe("berlinHourPhrase", () => {
     expect(
       berlinHourPhrase(Date.parse("2026-03-29T22:30:00Z"), saturdayNight),
     ).toBe("Mo. 0 Uhr");
+  });
+});
+
+describe("berlinHourPhrase with a word", () => {
+  it("puts it between the day and the hour", () => {
+    const ms = Date.parse("2026-11-19T20:22:00Z");
+    expect(berlinHourPhrase(ms, now, "gegen")).toBe("heute gegen 21 Uhr");
+    expect(berlinHourPhrase(ms + 6 * 3_600_000, now, "ab")).toBe(
+      "morgen ab 3 Uhr",
+    );
+  });
+});
+
+describe("berlinDayWord", () => {
+  it("names the day only", () => {
+    expect(berlinDayWord(now, now)).toBe("heute");
+    expect(berlinDayWord(Date.parse("2026-11-21T02:22:00Z"), now)).toBe("Sa.");
   });
 });

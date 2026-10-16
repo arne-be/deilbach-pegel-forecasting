@@ -45,7 +45,7 @@ export default function SiteScene({
   }, [levelCm, label, low, high]);
 
   return (
-    <div className="site-scene">
+    <div className="card site-scene">
       <svg
         ref={svgRef}
         className={stale ? "sc-scene sc-stale" : "sc-scene"}
