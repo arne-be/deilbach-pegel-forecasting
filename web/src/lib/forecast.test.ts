@@ -105,6 +105,16 @@ describe("verdict", () => {
     expect(result.possible).toBeNull();
   });
 
+  it("expects category 5 in chaos with nothing above", () => {
+    const chaos = fixtures.chaos;
+    const result = verdict(chaos.forecast, Date.parse(chaos.now));
+    expect(result.expected.number).toBe(5);
+    expect(
+      berlinHourPhrase(result.expectedAt?.atMs ?? 0, Date.parse(chaos.now)),
+    ).toBe("heute 21 Uhr");
+    expect(result.possible).toBeNull();
+  });
+
   it("has no time when the line starts in the expected category", () => {
     const high: ForecastResponse = {
       ...flood.forecast,
@@ -216,6 +226,15 @@ describe("levelAt", () => {
     expect(result?.measured).toBe(false);
     expect(result?.band90?.[0]).toBeCloseTo((127.8 + 132.0) / 2);
     expect(result?.band90?.[1]).toBeCloseTo((149.6 + 159.6) / 2);
+  });
+
+  it("widens the band from the newest reading to the first forecast hour", () => {
+    const halfway = (floodNewestMs + Date.parse(points[0].valid_at)) / 2;
+    const result = levelAt(history, points, halfway);
+    expect(result?.measured).toBe(false);
+    expect(result?.levelCm).toBeCloseTo((128 + 133.7) / 2);
+    expect(result?.band90?.[0]).toBeCloseTo((128 + 125.6) / 2);
+    expect(result?.band90?.[1]).toBeCloseTo((128 + 141.8) / 2);
   });
 
   it("opens the band from the newest reading", () => {

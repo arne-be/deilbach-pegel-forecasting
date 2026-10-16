@@ -79,6 +79,9 @@ export interface Verdict {
  * The forecast line sets the expected category; `expectedAt` is null when the line starts in it
  * already ("weiter …") or it is category 1. `possible` is the highest category above that the
  * 90 % top reaches.
+ *
+ * shortcut: without the current level, a reading below the threshold with the first point above it
+ * reads as "weiter" instead of "gegen <newest reading>"; pass the latest level if that matters.
  */
 export function verdict(forecast: ForecastResponse, _nowMs: number): Verdict {
   const expected = categoryFor(
