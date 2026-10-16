@@ -167,6 +167,26 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = ["arn:aws:budgets::${local.account_id}:budget/deilbach-pegel*"]
   }
 
+  # The website certificate. CloudFront only takes certificates from us-east-1, and
+  # RequestCertificate has no resource ARN to scope to.
+  statement {
+    sid       = "AcmRequest"
+    actions   = ["acm:RequestCertificate"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+      values   = ["us-east-1"]
+    }
+  }
+
+  statement {
+    sid       = "Acm"
+    actions   = ["acm:*"]
+    resources = ["arn:aws:acm:us-east-1:${local.account_id}:certificate/*"]
+  }
+
   # shortcut: CloudFront has few resource-level permissions; scope down if more distributions share this account.
   statement {
     sid       = "CloudFront"

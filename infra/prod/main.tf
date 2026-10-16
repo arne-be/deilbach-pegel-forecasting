@@ -33,6 +33,18 @@ provider "aws" {
   }
 }
 
+# CloudFront only takes certificates from us-east-1.
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      project = "deilbach-pegel"
+    }
+  }
+}
+
 variable "jobs_image_tag" {
   description = "Tag of the jobs image in ECR, the git SHA it was built from"
   type        = string

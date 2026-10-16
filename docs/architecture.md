@@ -19,7 +19,7 @@ Neon Postgres (Frankfurt)         S3 "data" (private)
 observations, forecasts,          raw files, models, backups,
 model metadata                    forecast.json, recent.json
 
-CloudFront (one domain)
+CloudFront (deilbach-pegel.energiekonzepte-ruhr.de)
   /        → S3 "site": static Astro build
   /api/*   → API Lambda (function URL) → S3 files or Neon
 ```
@@ -182,7 +182,6 @@ If Neon's free plan stops being enough, its paid plan is pay-as-you-go with no m
 
 ## Open questions
 
-- **Domain:** not decided. Until then the site runs on its `*.cloudfront.net` address. In OpenTofu the domain is an optional variable.
 - **Upstream gauges:** who runs the Langenberg gauge, is there an API, and may we show its data?
 - **Rain data:** DWD open data is the recommendation (RADOLAN for observed rain, ICON-D2 for forecasts). Open-Meteo is out: its free API is non-commercial, and historical forecasts need its Professional plan.
 - **Training without past rain forecasts:** how the model learns before we have our own archive of forecasts.
