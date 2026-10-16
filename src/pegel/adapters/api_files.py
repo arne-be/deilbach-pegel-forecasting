@@ -12,8 +12,8 @@ RECENT_KEY = "api/recent.json"
 ReadFile = Callable[[str], bytes]
 WriteFile = Callable[[str, bytes], None]
 
-# Short: a stalled S3 should cost a request or the hourly run seconds (about 16 s at worst).
-_S3_CONFIG = Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 2})
+# Short: a stalled S3 should cost a request or the hourly run seconds (2 tries, about 16 s).
+_S3_CONFIG = Config(connect_timeout=3, read_timeout=5, retries={"total_max_attempts": 2})
 
 
 def s3_reader(bucket: str) -> ReadFile:
