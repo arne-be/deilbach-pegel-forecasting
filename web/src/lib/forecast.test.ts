@@ -42,6 +42,9 @@ describe("stateOf", () => {
       stateOf(fixtures.fallback.forecast, Date.parse(fixtures.fallback.now)),
     ).toBe("fallback");
     expect(stateOf(null, floodNow)).toBe("error");
+    expect(stateOf({ ...flood.forecast, issued_at: "" }, floodNow)).toBe(
+      "stale",
+    );
   });
 
   it("allows 90 minutes on the newest observation", () => {
@@ -83,7 +86,7 @@ describe("stateOf", () => {
 
 describe("verdict", () => {
   it("names category 3 expected and category 4 possible in the flood", () => {
-    const result = verdict(flood.forecast, floodNow);
+    const result = verdict(flood.forecast, 128, floodNow);
     expect(result.expected.number).toBe(3);
     expect(result.expectedAt?.category.number).toBe(3);
     expect(berlinHourPhrase(result.expectedAt?.atMs ?? 0, floodNow)).toBe(
@@ -98,6 +101,7 @@ describe("verdict", () => {
   it("stays at category 1 with nothing possible on a normal day", () => {
     const result = verdict(
       fixtures.normal.forecast,
+      18.9,
       Date.parse(fixtures.normal.now),
     );
     expect(result.expected.number).toBe(1);
@@ -107,7 +111,7 @@ describe("verdict", () => {
 
   it("expects category 5 in chaos with nothing above", () => {
     const chaos = fixtures.chaos;
-    const result = verdict(chaos.forecast, Date.parse(chaos.now));
+    const result = verdict(chaos.forecast, 188, Date.parse(chaos.now));
     expect(result.expected.number).toBe(5);
     expect(
       berlinHourPhrase(result.expectedAt?.atMs ?? 0, Date.parse(chaos.now)),
@@ -115,7 +119,7 @@ describe("verdict", () => {
     expect(result.possible).toBeNull();
   });
 
-  it("has no time when the line starts in the expected category", () => {
+  it("has no time when the latest level is in the expected category already", () => {
     const high: ForecastResponse = {
       ...flood.forecast,
       points: flood.forecast.points.map((point) => ({
@@ -124,9 +128,24 @@ describe("verdict", () => {
         bands: [],
       })),
     };
-    const result = verdict(high, floodNow);
+    const result = verdict(high, 146, floodNow);
     expect(result.expected.number).toBe(2);
     expect(result.expectedAt).toBeNull();
+  });
+
+  it("dates a crossing before the first point at the newest reading", () => {
+    const high: ForecastResponse = {
+      ...flood.forecast,
+      points: flood.forecast.points.map((point) => ({
+        ...point,
+        level_cm: 150,
+      })),
+    };
+    const result = verdict(high, 140, floodNow);
+    expect(result.expectedAt?.category.number).toBe(2);
+    expect(berlinHourPhrase(result.expectedAt?.atMs ?? 0, floodNow)).toBe(
+      "heute 16 Uhr",
+    );
   });
 });
 

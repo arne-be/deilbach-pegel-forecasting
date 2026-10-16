@@ -44,7 +44,7 @@ function berlinDay(ms: number): number {
   return Date.parse(dateFormat.format(ms)) / DAY_MS;
 }
 
-/** "heute 21 Uhr", "morgen 3 Uhr", "Fr. 3 Uhr". */
+/** "heute 21 Uhr", "morgen 3 Uhr", "gestern 23 Uhr", "Fr. 3 Uhr". */
 export function berlinHourPhrase(ms: number, nowMs: number): string {
   const hourPart = hourFormat
     .formatToParts(ms)
@@ -53,6 +53,7 @@ export function berlinHourPhrase(ms: number, nowMs: number): string {
   const daysAhead = berlinDay(ms) - berlinDay(nowMs);
   if (daysAhead === 0) return `heute ${hour}`;
   if (daysAhead === 1) return `morgen ${hour}`;
+  if (daysAhead === -1) return `gestern ${hour}`;
   // Some ICU versions write "Fr", others "Fr.".
   return `${weekdayFormat.format(ms).replace(/\.?$/, ".")} ${hour}`;
 }

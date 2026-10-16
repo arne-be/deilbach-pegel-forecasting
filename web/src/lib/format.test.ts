@@ -34,6 +34,9 @@ describe("berlinHourPhrase", () => {
     expect(berlinHourPhrase(Date.parse("2026-11-21T02:22:00Z"), now)).toBe(
       "Sa. 3 Uhr",
     );
+    expect(berlinHourPhrase(Date.parse("2026-11-18T22:22:00Z"), now)).toBe(
+      "gestern 23 Uhr",
+    );
   });
 
   it("keeps morgen right across the switch to summer time", () => {

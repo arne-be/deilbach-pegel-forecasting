@@ -29,9 +29,12 @@ export function stateOf(
   if (forecast === null) return "error";
   const ageMinutes = (iso: string) => (nowMs - Date.parse(iso)) / MINUTE_MS;
   if (
-    ageMinutes(forecast.newest_observation_at) >
-      freshness.observation_max_age_minutes ||
-    ageMinutes(forecast.issued_at) > freshness.forecast_max_age_minutes
+    // Negated so an unparsable timestamp (NaN) counts as stale.
+    !(
+      ageMinutes(forecast.newest_observation_at) <=
+        freshness.observation_max_age_minutes &&
+      ageMinutes(forecast.issued_at) <= freshness.forecast_max_age_minutes
+    )
   ) {
     return "stale";
   }
@@ -76,29 +79,25 @@ export interface Verdict {
 }
 
 /**
- * The forecast line sets the expected category; `expectedAt` is null when the line starts in it
- * already ("weiter …") or it is category 1. `possible` is the highest category above that the
- * 90 % top reaches.
- *
- * shortcut: without the current level, a reading below the threshold with the first point above it
- * reads as "weiter" instead of "gegen <newest reading>"; pass the latest level if that matters.
+ * The forecast line sets the expected category; `expectedAt` is set only when that is above the
+ * latest level's category, at the last point before the crossing (the newest reading when the
+ * first point is already above). `possible` is the highest category above the expected one that
+ * the 90 % top reaches.
  */
-export function verdict(forecast: ForecastResponse, _nowMs: number): Verdict {
+export function verdict(
+  forecast: ForecastResponse,
+  latestLevelCm: number,
+  _nowMs: number,
+): Verdict {
   const expected = categoryFor(
     Math.max(...forecast.points.map((point) => point.level_cm)),
   );
-  const threshold = expected.above_cm;
-  const firstAbove =
-    threshold === null
-      ? -1
-      : forecast.points.findIndex((point) => point.level_cm > threshold);
-  const expectedAt =
-    firstAbove > 0
-      ? {
-          category: expected,
-          atMs: Date.parse(forecast.points[firstAbove - 1].valid_at),
-        }
+  const atMs =
+    expected.above_cm !== null &&
+    expected.number > categoryFor(latestLevelCm).number
+      ? crossingMs(forecast, expected.above_cm, (point) => point.level_cm)
       : null;
+  const expectedAt = atMs === null ? null : { category: expected, atMs };
   const possible =
     categories
       .filter(
