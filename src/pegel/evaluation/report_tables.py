@@ -42,6 +42,23 @@ def lag_table(lag: pd.DataFrame) -> pd.DataFrame:
     return table.reindex(model_order(list(table.index)))
 
 
+def band_table(band_scores: pd.DataFrame) -> pd.DataFrame:
+    """Share of truths inside each band and its mean width (cm), per model and situation,
+    pooled over the scored folds and all leads."""
+    pooled = band_scores[band_scores["fold"] == ALL_FOLDS].copy()
+    pooled["inside"] = pooled["coverage"] * pooled["n"]
+    pooled["width_sum"] = pooled["width"] * pooled["n"]
+    sums = pooled.groupby(["model", "situation", "coverage_percent"])[["inside", "width_sum", "n"]]
+    totals = sums.sum()
+    cells = (totals["inside"] / totals["n"]).map(lambda share: f"{share:.0%}") + (
+        totals["width_sum"] / totals["n"]
+    ).map(lambda width: f" / {width:.1f}")
+    table = cells.unstack("coverage_percent").rename(columns=lambda coverage: f"{coverage} %")
+    table["n"] = totals["n"].groupby(["model", "situation"]).first()
+    order = model_order(list(table.index.get_level_values("model")))
+    return table.reindex(order, level="model")
+
+
 def _folds_won(scores: pd.DataFrame) -> pd.DataFrame:
     """Per model: the folds where its mean MAE over all leads on `all` beats persistence's,
     and the number of folds."""

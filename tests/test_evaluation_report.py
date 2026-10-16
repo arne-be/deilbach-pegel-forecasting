@@ -296,3 +296,15 @@ def test_flood_titles_name_the_model_that_sees_most_against_persistence() -> Non
     assert report_plots.size_title(sizes, models, lead) == (
         "6 h before the peak, ridge saw a median 82 % of the rise; persistence 40 %"
     )
+
+
+def test_band_table_pools_leads_weighted_by_rows() -> None:
+    rows = [
+        ("m", "all", "calm", 1, 80, 100, 0.9, 2.0),
+        ("m", "all", "calm", 2, 80, 300, 0.7, 4.0),
+        ("m", "F2", "calm", 1, 80, 100, 0.0, 9.0),
+    ]
+    columns = ["model", "fold", "situation", "lead", "coverage_percent", "n", "coverage", "width"]
+    table = report_tables.band_table(pd.DataFrame(rows, columns=columns))
+    assert table.loc[("m", "calm"), "80 %"] == "75% / 3.5"
+    assert table.loc[("m", "calm"), "n"] == 400
