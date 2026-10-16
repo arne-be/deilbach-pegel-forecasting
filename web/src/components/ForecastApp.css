@@ -205,3 +205,26 @@
   border-radius: 0.5rem;
   font-weight: 700;
 }
+
+/* The bottom line; also used by the <noscript> note in index.astro. */
+.legal {
+  margin: 48px 0 0;
+  font-size: 16px;
+  color: var(--muted-foreground);
+}
+/* Inline, so it wraps as text; the padding gives a 44 px tap height without moving the line. */
+.legal a {
+  padding-block: 12px;
+  white-space: nowrap;
+  color: var(--accent);
+  font-weight: 500;
+}
+/* On phones the link wraps to its own line; a "·" would dangle there. */
+@media (max-width: 639px) {
+  .legal .sep {
+    display: none;
+  }
+}
+.legal a:hover {
+  text-decoration: underline;
+}

@@ -82,6 +82,14 @@ describe("stateOf", () => {
     };
     expect(stateOf(lastLeadBare, now)).toBe("fresh");
   });
+
+  it("is stale when the history's newest reading is too old, even with a fresh forecast", () => {
+    const now = Date.parse(fixtures.normal.now);
+    const dayOld = now - 24 * HOUR_MS;
+    expect(stateOf(fresh, now, dayOld)).toBe("stale");
+    expect(stateOf(fresh, now, now - 90 * MINUTE_MS)).toBe("fresh");
+    expect(stateOf(fresh, now, now - 90 * MINUTE_MS - 1)).toBe("stale");
+  });
 });
 
 describe("verdict", () => {
@@ -131,6 +139,29 @@ describe("verdict", () => {
     const result = verdict(high, 146, floodNow);
     expect(result.expected.number).toBe(2);
     expect(result.expectedAt).toBeNull();
+  });
+
+  it("offers nothing the level is already in while the water falls", () => {
+    // Latest 190 cm (category 4); the line falls from 180 cm, the first 90 % top reaches 192 cm.
+    const falling: ForecastResponse = {
+      ...flood.forecast,
+      points: flood.forecast.points.map((point, index) => {
+        const level = 180 - index * 2;
+        const upper = index === 0 ? 192 : level + 5;
+        return {
+          ...point,
+          level_cm: level,
+          bands: [
+            { coverage_percent: 80, lower_cm: level - 3, upper_cm: level + 3 },
+            { coverage_percent: 90, lower_cm: level - 5, upper_cm: upper },
+          ],
+        };
+      }),
+    };
+    const result = verdict(falling, 190, floodNow);
+    expect(result.expected.number).toBe(3);
+    expect(result.expectedAt).toBeNull();
+    expect(result.possible).toBeNull();
   });
 
   it("dates a crossing before the first point at the newest reading", () => {

@@ -1,5 +1,5 @@
 // The headline: the expected category in the next hours, or a badge saying why there is none.
-import { horizonHours } from "../lib/config";
+import { type Category, horizonHours } from "../lib/config";
 import type { State, Verdict as VerdictData } from "../lib/forecast";
 import { berlinHourPhrase } from "../lib/format";
 import Chip from "./Chip";
@@ -10,6 +10,8 @@ interface VerdictProps {
   state: State;
   /** Null unless `state` is "fresh". */
   verdict: VerdictData | null;
+  /** Category of the newest reading; null without data. */
+  current: Category | null;
   /** When the newest reading was taken, e.g. "16:22 Uhr"; null without data. */
   reading: string | null;
   nowMs: number;
@@ -25,6 +27,7 @@ const BADGES: Record<State, string> = {
 export default function Verdict({
   state,
   verdict,
+  current,
   reading,
   nowMs,
 }: VerdictProps) {
@@ -46,17 +49,20 @@ export default function Verdict({
     );
   }
   const { expected, expectedAt, possible } = verdict;
+  // "weiter" only for staying in a flood category; falling or calm reads "in den nächsten 24 Stunden".
+  const staying =
+    !expectedAt && expected.number > 1 && expected.number === current?.number;
   return (
     <p className="verdict" role="status">
       <span className="line">
-        Voraussichtlich {expected.number > 1 && !expectedAt && "weiter "}
+        Voraussichtlich {staying && "weiter "}
         <Chip category={expected} />{" "}
         {expectedAt ? (
           <span className="when">
             {berlinHourPhrase(expectedAt.atMs, nowMs, "gegen")}
           </span>
         ) : (
-          expected.number === 1 && `in den nächsten ${horizonHours} Stunden`
+          !staying && `in den nächsten ${horizonHours} Stunden`
         )}
       </span>
       {possible && (

@@ -21,19 +21,27 @@ export function categoryFor(levelCm: number): Category {
   );
 }
 
-/** Stale when either timestamp is older than its limit; fallback when the model step failed. */
+/**
+ * Stale when any timestamp is older than its limit: the forecast's two, and the newest reading in
+ * the history (it may come from an older cache than the forecast); fallback when the model step failed.
+ */
 export function stateOf(
   forecast: ForecastResponse | null,
   nowMs: number,
+  latestObservedMs?: number,
 ): State {
   if (forecast === null) return "error";
-  const ageMinutes = (iso: string) => (nowMs - Date.parse(iso)) / MINUTE_MS;
+  const ageMinutes = (ms: number) => (nowMs - ms) / MINUTE_MS;
+  const observationLimit = freshness.observation_max_age_minutes;
   if (
     // Negated so an unparsable timestamp (NaN) counts as stale.
     !(
-      ageMinutes(forecast.newest_observation_at) <=
-        freshness.observation_max_age_minutes &&
-      ageMinutes(forecast.issued_at) <= freshness.forecast_max_age_minutes
+      ageMinutes(Date.parse(forecast.newest_observation_at)) <=
+        observationLimit &&
+      ageMinutes(Date.parse(forecast.issued_at)) <=
+        freshness.forecast_max_age_minutes &&
+      (latestObservedMs === undefined ||
+        ageMinutes(latestObservedMs) <= observationLimit)
     )
   ) {
     return "stale";
@@ -81,8 +89,8 @@ export interface Verdict {
 /**
  * The forecast line sets the expected category; `expectedAt` is set only when that is above the
  * latest level's category, at the last point before the crossing (the newest reading when the
- * first point is already above). `possible` is the highest category above the expected one that
- * the 90 % top reaches.
+ * first point is already above). `possible` is the highest category above both the expected and
+ * the current one that the 90 % top reaches.
  */
 export function verdict(
   forecast: ForecastResponse,
@@ -92,9 +100,9 @@ export function verdict(
   const expected = categoryFor(
     Math.max(...forecast.points.map((point) => point.level_cm)),
   );
+  const currentNumber = categoryFor(latestLevelCm).number;
   const atMs =
-    expected.above_cm !== null &&
-    expected.number > categoryFor(latestLevelCm).number
+    expected.above_cm !== null && expected.number > currentNumber
       ? crossingMs(forecast, expected.above_cm, (point) => point.level_cm)
       : null;
   const expectedAt = atMs === null ? null : { category: expected, atMs };
@@ -102,7 +110,8 @@ export function verdict(
     categories
       .filter(
         (category) =>
-          category.number > expected.number && category.above_cm !== null,
+          category.number > Math.max(expected.number, currentNumber) &&
+          category.above_cm !== null,
       )
       .map((category) => ({
         category,

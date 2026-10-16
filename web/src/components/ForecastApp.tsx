@@ -1,8 +1,9 @@
 // The page's one island: loads forecast and history, keeps the freshness current and passes the
 // hour picked in the chart on to the scene.
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { FixtureName } from "../fixtures";
 import {
+  categoryFor,
   categoryTags,
   levelAt,
   type State,
@@ -24,7 +25,7 @@ import CategoryCards from "./CategoryCards";
 import ForecastChart from "./ForecastChart";
 import LevelNow from "./LevelNow";
 import SiteScene from "./SiteScene";
-import Verdict from "./Verdict";
+import Verdict, { PORTAL_URL } from "./Verdict";
 import "./ForecastApp.css";
 
 const REFETCH_MS = 5 * 60_000;
@@ -88,7 +89,23 @@ function sceneLabel(ms: number, levelCm: number, nowMs: number): string {
   return `${hour} · ${formatCm(levelCm)}`;
 }
 
-export default function ForecastApp() {
+/** "Keine amtliche Warnung", with the portal link unless the badge above already carries it. */
+function LegalLine({ portal }: { portal: boolean }) {
+  return (
+    <p className="legal">
+      Keine amtliche Warnung
+      {portal && (
+        <>
+          <span className="sep"> ·</span>{" "}
+          <a href={PORTAL_URL}>Hochwasserportal NRW</a>
+        </>
+      )}
+    </p>
+  );
+}
+
+/** `children` is the static "So entsteht die Vorhersage" section, placed above the legal line. */
+export default function ForecastApp({ children }: { children?: ReactNode }) {
   const [data, setData] = useState<Data | null>(null);
   const [failed, setFailed] = useState(false);
   const [pinned, setPinned] = useState<Pinned | null>(null);
@@ -97,20 +114,24 @@ export default function ForecastApp() {
 
   useEffect(() => {
     let cancelled = false;
+    // Only the newest request may set the data, so a slow older answer can't overwrite a newer one.
+    let latestRequest = 0;
     const timers: number[] = [];
-    const refresh = () =>
-      fetchData().then(
+    const refresh = () => {
+      const request = ++latestRequest;
+      return fetchData().then(
         (next) => {
-          if (cancelled) return;
+          if (cancelled || request !== latestRequest) return;
           setData(next);
           setFailed(false);
         },
         (error: unknown) => {
           console.error("Pegel data failed to load", error);
           // Data already shown stays: stateOf turns it stale once it is too old.
-          if (!cancelled) setFailed(true);
+          if (!cancelled && request === latestRequest) setFailed(true);
         },
       );
+    };
     const onVisible = () => {
       if (document.hidden) return;
       setClockMs(Date.now());
@@ -154,24 +175,39 @@ export default function ForecastApp() {
   const nowMs = pinned?.nowMs ?? clockMs;
   const latest = shown?.history.at(-1);
 
-  if (!shown && !failed) return <Skeleton />;
+  const page = (main: ReactNode, portal: boolean) => (
+    <>
+      {main}
+      {children}
+      <LegalLine portal={portal} />
+    </>
+  );
+
+  if (!shown && !failed) return page(<Skeleton />, true);
   // No data, or history without a single reading (ingest down longer than its window).
   if (!shown || !latest) {
-    return (
+    return page(
       <>
         <div className="hero">
-          <Verdict state="error" verdict={null} reading={null} nowMs={nowMs} />
+          <Verdict
+            state="error"
+            verdict={null}
+            current={null}
+            reading={null}
+            nowMs={nowMs}
+          />
         </div>
         <CategoryCards tags={null} outlineCurrent={false} nowMs={nowMs} />
-      </>
+      </>,
+      false,
     );
   }
 
   const { forecast, history } = shown;
-  const state: State = stateOf(forecast, nowMs);
+  const latestMs = Date.parse(latest.observed_at);
+  const state: State = stateOf(forecast, nowMs, latestMs);
   const fresh = state === "fresh";
   const points = fresh ? forecast.points : null;
-  const latestMs = Date.parse(latest.observed_at);
   const reading = readingText(latestMs, nowMs);
   // A picked forecast hour is dropped once the forecast is no longer shown, so the scene never
   // labels an old reading with a future time.
@@ -185,13 +221,14 @@ export default function ForecastApp() {
   const sceneMs = hovered && hoverMs !== null ? hoverMs : latestMs;
   const sceneLevel = hovered?.levelCm ?? latest.level_cm;
 
-  return (
+  return page(
     <>
       {testNotice}
       <div className={state === "stale" ? "hero is-old" : "hero"}>
         <Verdict
           state={state}
           verdict={fresh ? verdict(forecast, latest.level_cm, nowMs) : null}
+          current={categoryFor(latest.level_cm)}
           reading={reading}
           nowMs={nowMs}
         />
@@ -218,7 +255,8 @@ export default function ForecastApp() {
         outlineCurrent={state !== "stale"}
         nowMs={nowMs}
       />
-    </>
+    </>,
+    fresh,
   );
 }
 

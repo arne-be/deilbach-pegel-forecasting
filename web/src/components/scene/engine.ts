@@ -232,7 +232,7 @@ export class SceneEngine {
       tree(90, 246, LEVELS.park, 120, 28);
     o += parked();
     cut.clip = Number.NEGATIVE_INFINITY;
-    o += rangeAndTag(L, this.range, this.k);
+    o += rangeAndTag(L, this.range, this.k, this.narrow === true);
     this.dynLayer.innerHTML = o;
     this.skip = this.dynLayer.querySelector<SVGGElement>(".sc-skip");
     if (!this.skip) this.skipT0 = null;

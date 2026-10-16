@@ -67,7 +67,9 @@ export default function CategoryCards({
                 </span>
               )}
               <p>
-                {category.description} {category.actions}
+                {[category.description, category.actions]
+                  .filter(Boolean)
+                  .join(" ")}
               </p>
             </li>
           );

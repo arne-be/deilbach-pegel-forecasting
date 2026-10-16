@@ -11,10 +11,10 @@ import { horizonHours } from "../lib/config";
   description={`${horizonHours}-Stunden-Vorhersage des Wasserstands am Pegel Kupferdreh am Deilbach, mit Hochwasser-Stufen.`}
 >
   <h1>Deilbach Pegel Vorhersage</h1>
-  <ForecastApp client:load />
   <noscript>
     <p class="legal">Die Vorhersage braucht JavaScript. Aktuelle Pegel: <a href={PORTAL_URL}>Hochwasserportal NRW</a></p>
   </noscript>
-  <HowItWorks />
-  <p class="legal">Keine amtliche Warnung · <a href={PORTAL_URL}>Hochwasserportal NRW</a></p>
+  <ForecastApp client:load>
+    <HowItWorks />
+  </ForecastApp>
 </Base>

@@ -2,11 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { fixtures } from "../fixtures";
 import type { State } from "../lib/forecast";
-import ForecastChart, {
-  linePath,
-  nearestIndex,
-  scaleTop,
-} from "./ForecastChart";
+import { linePath, scaleTop } from "./ChartGrid";
+import ForecastChart from "./ForecastChart";
+import { nearestIndex } from "./useChartCursor";
 
 const HOUR = 3600e3;
 const same = (value: number) => value;

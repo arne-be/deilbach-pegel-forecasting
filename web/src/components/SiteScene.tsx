@@ -2,7 +2,9 @@
 import { useEffect, useRef } from "react";
 import { SceneEngine } from "./scene/engine";
 import { VB_WIDE } from "./scene/geometry";
+import "./SiteScene.tokens.css";
 import "./SiteScene.css";
+import "./SiteScene.water.css";
 
 export interface SiteSceneProps {
   levelCm: number;

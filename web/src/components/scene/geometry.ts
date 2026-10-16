@@ -176,7 +176,7 @@ export function ringV(
   return path(pts, cls);
 }
 
-// ---- view boxes: the whole site, or on narrow containers the wall, staff, barriers and house front ----
+// ---- view boxes: the whole site, or on narrow containers from the car park to the house front ----
 function bbox(points: P3[], pad: number): number[] {
   const xs = points.map((p) => pt(...p)[0]);
   const ys = points.map((p) => pt(...p)[1]);
@@ -208,14 +208,15 @@ export const VB_WIDE = bbox(
   ],
   14,
 );
+// From the front car and the P sign on the car park (category 2) to the house front, its right side trimmed.
 export const VB_NARROW = (() => {
-  const x0 = pt(180, 0, 0)[0];
-  const x1 = pt(740, HOUSE.v0, 0)[0];
+  const x0 = pt(50, 90, 0)[0];
+  const x1 = pt(705, HOUSE.v0, 0)[0];
   const y0 =
     Math.min(
       pt(684, 196, HOUSE.ridge + 30)[1],
       pt(HOUSE.ridgeU, HOUSE.v0, HOUSE.ridge)[1],
     ) - 18;
-  const y1 = Math.max(pt(180, 0, BOTTOM - 10)[1], pt(740, 0, BOTTOM - 10)[1]);
+  const y1 = Math.max(pt(60, 0, BOTTOM - 10)[1], pt(705, 0, BOTTOM - 10)[1]);
   return [x0, y0, x1 - x0, y1 - y0].map(f1);
 })();

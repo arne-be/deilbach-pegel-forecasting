@@ -262,6 +262,7 @@ export function rangeAndTag(
   L: number,
   range: readonly [number, number] | null,
   k: number,
+  clearSign = false,
 ): string {
   let o = "";
   if (range) {
@@ -283,7 +284,9 @@ export function rangeAndTag(
   const [ax, ay] = pt(STAFF.u - 3, STAFF.v1, Math.max(L, 0));
   // Beside the staff over the river; when the water nears the top, above the staff with a leader down to it.
   const staffTop = pt(STAFF.u, STAFF.v1, STAFF.top)[1];
-  const cy = Math.max(staffTop + hgt, ay - hgt * 0.9);
+  let cy = Math.max(staffTop + hgt, ay - hgt * 0.9);
+  // In the narrow view the tag reaches over the P sign; lift it above the sign, the leader shows the level.
+  if (clearSign) cy = Math.min(cy, pt(226, 14, LEVELS.park + 128)[1] - hgt);
   const lx = ax - 14 * k;
   o += `<g class="sc-tag"><path class="sc-tag-lead" d="M${f1(lx)},${f1(cy)}L${f1(ax)},${f1(ay)}"/><circle class="sc-tag-dot" cx="${f1(ax)}" cy="${f1(ay)}" r="${f1(2.2 * k)}"/>`;
   o += `<rect class="sc-tag-box" y="${f1(cy - hgt / 2)}" height="${f1(hgt)}" rx="${f1(hgt / 2)}"/><text class="sc-tag-text" y="${f1(cy)}" font-size="${f1(fs)}" data-right="${f1(lx)}"></text></g>`;
