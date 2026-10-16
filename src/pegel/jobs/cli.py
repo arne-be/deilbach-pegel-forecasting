@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from pegel.adapters.api_files import s3_writer
 from pegel.adapters.env_files import load_env_files, main_checkout
 from pegel.adapters.logging import configure_logging
 from pegel.adapters.model_files import load_model_from_s3
@@ -106,7 +107,10 @@ def run_hourly_from_env(config: PegelConfig, issued_at: datetime | None = None) 
             ),
         ]
         load_model = partial(load_model_from_s3, config)
-        return run_hourly(fetch, conn, config, issued_at, extra_steps, load_model)
+        # Set on Lambda only, so a local run never overwrites the page's files with dev data.
+        bucket = os.environ.get("API_FILES_BUCKET")
+        publish = s3_writer(bucket) if bucket else None
+        return run_hourly(fetch, conn, config, issued_at, extra_steps, load_model, publish)
 
 
 @contextmanager

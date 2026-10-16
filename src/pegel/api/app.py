@@ -1,30 +1,34 @@
-"""The public read-only API. Locally with uvicorn; on AWS behind the Lambda Web Adapter."""
+"""The public read-only API. Locally with uvicorn; on AWS behind the Lambda Web Adapter.
 
+The forecast and the default history range come from files the hourly run writes to S3, so
+page visits don't wake Neon. Anything else, or a missing or unreadable file, comes from Neon.
+"""
+
+import logging
 import os
+from collections.abc import Callable
 from datetime import date, datetime
 from functools import cache
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
+from pegel.adapters.api_files import FORECAST_KEY, RECENT_KEY, ReadFile, s3_reader
 from pegel.adapters.env_files import load_env_files, main_checkout
+from pegel.adapters.logging import configure_logging
 from pegel.adapters.storage.connection import connect
-from pegel.adapters.storage.forecasts import newest_forecast
-from pegel.adapters.storage.observations import fetch_values
-from pegel.api.schemas import (
-    BandResponse,
-    ForecastPointResponse,
-    ForecastResponse,
-    HistoryPoint,
-    HistoryResponse,
-)
+from pegel.api.responses import forecast_response, history_response, matches_range, to_json
+from pegel.api.schemas import ForecastResponse, HistoryResponse
 from pegel.config import PegelConfig, load_config
-from pegel.core.history import DISPLAY_TIME_ZONE, history_days, utc_window
-from pegel.core.persistence import MODEL_NAME as PERSISTENCE
-from pegel.core.series import cleaned_level_series_id
+from pegel.core.history import DISPLAY_TIME_ZONE, history_days
 
 # Only plain dates, so a day has one spelling and one cache entry (no times, no timestamps).
 DAY_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+ON_LAMBDA = "AWS_LAMBDA_FUNCTION_NAME" in os.environ
+
+if ON_LAMBDA:
+    configure_logging()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Deilbach Pegel",
@@ -44,9 +48,9 @@ def get_today() -> date:
 
 
 @cache
-def get_database_url() -> str:
+def _database_url() -> str:
     # On Lambda the environment is set already, and there is no git checkout to read from.
-    if "AWS_LAMBDA_FUNCTION_NAME" not in os.environ:
+    if not ON_LAMBDA:
         load_env_files(main_checkout())
     database_url = os.environ.get("API_DATABASE_URL")
     if not database_url:
@@ -54,52 +58,66 @@ def get_database_url() -> str:
     return database_url
 
 
-@app.get("/api/forecast", responses={404: {"description": "No forecast stored yet"}})
+def get_database_url() -> Callable[[], str]:
+    """Called only on the Neon path, so a request the files answer needs no database settings."""
+    return _database_url
+
+
+@cache
+def get_read_file() -> ReadFile | None:
+    """Reads the hourly run's files; None without API_FILES_BUCKET, e.g. locally."""
+    bucket = os.environ.get("API_FILES_BUCKET")
+    return s3_reader(bucket) if bucket else None
+
+
+def _json(body: bytes) -> Response:
+    return Response(body, media_type="application/json")
+
+
+def _read(read_file: ReadFile | None, endpoint: str, key: str) -> bytes | None:
+    """The file's bytes, or None if there is no reader or the file can't be read (logged)."""
+    if read_file is None:
+        return None
+    try:
+        return read_file(key)
+    except Exception as error:
+        # Without s3:ListBucket a missing file is AccessDenied, not NoSuchKey: both land here.
+        logger.warning(
+            "api file unreadable, answering from the database",
+            extra={"endpoint": endpoint, "key": key, "error": type(error).__name__},
+        )
+        return None
+
+
+@app.get(
+    "/api/forecast",
+    response_model=ForecastResponse,
+    responses={404: {"description": "No forecast stored yet"}},
+)
 def forecast(
     config: Annotated[PegelConfig, Depends(get_config)],
-    database_url: Annotated[str, Depends(get_database_url)],
-) -> ForecastResponse:
+    database_url: Annotated[Callable[[], str], Depends(get_database_url)],
+    read_file: Annotated[ReadFile | None, Depends(get_read_file)],
+) -> Response:
     """The newest forecast of the configured model, with its issue time and the newest reading
     it used. Persistence instead when the model's forecast is missing or older, so a failing
     model step never leaves the page on a stale forecast."""
-    station_id = config.forecast.station_id
-    with connect(database_url) as conn:
-        newest = newest_forecast(conn, station_id, config.forecast.model)
-        if config.forecast.model != PERSISTENCE:
-            fallback = newest_forecast(conn, station_id, PERSISTENCE)
-            if newest is None or (fallback is not None and fallback.issued_at > newest.issued_at):
-                newest = fallback
-    if newest is None:
+    body = _read(read_file, "forecast", FORECAST_KEY)
+    if body is not None:
+        return _json(body)
+    with connect(database_url()) as conn:
+        response = forecast_response(conn, config)
+    if response is None:
         raise HTTPException(status_code=404, detail="no forecast yet")
-    return ForecastResponse(
-        station_id=newest.station_id,
-        model=newest.model,
-        issued_at=newest.issued_at,
-        newest_observation_at=newest.newest_observation_at,
-        situation=newest.situation,
-        points=[
-            ForecastPointResponse(
-                valid_at=point.valid_at,
-                level_cm=point.level_cm,
-                bands=[
-                    BandResponse(
-                        coverage_percent=band.coverage_percent,
-                        lower_cm=band.lower_cm,
-                        upper_cm=band.upper_cm,
-                    )
-                    for band in point.bands
-                ],
-            )
-            for point in newest.points
-        ],
-    )
+    return _json(to_json(response))
 
 
-@app.get("/api/history")
+@app.get("/api/history", response_model=HistoryResponse)
 def history(
     config: Annotated[PegelConfig, Depends(get_config)],
     today: Annotated[date, Depends(get_today)],
-    database_url: Annotated[str, Depends(get_database_url)],
+    database_url: Annotated[Callable[[], str], Depends(get_database_url)],
+    read_file: Annotated[ReadFile | None, Depends(get_read_file)],
     from_text: Annotated[
         str | None,
         Query(
@@ -112,7 +130,7 @@ def history(
         str | None,
         Query(alias="to", pattern=DAY_PATTERN, description="Last day, included; defaults to today"),
     ] = None,
-) -> HistoryResponse:
+) -> Response:
     """Observed levels, outliers removed, for whole days. Without a range, the last days."""
     try:
         # fromisoformat also rejects days that don't exist, like 2026-02-30.
@@ -124,17 +142,13 @@ def history(
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
-    station_id = config.forecast.station_id
+    # The file holds the default range only. Served only if its own range is exactly the one
+    # asked for: after midnight it still ends yesterday until the next run replaces it.
+    is_default = (first_day, last_day) == history_days(None, None, today, config.api)
+    body = _read(read_file, "history", RECENT_KEY) if is_default else None
+    if body is not None and matches_range(body, first_day, last_day):
+        return _json(body)
     # The connection opens only after validation, so bad requests never wake the database.
-    with connect(database_url) as conn:
-        values = fetch_values(
-            conn, cleaned_level_series_id(station_id), *utc_window(first_day, last_day)
-        )
-    return HistoryResponse(
-        station_id=station_id,
-        first_day=first_day,
-        last_day=last_day,
-        observations=[
-            HistoryPoint(observed_at=value.valid_at, level_cm=value.value) for value in values
-        ],
-    )
+    with connect(database_url()) as conn:
+        response = history_response(conn, config.forecast.station_id, first_day, last_day)
+    return _json(to_json(response))

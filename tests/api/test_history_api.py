@@ -8,9 +8,11 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg.rows import TupleRow
 
+from pegel.adapters.api_files import RECENT_KEY
 from pegel.adapters.storage.observations import upsert_values
 from pegel.adapters.storage.series import ensure_series
-from pegel.api.app import app, get_database_url, get_today
+from pegel.api.app import app, get_database_url, get_read_file, get_today
+from pegel.api.responses import matches_range
 from pegel.config import load_config
 from pegel.core.series import SeriesValue, cleaned_level_series, level_series, level_series_id
 
@@ -20,8 +22,14 @@ TODAY = date(2026, 10, 12)
 
 
 @pytest.fixture
-def client(database_url: str) -> Iterator[TestClient]:
-    app.dependency_overrides[get_database_url] = lambda: database_url
+def files() -> dict[str, bytes]:
+    return {}
+
+
+@pytest.fixture
+def client(database_url: str, files: dict[str, bytes]) -> Iterator[TestClient]:
+    app.dependency_overrides[get_database_url] = lambda: lambda: database_url
+    app.dependency_overrides[get_read_file] = lambda: files.__getitem__
     app.dependency_overrides[get_today] = lambda: TODAY
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -93,7 +101,9 @@ def test_without_range_returns_the_last_seven_days(client: TestClient) -> None:
 )
 def test_bad_ranges_are_rejected_before_the_database(params: dict[str, str]) -> None:
     # An unreachable database proves validation fails before any connection is made.
-    app.dependency_overrides[get_database_url] = lambda: "postgresql://nobody@127.0.0.1:1/none"
+    app.dependency_overrides[get_database_url] = lambda: (
+        lambda: "postgresql://nobody@127.0.0.1:1/none"
+    )
     app.dependency_overrides[get_today] = lambda: TODAY
     try:
         status = TestClient(app).get("/api/history", params=params).status_code
@@ -105,3 +115,44 @@ def test_bad_ranges_are_rejected_before_the_database(params: dict[str, str]) -> 
 def test_max_days_is_allowed(client: TestClient) -> None:
     response = client.get("/api/history", params={"from": "2026-09-11", "to": "2026-10-11"})
     assert response.status_code == 200
+
+
+def recent_file(first_day: str, last_day: str) -> bytes:
+    return (
+        f'{{"station_id": "{STATION}", "from": "{first_day}", "to": "{last_day}", '
+        '"observations": [{"observed_at": "2026-10-12T08:22:00Z", "level_cm": 99.0}]}'
+    ).encode()
+
+
+def no_database() -> str:
+    raise AssertionError("the database was asked")
+
+
+@pytest.mark.parametrize("params", [{}, {"from": "2026-10-06", "to": "2026-10-12"}])
+def test_default_range_is_served_from_the_file(
+    client: TestClient, files: dict[str, bytes], params: dict[str, str]
+) -> None:
+    files[RECENT_KEY] = recent_file("2026-10-06", "2026-10-12")
+    app.dependency_overrides[get_database_url] = lambda: no_database
+    body = client.get("/api/history", params=params).json()
+    assert body["observations"][0]["level_cm"] == 99.0
+
+
+def test_file_of_yesterday_falls_back_to_the_database(
+    client: TestClient, files: dict[str, bytes]
+) -> None:
+    # Just after midnight: the newest file still ends yesterday.
+    files[RECENT_KEY] = recent_file("2026-10-05", "2026-10-11")
+    body = client.get("/api/history").json()
+    assert (body["from"], body["to"], body["observations"]) == ("2026-10-06", "2026-10-12", [])
+
+
+def test_older_range_comes_from_the_database(client: TestClient, files: dict[str, bytes]) -> None:
+    files[RECENT_KEY] = recent_file("2026-10-06", "2026-10-12")
+    body = client.get("/api/history", params={"from": "2026-10-01", "to": "2026-10-07"}).json()
+    assert (body["from"], body["to"], body["observations"]) == ("2026-10-01", "2026-10-07", [])
+
+
+@pytest.mark.parametrize("body", [b"not json", b"[]", b"{}", b'{"from": "2026-10-06"}'])
+def test_matches_range_is_false_for_a_bad_body(body: bytes) -> None:
+    assert not matches_range(body, date(2026, 10, 6), date(2026, 10, 12))

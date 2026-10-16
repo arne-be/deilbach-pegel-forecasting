@@ -47,6 +47,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Capped-training stress test, `<model>:cap100` trained without issue times above 100 cm: `src/pegel/evaluation/models/capped.py`
 - `ridge:change:v2` in production: model file as JSON (`CuratedChange.to_dict`/`from_dict`), training script (`pegel train-model`), hourly forecast from the file on S3 (`forecast.model_file`), persistence as fallback: `src/pegel/evaluation/models/curated.py`, `src/pegel/jobs/train.py`, `src/pegel/jobs/model_forecast.py`, `src/pegel/adapters/model_files.py`, `src/pegel/jobs/pipeline.py`, `docs/decisions/0009-ridge-in-production.md`
 - Uncertainty bands (80/90/95 %) and situation tag per model forecast, fitted by `pegel train-model`, scored in `bands.csv`, served by `GET /api/forecast`: `src/pegel/core/bands.py`, `src/pegel/evaluation/bands.py`, `forecast_bands` table
+- Forecast and recent history published to S3 (`api/forecast.json`, `api/recent.json`) by the hourly run, read by the API with Neon fallback: `src/pegel/api/responses.py`, `src/pegel/adapters/api_files.py`, `src/pegel/jobs/publish.py`
 - Placeholder website on S3 + CloudFront on `deilbach-pegel.energiekonzepte-ruhr.de`, built and synced by the deploy job: `web/`, `infra/prod/website.tf`, `.github/workflows/web.yml`, `docs/setup-domain.md`
 
 ## Layout

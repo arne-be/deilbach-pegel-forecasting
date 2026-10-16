@@ -81,7 +81,7 @@ resource "aws_ecr_lifecycle_policy" "jobs" {
   })
 }
 
-# Raw files, models, backups and the published JSON files, once those jobs exist.
+# Trained models and the API's JSON files (api/); raw files and backups once those jobs exist.
 resource "aws_s3_bucket" "data" {
   # Bucket names are global, so the account ID keeps this one unique.
   bucket = "deilbach-pegel-data-${data.aws_caller_identity.current.account_id}"
