@@ -197,3 +197,11 @@
 .skeleton .chart-box {
   height: 300px;
 }
+
+.testdata {
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border: 2px dashed var(--destructive);
+  border-radius: 0.5rem;
+  font-weight: 700;
+}

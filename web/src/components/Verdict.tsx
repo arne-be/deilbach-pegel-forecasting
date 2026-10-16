@@ -16,7 +16,7 @@ interface VerdictProps {
 }
 
 const BADGES: Record<State, string> = {
-  fresh: "Keine Daten", // only reached without a verdict
+  fresh: "Keine Daten", // not reached: a fresh state always comes with a verdict
   stale: "Veraltet",
   fallback: "Keine Prognose",
   error: "Keine Daten",

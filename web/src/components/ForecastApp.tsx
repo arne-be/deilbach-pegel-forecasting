@@ -116,18 +116,25 @@ export default function ForecastApp() {
       setClockMs(Date.now());
       refresh();
     };
-    pinnedFromQuery(location.search).then((found) => {
-      if (cancelled) return;
-      if (found) {
-        setPinned(found);
-        setHoverMs(found.hoverMs);
-        return;
-      }
-      refresh();
-      timers.push(window.setInterval(refresh, REFETCH_MS));
-      timers.push(window.setInterval(() => setClockMs(Date.now()), RECHECK_MS));
-      document.addEventListener("visibilitychange", onVisible);
-    });
+    pinnedFromQuery(location.search)
+      .catch((error: unknown) => {
+        console.error("Fixture failed to load", error);
+        return null;
+      })
+      .then((found) => {
+        if (cancelled) return;
+        if (found) {
+          setPinned(found);
+          setHoverMs(found.hoverMs);
+          return;
+        }
+        refresh();
+        timers.push(window.setInterval(refresh, REFETCH_MS));
+        timers.push(
+          window.setInterval(() => setClockMs(Date.now()), RECHECK_MS),
+        );
+        document.addEventListener("visibilitychange", onVisible);
+      });
     return () => {
       cancelled = true;
       for (const timer of timers) clearInterval(timer);
@@ -138,11 +145,18 @@ export default function ForecastApp() {
   const onHover = useCallback((ms: number | null) => setHoverMs(ms), []);
 
   const shown = pinned ?? data;
+  // Fixtures work in production builds too (for screenshots), so they say so on the page.
+  const testNotice = pinned && (
+    <p className="testdata" role="note">
+      Testdaten, nicht der aktuelle Pegel
+    </p>
+  );
   const nowMs = pinned?.nowMs ?? clockMs;
   const latest = shown?.history.at(-1);
 
+  if (!shown && !failed) return <Skeleton />;
+  // No data, or history without a single reading (ingest down longer than its window).
   if (!shown || !latest) {
-    if (!failed) return <Skeleton />;
     return (
       <>
         <div className="hero">
@@ -159,12 +173,21 @@ export default function ForecastApp() {
   const points = fresh ? forecast.points : null;
   const latestMs = Date.parse(latest.observed_at);
   const reading = readingText(latestMs, nowMs);
-  const hovered = hoverMs === null ? null : levelAt(history, points, hoverMs);
+  // A picked forecast hour is dropped once the forecast is no longer shown, so the scene never
+  // labels an old reading with a future time.
+  const lastMs = points?.length
+    ? Date.parse(points[points.length - 1].valid_at)
+    : latestMs;
+  const hovered =
+    hoverMs === null || hoverMs > lastMs
+      ? null
+      : levelAt(history, points, hoverMs);
   const sceneMs = hovered && hoverMs !== null ? hoverMs : latestMs;
   const sceneLevel = hovered?.levelCm ?? latest.level_cm;
 
   return (
     <>
+      {testNotice}
       <div className={state === "stale" ? "hero is-old" : "hero"}>
         <Verdict
           state={state}
