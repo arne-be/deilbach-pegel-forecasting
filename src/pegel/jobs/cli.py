@@ -66,7 +66,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         eval_set.run(config, database_url, arguments.start, arguments.end, arguments.out)
         return 0
     if arguments.command == "train-model":
-        # Lazy, like build-eval-set: training isn't part of the Lambda.
+        # Lazy: training isn't part of the Lambda.
         from pegel.jobs import train
 
         evaluation = config.evaluation
