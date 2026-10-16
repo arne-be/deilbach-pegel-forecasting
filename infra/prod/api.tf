@@ -105,7 +105,7 @@ resource "aws_cloudfront_origin_access_control" "api" {
   signing_protocol                  = "sigv4"
 }
 
-# The API sets Cache-Control; these bounds only cap it. No origin request policy, so the
+# The API sets Cache-Control; these bounds only cap it. The key holds `from` and `to` only. No origin request policy, so the
 # viewer's Host header isn't forwarded: the function URL needs its own.
 resource "aws_cloudfront_cache_policy" "api" {
   name        = local.api_name
@@ -117,8 +117,12 @@ resource "aws_cloudfront_cache_policy" "api" {
     enable_accept_encoding_gzip   = true
     enable_accept_encoding_brotli = true
 
+    # Only the API's own parameters, so a random extra one can't bypass the cache.
     query_strings_config {
-      query_string_behavior = "all"
+      query_string_behavior = "whitelist"
+      query_strings {
+        items = ["from", "to"]
+      }
     }
 
     headers_config {
