@@ -5,7 +5,7 @@ locals {
   site_domain = "deilbach-pegel.energiekonzepte-ruhr.de"
   # CloudFront rejects a certificate that isn't issued yet. Set to true once ACM
   # shows it as issued, after the validation CNAME is in GoDaddy.
-  site_certificate_issued = false
+  site_certificate_issued = true
 }
 
 resource "aws_acm_certificate" "site" {
