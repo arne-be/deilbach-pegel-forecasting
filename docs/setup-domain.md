@@ -7,8 +7,8 @@ The website runs on `deilbach-pegel.energiekonzepte-ruhr.de`. The DNS stays at G
    ```
    cd infra/prod && tofu output site_certificate_validation
    ```
-3. **Validation CNAME at GoDaddy.** In the DNS of `energiekonzepte-ruhr.de`, add a CNAME with `resource_record_name` without the trailing `.energiekonzepte-ruhr.de.` as name and `resource_record_value` as value. Keep it: ACM uses it to renew the certificate every year.
-4. **Wait** until the certificate shows "Issued" in ACM (us-east-1), usually a few minutes:
+3. **Validation CNAME at GoDaddy.** In the DNS of `energiekonzepte-ruhr.de`, add a CNAME with `resource_record_name` without the trailing `.energiekonzepte-ruhr.de.` as name and `resource_record_value` as value. Keep it: ACM uses it for every automatic renewal.
+4. **Wait** until the certificate shows "Issued" in the ACM console (region us-east-1), usually a few minutes. Or:
    ```
    aws acm list-certificates --region us-east-1 --query "CertificateSummaryList[].[DomainName,Status]"
    ```
