@@ -1,81 +1,5 @@
-/* Tokens, base, header and footer, from docs/website/mockup-kombi.html. Base, header, footer
-   and type scale mirror energiekonzepte-ruhr.de (Tailwind build: max-w-6xl, md = 768px). */
-
-/* Self-hosted, so no visitor IP goes to Google (no consent banner needed). OFL, see fonts/. */
-@font-face {
-  font-family: "Manrope";
-  font-style: normal;
-  font-weight: 300 700;
-  font-display: swap;
-  src: url("/fonts/manrope-latin.woff2") format("woff2");
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
-    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "Space Grotesk";
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url("/fonts/space-grotesk-latin.woff2") format("woff2");
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
-    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-:root {
-  color-scheme: light dark;
-  --background: oklch(99% 0.003 90);
-  --foreground: oklch(20% 0.025 215);
-  --brand: oklch(36% 0.04 215);
-  --brand-deep: oklch(28% 0.035 215);
-  --brand-foreground: oklch(97% 0.005 90);
-  --accent: oklch(72% 0.18 50);
-  --accent-foreground: oklch(18% 0.025 215);
-  --muted: oklch(96% 0.008 210);
-  --muted-foreground: oklch(48% 0.02 215);
-  --border: oklch(90% 0.008 210);
-  --card: #fff;
-  --destructive: oklch(58% 0.22 27);
-  --c1: oklch(66% 0.13 155);
-  --c2: oklch(85% 0.15 92);
-  --c3: oklch(55% 0.19 30);
-  --c4: oklch(50% 0.2 25);
-  --c5: oklch(34% 0.12 15);
-  --grey: oklch(78% 0.01 215);
-  --band80: oklch(36% 0.04 215 / 0.3);
-  --band90: oklch(36% 0.04 215 / 0.14);
-  --gutter: 16px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --background: oklch(18% 0.025 215);
-    --foreground: oklch(97% 0.005 90);
-    --muted: oklch(24% 0.025 215);
-    --muted-foreground: oklch(76% 0.02 215);
-    --border: oklch(32% 0.025 215);
-    --card: oklch(22% 0.025 215);
-    --grey: oklch(45% 0.01 215);
-    --band80: oklch(85% 0.04 215 / 0.32);
-    --band90: oklch(85% 0.04 215 / 0.15);
-  }
-}
-:root[data-theme="dark"] {
-  --background: oklch(18% 0.025 215);
-  --foreground: oklch(97% 0.005 90);
-  --muted: oklch(24% 0.025 215);
-  --muted-foreground: oklch(76% 0.02 215);
-  --border: oklch(32% 0.025 215);
-  --card: oklch(22% 0.025 215);
-  --grey: oklch(45% 0.01 215);
-  --band80: oklch(85% 0.04 215 / 0.32);
-  --band90: oklch(85% 0.04 215 / 0.15);
-}
-@media (min-width: 640px) {
-  :root {
-    --gutter: 24px;
-  }
-}
+/* Base, header, footer, page type and the shared card. They mirror energiekonzepte-ruhr.de
+   (Tailwind build: max-w-6xl, md = 768px). Fonts and colour tokens: tokens.css. */
 
 * {
   box-sizing: border-box;
@@ -111,6 +35,43 @@ a {
   white-space: nowrap;
 }
 
+/* Page type and the shared card (scene, chart, category and how-it-works cards). */
+main.wrap {
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+h1 {
+  font:
+    600 36px / 40px "Space Grotesk",
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.025em;
+  margin: 0 0 24px;
+}
+@media (min-width: 640px) {
+  h1 {
+    font-size: 48px;
+    line-height: 1;
+  }
+}
+.label {
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  font:
+    500 30px / 36px "Space Grotesk",
+    system-ui,
+    sans-serif;
+  color: var(--foreground);
+  margin: 0 0 24px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow:
+    0 1px 3px 0 #0000001a,
+    0 1px 2px -1px #0000001a;
+}
 header.site {
   position: sticky;
   top: 0;
@@ -182,6 +143,7 @@ header.site .bar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0; /* stays 44 px wide at 320 px */
   width: 44px;
   height: 44px;
   margin-right: -2px;
@@ -295,6 +257,18 @@ footer.site ul {
 }
 footer.site li + li {
   margin-top: 4px;
+}
+/* 44 px tap height on phones (the main site has 20 px). */
+@media (max-width: 767px) {
+  footer.site ul a,
+  footer.site p a {
+    display: inline-block;
+    min-width: 44px;
+    padding-block: 12px;
+  }
+  footer.site li + li {
+    margin-top: 0;
+  }
 }
 footer.site a:hover {
   color: var(--accent);

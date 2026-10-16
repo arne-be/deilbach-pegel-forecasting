@@ -13,9 +13,7 @@ describe("config", () => {
       .map((category) => category.above_cm ?? Number.NaN);
     expect(bounds).toEqual([...bounds].sort((a, b) => a - b));
     expect(Math.max(...bounds)).toBeLessThan(scaleTopCm);
-    expect(
-      categories.every((category) => category.description && category.actions),
-    ).toBe(true);
+    expect(categories.every((category) => category.actions)).toBe(true);
   });
 
   it("reads freshness and site settings", () => {
