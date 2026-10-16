@@ -47,6 +47,15 @@ aws secretsmanager put-secret-value --secret-id deilbach-pegel/jobs-database-url
 rm "$tmp"
 ```
 
+API database: the pooled connection string of the Neon `prod` branch for the role `pegel_api`, read only. The API Lambda reads it on the first request that needs Neon. Until it is set, those requests fail with a 500; requests the S3 files answer still work. Same pattern:
+
+```
+tmp=$(mktemp)
+$EDITOR "$tmp"
+aws secretsmanager put-secret-value --secret-id deilbach-pegel/api-database-url --secret-string "file://$tmp"
+rm "$tmp"
+```
+
 Migration database: the direct (not pooled) connection string of the Neon `prod` branch for the role `pegel_owner`. The deploy job uses it to run dbmate. Copy it from the Neon console and pass it from the clipboard, so it never lands in the shell history (`$(...)` drops the trailing newline):
 
 ```
@@ -83,4 +92,4 @@ After that, the schedule runs the job every hour at :30 UTC.
 
 ## Changing a secret later
 
-Put the new value the same way. The next run reads it; nothing needs to be deployed.
+Put the new value the same way. The next hourly run reads it; nothing needs to be deployed. The API keeps its database string for the life of a warm container, so after changing `deilbach-pegel/api-database-url`, recycle the containers with a redeploy (or wait until Lambda replaces them).

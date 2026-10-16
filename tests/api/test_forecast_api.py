@@ -136,3 +136,18 @@ def test_failing_reader_falls_back_to_the_database(client: TestClient, conn: Con
     app.dependency_overrides[get_read_file] = lambda: broken
     save_forecast(conn, forecast(OBSERVED_AT, [10.0]))
     assert client.get("/api/forecast").json()["points"][0]["level_cm"] == 10.0
+
+
+@pytest.mark.parametrize("from_file", [True, False])
+def test_forecast_is_cached_briefly(
+    client: TestClient, conn: Conn, files: dict[str, bytes], from_file: bool
+) -> None:
+    if from_file:
+        files[FORECAST_KEY] = b"{}"
+    save_forecast(conn, forecast(OBSERVED_AT, [10.0]))
+    response = client.get("/api/forecast")
+    assert response.headers["cache-control"] == "public, max-age=300, stale-if-error=86400"
+
+
+def test_no_forecast_is_not_cached(client: TestClient) -> None:
+    assert "cache-control" not in client.get("/api/forecast").headers

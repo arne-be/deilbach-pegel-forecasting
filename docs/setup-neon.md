@@ -78,7 +78,7 @@ Always keep `sslmode=require` in the string.
 
 ## 6. Production secrets
 
-The jobs Lambda reads the pooled `prod` string for `pegel_jobs` from the secret `deilbach-pegel/jobs-database-url`. How to set it is in [setup-aws.md](setup-aws.md). The API secret follows when the API is deployed.
+The jobs Lambda reads the pooled `prod` string for `pegel_jobs` from the secret `deilbach-pegel/jobs-database-url`. How to set it is in [setup-aws.md](setup-aws.md). The API reads the pooled `prod` string for `pegel_api` from `deilbach-pegel/api-database-url`, set the same way.
 
 The console doesn't know the passwords of `pegel_jobs` and `pegel_api`, because you set them in SQL. Its connection strings for these roles carry the wrong password; use the one from your password manager.
 

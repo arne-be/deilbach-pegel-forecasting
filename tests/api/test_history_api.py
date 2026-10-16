@@ -156,3 +156,24 @@ def test_older_range_comes_from_the_database(client: TestClient, files: dict[str
 @pytest.mark.parametrize("body", [b"not json", b"[]", b"{}", b'{"from": "2026-10-06"}'])
 def test_matches_range_is_false_for_a_bad_body(body: bytes) -> None:
     assert not matches_range(body, date(2026, 10, 6), date(2026, 10, 12))
+
+
+@pytest.mark.parametrize(
+    ("last_day", "cache_control"),
+    [
+        ("2026-10-12", "public, max-age=300, stale-if-error=86400"),
+        ("2026-10-11", "public, max-age=300, stale-if-error=86400"),
+        ("2026-10-10", "public, max-age=86400, stale-if-error=86400"),
+    ],
+)
+def test_cache_lifetime_depends_on_the_last_day(
+    client: TestClient, last_day: str, cache_control: str
+) -> None:
+    response = client.get("/api/history", params={"from": "2026-10-01", "to": last_day})
+    assert response.headers["cache-control"] == cache_control
+
+
+def test_history_file_is_cached_briefly(client: TestClient, files: dict[str, bytes]) -> None:
+    files[RECENT_KEY] = recent_file("2026-10-06", "2026-10-12")
+    response = client.get("/api/history")
+    assert response.headers["cache-control"] == "public, max-age=300, stale-if-error=86400"
