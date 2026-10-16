@@ -7,7 +7,7 @@ page visits don't wake Neon. Anything else, or a missing or unreadable file, com
 import logging
 import os
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import cache
 from typing import Annotated
 
@@ -16,6 +16,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from pegel.adapters.api_files import FORECAST_KEY, RECENT_KEY, ReadFile, s3_reader
 from pegel.adapters.env_files import load_env_files, main_checkout
 from pegel.adapters.logging import configure_logging
+from pegel.adapters.secrets import secrets_manager
 from pegel.adapters.storage.connection import connect
 from pegel.api.responses import forecast_response, history_response, matches_range, to_json
 from pegel.api.schemas import ForecastResponse, HistoryResponse
@@ -25,6 +26,10 @@ from pegel.core.history import DISPLAY_TIME_ZONE, history_days
 # Only plain dates, so a day has one spelling and one cache entry (no times, no timestamps).
 DAY_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 ON_LAMBDA = "AWS_LAMBDA_FUNCTION_NAME" in os.environ
+# Recent data changes with every hourly run; days before yesterday are final. Yesterday's last
+# readings only arrive with the 00:30 run. stale-if-error lets CloudFront bridge a failing API.
+RECENT_CACHE = "public, max-age=300, stale-if-error=86400"
+PAST_CACHE = "public, max-age=86400, stale-if-error=86400"
 
 if ON_LAMBDA:
     configure_logging()
@@ -49,9 +54,11 @@ def get_today() -> date:
 
 @cache
 def _database_url() -> str:
-    # On Lambda the environment is set already, and there is no git checkout to read from.
-    if not ON_LAMBDA:
-        load_env_files(main_checkout())
+    if ON_LAMBDA:
+        # shortcut: cached per container, so a rotated password needs recycled containers
+        # (a redeploy). Fine while rotation is manual.
+        return secrets_manager()(os.environ["API_DATABASE_URL_SECRET_NAME"]).strip()
+    load_env_files(main_checkout())
     database_url = os.environ.get("API_DATABASE_URL")
     if not database_url:
         raise RuntimeError("API_DATABASE_URL is not set")
@@ -70,8 +77,8 @@ def get_read_file() -> ReadFile | None:
     return s3_reader(bucket) if bucket else None
 
 
-def _json(body: bytes) -> Response:
-    return Response(body, media_type="application/json")
+def _json(body: bytes, cache_control: str = RECENT_CACHE) -> Response:
+    return Response(body, media_type="application/json", headers={"Cache-Control": cache_control})
 
 
 def _read(read_file: ReadFile | None, endpoint: str, key: str) -> bytes | None:
@@ -151,4 +158,5 @@ def history(
     # The connection opens only after validation, so bad requests never wake the database.
     with connect(database_url()) as conn:
         response = history_response(conn, config.forecast.station_id, first_day, last_day)
-    return _json(to_json(response))
+    cache_control = PAST_CACHE if last_day < today - timedelta(days=1) else RECENT_CACHE
+    return _json(to_json(response), cache_control)

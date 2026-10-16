@@ -46,7 +46,7 @@ provider "aws" {
 }
 
 variable "jobs_image_tag" {
-  description = "Tag of the jobs image in ECR, the git SHA it was built from"
+  description = "The git SHA the images were built from: the jobs image is tagged with it, the API image with api-<sha>"
   type        = string
 }
 
@@ -70,11 +70,12 @@ resource "aws_ecr_lifecycle_policy" "jobs" {
   policy = jsonencode({
     rules = [{
       rulePriority = 1
-      description  = "Keep the last 10 images"
+      # Each deploy pushes two images (jobs and api-), so this keeps the last 10 deploys.
+      description = "Keep the last 20 images"
       selection = {
         tagStatus   = "any"
         countType   = "imageCountMoreThan"
-        countNumber = 10
+        countNumber = 20
       }
       action = { type = "expire" }
     }]
@@ -124,6 +125,11 @@ resource "aws_secretsmanager_secret" "influx_client_key" {
 resource "aws_secretsmanager_secret" "jobs_database_url" {
   name        = "deilbach-pegel/jobs-database-url"
   description = "Neon prod pooled connection string, role pegel_jobs"
+}
+
+resource "aws_secretsmanager_secret" "api_database_url" {
+  name        = "deilbach-pegel/api-database-url"
+  description = "Neon prod pooled connection string, role pegel_api"
 }
 
 # Read only by the deploy job for migrations, never by the Lambda.

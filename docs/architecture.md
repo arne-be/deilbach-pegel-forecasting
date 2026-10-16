@@ -98,12 +98,12 @@ The forecast and recent history come from S3 files, so the database only wakes f
 
 Every response carries `issued_at` and `newest_observation_at` (UTC, ISO 8601) and a `stale` flag. FastAPI checks the query parameters (valid dates, maximum range) before anything reaches the database. The generated `openapi.json` is committed, and CI checks that it's current.
 
-Caching in CloudFront:
-- `/api/forecast` and recent history: 5 minutes.
-- History ranges that are fully in the past: days. The history selector rounds ranges to whole days, so repeat requests hit the cache.
-- All API responses allow `stale-if-error` for a day. If the Lambda fails, CloudFront serves the last good response instead of an error.
+Caching in CloudFront. The API sets `Cache-Control` on every 200; the `/api/*` cache policy keys on `from` and `to` only and caps the lifetime at a day:
+- `/api/forecast` and history ending yesterday or today: 5 minutes. Yesterday's last readings arrive with the 00:30 run.
+- History ending before yesterday: a day. The history selector rounds ranges to whole days, so repeat requests hit the cache.
+- All of them allow `stale-if-error` for a day. If the Lambda fails, CloudFront serves the last good response instead of an error.
 
-The API Lambda has a reserved concurrency of 5. That caps both costs and the load on Neon.
+The API Lambda should have a reserved concurrency of 5, to cap both costs and the load on Neon. Like the jobs, it waits for a quota increase. A cold start loads the jobs image, ML libraries included.
 
 ## Website
 
@@ -149,7 +149,7 @@ There are two environments: local and prod.
 
 GitHub Actions does everything:
 - **On every pull request:** type checks, tests, lint, gitleaks and `tofu plan`.
-- **On merge to `main`:** build and push both images, `tofu apply`, build the website, sync it to S3 and clear the HTML from the CloudFront cache.
+- **On merge to `main`:** build and push both images, `tofu apply`, build the website, sync it to S3 and clear the CloudFront cache (API responses included).
 
 CI logs in to AWS with GitHub's OIDC, with no stored keys, and uses two roles:
 - **`github-plan`**, read only, for pull requests from this repo.
@@ -175,9 +175,9 @@ Two things run from a laptop on purpose:
 |---|---|
 | Lambda, EventBridge, CloudFront, CloudWatch Logs | €0 (free tier) |
 | S3, ECR | < €1 |
-| Secrets Manager (4 secrets) | ~€1.60 |
+| Secrets Manager (7 secrets) | ~€2.80 |
 | Neon | €0 (free plan) |
-| **Total** | **~€2–3** |
+| **Total** | **~€3–4** |
 
 Plus the domain itself.
 
