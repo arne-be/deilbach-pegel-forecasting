@@ -18,7 +18,7 @@
       "id": 1,
       "type": "timeseries",
       "title": "Forecast station: observed, newest forecast and its bands",
-      "description": "Raw and cleaned level at every station we forecast, the newest forecast of each model with its situation tag, and its uncertainty bands (80, 90, 95 %) where it has them.",
+      "description": "Raw and cleaned level at every station we forecast, the newest forecast of each model with its situation tag, and its uncertainty bands (80, 90, 95 %) where it has them. Band series aren't named per model: fine while only the configured model has bands.",
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "${datasource}"
@@ -65,10 +65,6 @@
                   "mode": "fixed",
                   "fixedColor": "blue"
                 }
-              },
-              {
-                "id": "displayName",
-                "value": "band 95 %"
               }
             ]
           },
@@ -123,10 +119,6 @@
                   "mode": "fixed",
                   "fixedColor": "blue"
                 }
-              },
-              {
-                "id": "displayName",
-                "value": "band 90 %"
               }
             ]
           },
@@ -181,10 +173,6 @@
                   "mode": "fixed",
                   "fixedColor": "blue"
                 }
-              },
-              {
-                "id": "displayName",
-                "value": "band 80 %"
               }
             ]
           },
