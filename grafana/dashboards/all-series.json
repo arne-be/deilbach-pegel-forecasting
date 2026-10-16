@@ -17,8 +17,8 @@
     {
       "id": 1,
       "type": "timeseries",
-      "title": "Forecast station: observed and newest forecast",
-      "description": "Raw and cleaned level at every station we forecast, and the newest forecast of each model.",
+      "title": "Forecast station: observed, newest forecast and its bands",
+      "description": "Raw and cleaned level at every station we forecast, the newest forecast of each model with its situation tag, and its uncertainty bands (80, 90, 95 %) where it has them.",
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "${datasource}"
@@ -40,7 +40,182 @@
             "showPoints": "never"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "95 % upper"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "95 % lower"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 8
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "band 95 %"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "95 % lower"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "90 % upper"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "90 % lower"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 12
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "band 90 %"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "90 % lower"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "80 % upper"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "80 % lower"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 18
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "band 80 %"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "80 % lower"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -73,7 +248,18 @@
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
-          "rawSql": "SELECT p.valid_at AS time, 'forecast:' || f.model AS metric, p.level_cm AS value\nFROM forecast_points p\nJOIN (\n  SELECT DISTINCT ON (station_id, model) id, model\n  FROM forecasts\n  ORDER BY station_id, model, issued_at DESC\n) f ON f.id = p.forecast_id\nORDER BY 1"
+          "rawSql": "SELECT p.valid_at AS time,\n  'forecast:' || f.model || coalesce(' (' || f.situation || ')', '') AS metric,\n  p.level_cm AS value\nFROM forecast_points p\nJOIN (\n  SELECT DISTINCT ON (station_id, model) id, model, situation\n  FROM forecasts\n  ORDER BY station_id, model, issued_at DESC\n) f ON f.id = p.forecast_id\nORDER BY 1"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT b.valid_at AS time, b.coverage_percent || ' % ' || edge.name AS metric, edge.value\nFROM forecast_bands b\nJOIN (\n  SELECT DISTINCT ON (station_id, model) id\n  FROM forecasts\n  ORDER BY station_id, model, issued_at DESC\n) f ON f.id = b.forecast_id\nCROSS JOIN LATERAL (VALUES ('lower', b.lower_cm), ('upper', b.upper_cm)) AS edge (name, value)\nORDER BY 1"
         }
       ]
     },
