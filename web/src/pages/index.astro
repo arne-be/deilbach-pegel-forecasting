@@ -1,8 +1,9 @@
 ---
 import Base from "../layouts/Base.astro";
+import { horizonHours } from "../lib/config";
 ---
 
 <Base
   title="Deilbach Pegel Vorhersage"
-  description="24-Stunden-Vorhersage des Wasserstands am Pegel Kupferdreh am Deilbach, mit Hochwasser-Stufen."
+  description={`${horizonHours}-Stunden-Vorhersage des Wasserstands am Pegel Kupferdreh am Deilbach, mit Hochwasser-Stufen.`}
 />

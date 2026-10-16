@@ -2,6 +2,7 @@
 import {
   categories as configCategories,
   freshness as configFreshness,
+  forecast,
   site,
 } from "../../../config/pegel.json";
 
@@ -22,6 +23,8 @@ export interface Freshness {
 /** Ascending; the first has `above_cm: null` (validated in src/pegel/config.py). */
 export const categories: readonly Category[] = configCategories;
 export const freshness: Freshness = configFreshness;
+/** Hours the forecast reaches ahead. */
+export const horizonHours: number = forecast.horizon_hours;
 /** Hours of measured levels the chart shows before the forecast. */
 export const historyHours: number = site.history_hours;
 /** Top of the chart and scene scale in cm; it grows only if a value goes higher. */
