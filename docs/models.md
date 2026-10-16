@@ -1,6 +1,6 @@
 # Models
 
-Every model the evaluation runs, what it does and why. How models are scored is in [evaluation.md](evaluation.md), the plan behind the ladder in [decision 0008](decisions/0008-model-evaluation-and-selection.md). All models are backtest models for now; the website still shows persistence. The registered list is `src/pegel/evaluation/registry.py`.
+Every model the evaluation runs, what it does and why. How models are scored is in [evaluation.md](evaluation.md), the plan behind the ladder in [decision 0008](decisions/0008-model-evaluation-and-selection.md). The website shows `ridge:change:v2` ([In production](#in-production-ridgechangev2)); every other model is a backtest model. The registered list is `src/pegel/evaluation/registry.py`.
 
 ## Ladder
 
@@ -84,6 +84,27 @@ change_k = c0 + c1·(last − base_30d)
 
 **How the inputs were chosen.** On an inner time split inside each fold's training rows: fit on the older 80 %, validate on the newest 20 %, with a 24-hour gap. Version 1 (retired) came from about 20 candidates, version 2 from 68 (`analysis/model-evaluation/models-v2-candidates.csv`). Tried and dropped: ICON-D2 p90, the radar zones and the catchment maximum, radar beyond 24 hours, Kupferdreh and upstream level lags, a recession gated to after the peak, other time constants (6, 8, 12, 36, 48 h) in place of the 24-hour one in `rain_change:v2:split`. The inner splits of later folds overlap earlier test periods, so this is not a clean hold-out; the live shadow run is.
 
+## In production: `ridge:change:v2`
+
+The website shows `ridge:change:v2`. It ties `rain_change:v2:split` over all issue times, is better at high water (4.8 against 5.1 cm) and sees one flood more a day ahead, at the cost of one false alarm more in 18 test months. Decision: [0009](decisions/0009-ridge-in-production.md).
+
+**Training.** `pegel train-model` fits the model on every issue time from 2024-02-01 to 2026-04-12 with the same code and the same settings as the evaluation (`registry.py`), reading prod read-only. The window ends where the Langenberg open data ends: a missing upstream change counts as 0, so months without Langenberg would teach the model that upstream rises don't matter. Rerun it whenever new data has arrived:
+
+```
+JOBS_DATABASE_URL="$(pbpaste)" uv run pegel train-model --model ridge:change:v2 --to <last day> --out ~/data/deilbach-pegel/models/<date>/ --bucket deilbach-pegel-data-<account>
+pbcopy </dev/null
+```
+
+It prints the coverage of every input, so check that no gauge is missing over long stretches before going further.
+
+**The model file.** One JSON file per training run: the input names, split, ridge penalty, the radar cells per zone and the coefficients (2 groups × 24 leads × 20 inputs), plus what it was trained on: window, row count, code commit, config, database and the in-sample MAE per lead. JSON, not pickle, so a file can't run code when loaded. Loading refuses a file whose radar zones differ from the current cells file or whose coefficients aren't finite. It lives in the data bucket under `models/`, and a file is never overwritten.
+
+**Going live.** `forecast.model_file` in `config/pegel.json` names the file the hourly job loads. A new model goes live by changing that key in a PR; a rollback is the same change back to the previous file. The model only goes live if it beats the current one on the same evaluation (`.claude/rules/data-and-ml.md`).
+
+**Each hour.** At hh:30 the job builds one dataset row for the issue time with the code that builds the evaluation dataset (`eval_set.build_rows`), so training and live inputs can't drift apart. Every input is taken as known at the issue time. The model forecasts leads 1 to 24, and the website shows 24 hours. 48 hours waits for data: the training data has no rain forecast known beyond 24 hours (see [0009](decisions/0009-ridge-in-production.md)). The job saves persistence first and then the ridge forecast. If the ridge step fails, the failure is logged and persistence still gets saved; the API then serves persistence, because it never shows a ridge forecast older than the newest persistence one. The response's `model` field says which one it is. Each input is read only as far back as it needs (30 days for the base level, a day for the gauges, a week for radar), about 0.5 MB per run from Neon. A rerun of a past hour (`pegel run-hourly --issued-at`) usually gets a ridge forecast with persistence values: live readings are stamped with the hour they were fetched, so at a past issue time they weren't known yet, and an unknown input counts as no change.
+
+**What to watch.** It went live without a shadow run, so live forecasts are its first real hold-out. It was trained on day-old ICON-D2 rain, while live values come from runs 4 to 27 hours ahead. Having learned to trust day-old rain little, it may underuse sharp short-range rain live ([catchment.md](catchment.md#what-a-model-sees-at-an-issue-time)). The weaknesses below still apply.
+
 ## LightGBM on the ridge residual
 
 Step 6 of the ladder, in a form that keeps ridge's flood size: `ridge:change:v2` makes the forecast, and one LightGBM booster per lead adds a correction fitted on its residual. Ridge is linear and extrapolates; a tree can't go past the residuals it trained on, so its cap limits only the correction. Numbers from run [2026-10-15-lightgbm-residual](../analysis/model-evaluation/experiments.md#2026-10-15-lightgbm-residual).
@@ -105,4 +126,4 @@ Step 6 of the ladder, in a form that keeps ridge's flood size: `ridge:change:v2`
 - **Too high on small floods.** 12 hours before the 91 cm peak of 2026-02-22 they forecast 145 and 162 % of the rise.
 - **False alarms:** 2 (`rain_change:v2:split`) and 3 (`ridge:change:v2`) in 18 test months; persistence none.
 - **Chosen from many candidates** on inner splits that overlap earlier test periods.
-- **Trained on day-old ICON-D2.** How the fitted coefficients behave on fresh runs is unknown until the live shadow run.
+- **Trained on day-old ICON-D2.** How the fitted coefficients behave on fresh runs shows only in live forecasts.

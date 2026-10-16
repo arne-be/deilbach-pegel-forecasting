@@ -45,6 +45,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Lead timeline page, 1, 3, 6, 12 and 24 h ahead over the whole test period (`python -m pegel.evaluation.timeline <run dir> <eval.parquet>`, writes `timeline.html`): `src/pegel/evaluation/timeline.py`, `timeline.html`
 - How the evaluation works (data, split, flood events, metrics) and every model on one page: `docs/evaluation.md`, `docs/models.md`, `analysis/model-evaluation/methodology_plots.py`
 - Capped-training stress test, `<model>:cap100` trained without issue times above 100 cm: `src/pegel/evaluation/models/capped.py`
+- `ridge:change:v2` in production: model file as JSON (`CuratedChange.to_dict`/`from_dict`), training script (`pegel train-model`), hourly forecast from the file on S3 (`forecast.model_file`), persistence as fallback: `src/pegel/evaluation/models/curated.py`, `src/pegel/jobs/train.py`, `src/pegel/jobs/model_forecast.py`, `src/pegel/adapters/model_files.py`, `src/pegel/jobs/pipeline.py`, `docs/decisions/0009-ridge-in-production.md`
 
 ## Layout
 
@@ -197,6 +198,14 @@ uv run pegel backfill-radar --from 2023-01-01 [--to 2026-10-01] [--cache-dir ~/.
 The frozen dataset for model evaluation (docs/decisions/0008) is built by a person from prod. It only reads: every transaction is read-only. It needs the `analysis` group (`uv sync --group analysis`) and writes `eval.parquet` and `eval.manifest.json` to a folder outside the repo; it never overwrites them. `--to` is inclusive.
 ```
 JOBS_DATABASE_URL="$(pbpaste)" uv run --group analysis pegel build-eval-set --from 2024-02-01 --to 2026-04-12 --out ~/data/deilbach-pegel/eval/2026-10-14/
+pbcopy </dev/null
+```
+
+### Train the live model
+
+Read-only from prod, like the evaluation dataset. Writes the model JSON to `--out` and uploads it to `models/` in the data bucket; it never overwrites a file. Then put the printed key in `forecast.model_file` in `config/pegel.json` and merge that. Details in `docs/models.md`.
+```
+JOBS_DATABASE_URL="$(pbpaste)" uv run pegel train-model --model ridge:change:v2 --to 2026-04-12 --out ~/data/deilbach-pegel/models/<date>/ --bucket deilbach-pegel-data-<account>
 pbcopy </dev/null
 ```
 
