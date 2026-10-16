@@ -97,7 +97,7 @@ pbcopy </dev/null
 
 It prints the coverage of every input, so check that no gauge is missing over long stretches before going further.
 
-**The model file.** One JSON file per training run: the input names, split, ridge penalty, the radar cells per zone and the coefficients (2 groups × 24 leads × 20 inputs), plus what it was trained on: window, row count, code commit, config, database and the in-sample MAE per lead. JSON, not pickle, so a file can't run code when loaded. Loading refuses a file whose radar zones differ from the current cells file or whose coefficients aren't finite. It lives in the data bucket under `models/`, and a file is never overwritten.
+**The model file.** One JSON file per training run: the input names, split, ridge penalty, the radar cells per zone and the coefficients (2 groups × 24 leads × 20 inputs), the [band table](#uncertainty-bands), plus what it was trained on: window, row count, code commit, config, database and the in-sample MAE per lead. JSON, not pickle, so a file can't run code when loaded. Loading refuses a file whose radar zones differ from the current cells file or whose coefficients aren't finite. It lives in the data bucket under `models/`, and a file is never overwritten.
 
 **Going live.** `forecast.model_file` in `config/pegel.json` names the file the hourly job loads. A new model goes live by changing that key in a PR; a rollback is the same change back to the previous file. The model only goes live if it beats the current one on the same evaluation (`.claude/rules/data-and-ml.md`).
 
@@ -127,3 +127,38 @@ Step 6 of the ladder, in a form that keeps ridge's flood size: `ridge:change:v2`
 - **False alarms:** 2 (`rain_change:v2:split`) and 3 (`ridge:change:v2`) in 18 test months; persistence none.
 - **Chosen from many candidates** on inner splits that overlap earlier test periods.
 - **Trained on day-old ICON-D2.** How the fitted coefficients behave on fresh runs shows only in live forecasts.
+
+## Uncertainty bands
+
+Every model forecast carries three bands, 80, 90 and 95 %: the observed level should lie inside in that share of cases. They come from the model's own past errors on the evaluation folds, never from the rows it was fitted on (`core/bands.py`, fitted by `pegel train-model` and stored in the model file). A model file trained before bands existed still loads; its forecasts just have none until the model is retrained.
+
+**How.** Per lead k, an error scale grows with how much the model expects to change and with the forecast rain:
+
+```
+s_k = a_k + b_k · |forecast_k − last level| + c_k · ICON rain to hour k
+```
+
+with a, b, c ≥ 0 fitted by least squares on the absolute errors, and capped at the 99th percentile of the scales seen in calibration. The band is the forecast plus the 5 % and 95 % quantiles (for 90 %) of error / s_k. It is never narrower than ±1.5 cm, and its lower edge never goes below 0 cm.
+
+**When an input is missing,** the model falls back to persistence (change exactly 0) and the band uses the quantiles of the persistence error instead. Missing ICON rain does the same even where the forecast still moves: never read as dry, the band only gets wider. If the bands fail for any other reason, the forecast is saved without them.
+
+**Situation tag.** Each forecast gets a tag for the page. It names the situation; it doesn't pick the band. The first that matches:
+
+| Tag | When | On the page |
+|---|---|---|
+| `degraded` | an input is missing, persistence bands | Eingeschränkte Vorhersage |
+| `strong` | largest predicted change in 24 h ≥ 8 cm | Starke Änderung erwartet |
+| `moving` | that change ≥ 2 cm, or ICON rain over 24 h ≥ 3 mm | Bewegung oder Regen erwartet |
+| `calm` | otherwise | Ruhige Lage |
+
+Thresholds and coverages are in `bands` in `config/pegel.json`.
+
+**Why a scale and not one table per situation.** Three schemes were tried against one quantile table per lead, each calibrated only on the folds before its test fold: situation buckets from hydrology, buckets from a shallow tree, and the scale above. Only the scale beat the per-lead table in every fold and in 63 of 69 weeks (interval score at 90 %, leads 1 to 24: 11.8 against 18.2). The buckets left small cells whose tails varied threefold under bootstrap. Details in [learnings](../analysis/model-evaluation/learnings.md#2026-10-16--uncertainty-bands).
+
+**Scored** in every evaluation run (`bands.csv`, a folded table in the run report): coverage, mean width and interval score per model, fold, situation, lead and coverage. Fold F1 has no earlier fold to calibrate on, so it is not scored.
+
+**Limits.**
+- On a rise into a flood the 95 % band holds only about 85 %: 14 % of those readings land above it. Don't call it "95 % sicher" on the page during a rise.
+- A summer calibrated only on winters undercovered (F3: 83 % at 90 %). The live table includes one summer; watch coverage live.
+- The upper edge can jump by up to 13 cm (p99) from one hour to the next at +6 h.
+- Refit with every model: the scale depends on the model's predicted change.

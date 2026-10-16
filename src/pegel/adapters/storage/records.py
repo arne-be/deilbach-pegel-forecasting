@@ -5,6 +5,15 @@ from datetime import datetime, timedelta
 
 
 @dataclass(frozen=True)
+class ForecastBandRecord:
+    forecast_id: int
+    valid_at: datetime
+    coverage_percent: int
+    lower_cm: float
+    upper_cm: float
+
+
+@dataclass(frozen=True)
 class ForecastPointRecord:
     forecast_id: int
     valid_at: datetime
@@ -19,6 +28,7 @@ class ForecastRecord:
     issued_at: datetime
     newest_observation_at: datetime
     created_at: datetime
+    situation: str | None
 
 
 @dataclass(frozen=True)

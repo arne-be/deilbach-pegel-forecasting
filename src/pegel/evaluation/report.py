@@ -24,6 +24,7 @@ CSV_TABLES = (
     "peaks",
     "false_alarms",
     "lag",
+    "bands",
 )
 EMPTY = pd.DataFrame()
 # One sentence under each plot on how to read it, by file stem.
@@ -134,6 +135,15 @@ def section(
             "Lag check",
             "Shift in hours that best matches the forecast to the observed level on high water.",
             report_tables.lag_table(lag),
+        )
+    band_scores = tables.get("bands", EMPTY)
+    if not band_scores.empty:
+        lines += _table_details(
+            "Uncertainty bands",
+            "Share of observed levels inside each band / its mean width in cm, per situation,"
+            " pooled over leads and the folds after the first (each calibrated on the folds"
+            " before it). A good band holds its nominal share in every situation.",
+            report_tables.band_table(band_scores),
         )
     state = "dirty" if run_info["dirty"] else "clean"
     models = ", ".join(report_tables.model_order(run_info["models"]))

@@ -160,6 +160,7 @@ Every score is computed for **all issue times** (mostly low, slowly falling wate
 - **MAE per lead time**, 1 to 24 hours, per model and fold. The main metric.
 - **Skill against persistence:** 1 − MAE / MAE of persistence (the last level held flat). Above 0 is better than doing nothing. A bootstrap over whole days gives a 90 % range for the difference to persistence.
 - **Lag check:** on high water, the time shift that best fits the forecast to the observed level. If it equals the lead, the model is only a delayed persistence.
+- **Uncertainty bands:** coverage, width and interval score of the 80, 90 and 95 % bands per situation, each fold calibrated on the folds before it. See [models](models.md#uncertainty-bands).
 
 ## Flood forecasts
 

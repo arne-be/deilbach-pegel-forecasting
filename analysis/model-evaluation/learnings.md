@@ -97,3 +97,14 @@ From run [2026-10-15-rain-response](experiments.md#2026-10-15-rain-response).
 - **Fit the slow store on more than a day.** On the 24-hour change the slow store's time constant runs to the edge of any grid, because over a day it looks like a step. On 72 hours it settles at 96 to 144 h, with the fast store at 4 to 6 h and the peak 4 to 5 h after the rain, close to the analysis.
 - **As a ridge input the responses are a fair swap for the radar and ICON sums:** 2.06 against 2.07 cm over all issue times, 4.74 against 4.83 cm at high water, the same false alarms. Small enough to be selection noise. Both variants are retired; the code is in git history (see [models.md](../../docs/models.md#retired)).
 - **A day ahead the limit is ICON quality, not model form or training range.** Inside the ridge variant the ridge gives the ICON response 0.34 to 0.58 of the radar gain, and the radar response about 0 at +24 h. However the rain enters, as sums or through a physical hydrograph, the model can only trust day-old ICON about half, and a day ahead there is nothing else to go on.
+
+## 2026-10-16 · Uncertainty bands
+
+Bands for `ridge:change:v2` from its out-of-sample errors in run 2026-10-15-models-v2. Three schemes were proposed, attacked by three critics (statistics, live operation, flood safety) and judged. All calibrated forward: F2 on F1, F3 on F1–F2, F4 on F1–F3.
+
+- **One table per lead undercovers exactly where it matters.** At +24 h its 80 % band holds 58 % on rainy issue times and 95 % on dry ones. Pooled over leads it looks fine (77 %).
+- **A continuous scale beats situation buckets.** Scaling the error by the predicted change and the ICON rain wins in every fold and in 63 of 69 weeks (interval score at 90 %: 11.8 against 18.2 for the per-lead table). Buckets from hydrology (15.1) or a shallow tree (14.3) won less, and their rare cells (strong rise, elevated level) rested on 6 to 20 episodes, with tails that moved threefold under bootstrap.
+- **The model's own predicted change is the best single input** for how wrong it will be. Every scheme found it.
+- **Keep the ICON term.** Without it, 31 % of readings on rises into a flood land above the 95 % band; with it, 14 %. Its cost in coverage showed up only in folds calibrated without a summer.
+- **A missing input must not look calm.** One missing radar or ICON hour turns the curated models into persistence. With the scaled table that gives 59 % coverage at 90 %, with persistence errors 93 %. The eval set has no such rows, so this was simulated.
+- **Not solved:** 14 % of into-flood readings above the 95 % band (nominal 2.5 %); a summer calibrated on winters undercovers (F3 83 % at 90 %); bands jump up to 13 cm between hours.

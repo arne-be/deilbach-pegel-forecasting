@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from pegel.config import PegelConfig, load_config
-from pegel.evaluation import events, flood_scores, metrics
+from pegel.evaluation import bands, events, flood_scores, metrics
 
 
 def score_tables(
@@ -34,6 +34,7 @@ def score_tables(
             predictions, dataset, floods, settings.high_water_cm, leads
         ),
         "lag": events.lag_check(predictions, dataset, leads, settings.high_water_cm),
+        "bands": bands.band_scores(predictions, dataset, config),
     }
 
 

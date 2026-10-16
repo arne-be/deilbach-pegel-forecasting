@@ -52,5 +52,6 @@ def conn(database_url: str) -> Iterator[psycopg.Connection[TupleRow]]:
         yield connection
         connection.execute("RESET ROLE")
         connection.execute(
-            "TRUNCATE series, observations, input_forecasts, forecasts, forecast_points"
+            "TRUNCATE series, observations, input_forecasts, "
+            "forecasts, forecast_points, forecast_bands"
         )

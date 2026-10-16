@@ -1,26 +1,35 @@
-"""The forecast of a trained model (`forecast.model`), from the same input row as training."""
+"""The forecast of a trained model (`forecast.model`), from the same input row as training,
+with its uncertainty bands."""
 
+import logging
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
+from pegel.adapters.model_files import TrainedModel
 from pegel.config import PegelConfig
-from pegel.core.forecasts import Forecast, ForecastPoint
+from pegel.core import bands, features
+from pegel.core.forecasts import Band, Forecast, ForecastPoint
 from pegel.core.issue_inputs import TARGET_MINUTE
 from pegel.evaluation import contract
 from pegel.jobs import eval_set
 
+logger = logging.getLogger(__name__)
+
 # Loads the trained model, e.g. from S3. Passed in, so tests need no S3.
-ModelLoader = Callable[[], contract.Model]
+ModelLoader = Callable[[], TrainedModel]
 
 
 def model_forecast(
-    conn: eval_set.Conn, config: PegelConfig, issued_at: datetime, model: contract.Model
+    conn: eval_set.Conn, config: PegelConfig, issued_at: datetime, trained: TrainedModel
 ) -> Forecast:
-    """Builds the input row for the issue time and predicts with the model."""
+    """Builds the input row for the issue time and predicts with the model; bands too when the
+    model file has a band table."""
+    model = trained.model
     rows, _ = eval_set.build_rows(conn, config, pd.DatetimeIndex([issued_at]))
     # Targets lie in the future, so they are NaN here; models never see them (as in the harness).
     inputs = rows.loc[:, ~rows.columns.str.startswith(f"{contract.TARGET}_")]
@@ -31,12 +40,49 @@ def model_forecast(
     leads = config.evaluation.leads_hours
     if levels.shape != (leads,) or not np.isfinite(levels).all():
         raise ValueError(f"{model.name} predicted {levels}, expected {leads} finite levels")
+    points = model_points(issued_at, levels)
+    situation = None
+    if trained.bands is not None:
+        # Bands are extra: a broken table or config costs the bands, never the forecast.
+        try:
+            row_levels = levels[np.newaxis, :]
+            last_level = inputs[contract.KD_LAST_CM].to_numpy(np.float64)
+            icon_to_lead = features.icon_cumulative(inputs, leads)
+            bounds = bands.band_bounds(
+                trained.bands, row_levels, last_level, icon_to_lead, config.bands
+            )
+            [situation] = bands.situations(row_levels, last_level, icon_to_lead, config.bands)
+            points = with_bands(points, bounds)
+        except Exception:
+            logger.exception(
+                "bands failed, saving the forecast without them",
+                extra={"job": "forecast", "model": model.name, "issued_at": issued_at.isoformat()},
+            )
+            situation = None
     return Forecast(
         station_id=config.forecast.station_id,
         model=model.name,
         issued_at=issued_at,
         newest_observation_at=newest_observation_at.to_pydatetime(),
-        points=model_points(issued_at, levels),
+        points=points,
+        situation=situation,
+    )
+
+
+def with_bands(
+    points: tuple[ForecastPoint, ...],
+    bounds: dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]],
+) -> tuple[ForecastPoint, ...]:
+    """The points with one band per coverage, narrowest first; `bounds` are (1, leads)."""
+    return tuple(
+        replace(
+            point,
+            bands=tuple(
+                Band(coverage, float(lower[0, lead]), float(upper[0, lead]))
+                for coverage, (lower, upper) in sorted(bounds.items())
+            ),
+        )
+        for lead, point in enumerate(points)
     )
 
 

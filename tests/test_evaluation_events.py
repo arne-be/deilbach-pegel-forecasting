@@ -152,6 +152,8 @@ def test_runner_writes_every_table(tmp_path: Path) -> None:
     dataset = _dataset(observed)
     for lead in range(LEADS + 1, load_config().evaluation.leads_hours + 1):
         dataset[f"target_{lead}"] = np.nan
+    for lead in range(1, load_config().evaluation.leads_hours + 1):
+        dataset[f"icon_mean_{lead}"] = 0.0
     predictions.to_parquet(tmp_path / "predictions.parquet")
     dataset.to_parquet(tmp_path / "dataset.parquet")
     main(
@@ -163,5 +165,5 @@ def test_runner_writes_every_table(tmp_path: Path) -> None:
         ]
     )
     written = sorted(path.stem for path in (tmp_path / "out").glob("*.csv"))
-    assert written == ["bootstrap", "events", "false_alarms", "lag", "peaks", "scores"]
+    assert written == ["bands", "bootstrap", "events", "false_alarms", "lag", "peaks", "scores"]
     assert len(pd.read_csv(tmp_path / "out" / "events.csv")) == 1

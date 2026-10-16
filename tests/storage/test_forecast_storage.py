@@ -5,7 +5,7 @@ import pytest
 from psycopg.rows import TupleRow
 
 from pegel.adapters.storage.forecasts import newest_forecast, save_forecast
-from pegel.core.forecasts import Forecast, ForecastPoint
+from pegel.core.forecasts import Band, Forecast, ForecastPoint
 
 STATION = "kupferdreh"
 MODEL = "persistence"
@@ -26,6 +26,21 @@ def test_saved_forecast_round_trips(conn: Conn) -> None:
     saved = forecast([40.0, -10.0, 60.0])
     save_forecast(conn, saved)
     assert newest_forecast(conn, STATION, MODEL) == saved
+
+
+def test_bands_and_situation_round_trip(conn: Conn) -> None:
+    points = (
+        ForecastPoint(
+            ISSUED_AT + timedelta(hours=1), 40.0, (Band(80, 39.0, 41.0), Band(95, 38.0, 43.0))
+        ),
+        ForecastPoint(ISSUED_AT + timedelta(hours=2), 41.0),
+    )
+    saved = Forecast(STATION, MODEL, ISSUED_AT, ISSUED_AT - timedelta(minutes=8), points, "wet")
+    save_forecast(conn, saved)
+    assert newest_forecast(conn, STATION, MODEL) == saved
+    # A rerun without bands drops the old ones with their points.
+    save_forecast(conn, forecast([40.0]))
+    assert newest_forecast(conn, STATION, MODEL) == forecast([40.0])
 
 
 def test_rerun_replaces_points(conn: Conn) -> None:

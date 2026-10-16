@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "pegel.json"
 
@@ -136,6 +136,32 @@ class EvaluationSettings(_Frozen):
     target_tolerance_minutes: int = Field(ge=0)
 
 
+class BandSettings(_Frozen):
+    """Uncertainty bands around a model forecast (docs/models.md#uncertainty-bands)."""
+
+    # Central bands drawn on the page, narrowest first.
+    coverages_percent: tuple[int, ...]
+    # No band is narrower than this either side of the forecast: the scaled errors of calm
+    # hours undercover otherwise.
+    min_half_width_cm: float = Field(ge=0)
+    # The error scale stops at this quantile of the scales seen in calibration, so a rare
+    # input never draws a band far wider than any seen before.
+    scale_cap_quantile: float = Field(gt=0, le=1)
+    # Situation tags for the page: the largest predicted change in 24 h, and the forecast rain.
+    strong_change_cm: float = Field(gt=0)
+    moving_change_cm: float = Field(gt=0)
+    moving_rain_mm: float = Field(gt=0)
+
+    @field_validator("coverages_percent")
+    @classmethod
+    def _check_coverages(cls, coverages: tuple[int, ...]) -> tuple[int, ...]:
+        if not coverages or list(coverages) != sorted(set(coverages)):
+            raise ValueError("coverages must be distinct and ascending")
+        if not all(0 < coverage < 100 for coverage in coverages):
+            raise ValueError("coverages must lie between 0 and 100")
+        return coverages
+
+
 class PegelConfig(_Frozen):
     stations: tuple[Station, ...]
     forecast: ForecastSettings
@@ -144,6 +170,7 @@ class PegelConfig(_Frozen):
     freshness: Freshness
     api: ApiSettings
     evaluation: EvaluationSettings
+    bands: BandSettings
     rain: RainSettings
 
     @model_validator(mode="after")

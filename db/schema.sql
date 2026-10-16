@@ -20,6 +20,21 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: forecast_bands; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.forecast_bands (
+    forecast_id bigint NOT NULL,
+    valid_at timestamp with time zone NOT NULL,
+    coverage_percent integer NOT NULL,
+    lower_cm double precision NOT NULL,
+    upper_cm double precision NOT NULL,
+    CONSTRAINT forecast_bands_check CHECK ((lower_cm <= upper_cm)),
+    CONSTRAINT forecast_bands_coverage_percent_check CHECK (((coverage_percent > 0) AND (coverage_percent < 100)))
+);
+
+
+--
 -- Name: forecast_points; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -40,7 +55,8 @@ CREATE TABLE public.forecasts (
     model text NOT NULL,
     issued_at timestamp with time zone NOT NULL,
     newest_observation_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    situation text
 );
 
 
@@ -122,6 +138,14 @@ CREATE TABLE public.series (
 
 
 --
+-- Name: forecast_bands forecast_bands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.forecast_bands
+    ADD CONSTRAINT forecast_bands_pkey PRIMARY KEY (forecast_id, valid_at, coverage_percent);
+
+
+--
 -- Name: forecast_points forecast_points_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -186,6 +210,14 @@ ALTER TABLE ONLY public.series
 
 
 --
+-- Name: forecast_bands forecast_bands_forecast_id_valid_at_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.forecast_bands
+    ADD CONSTRAINT forecast_bands_forecast_id_valid_at_fkey FOREIGN KEY (forecast_id, valid_at) REFERENCES public.forecast_points(forecast_id, valid_at) ON DELETE CASCADE;
+
+
+--
 -- Name: forecast_points forecast_points_forecast_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -230,4 +262,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20261013200000'),
     ('20261014120000'),
     ('20261014130000'),
-    ('20261014150000');
+    ('20261014150000'),
+    ('20261015120000');

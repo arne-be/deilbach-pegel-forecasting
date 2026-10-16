@@ -75,6 +75,14 @@
     "flood_cm": 95,
     "target_tolerance_minutes": 10
   },
+  "bands": {
+    "coverages_percent": [80, 90, 95],
+    "min_half_width_cm": 1.5,
+    "scale_cap_quantile": 0.99,
+    "strong_change_cm": 8,
+    "moving_change_cm": 2,
+    "moving_rain_mm": 3
+  },
   "rain": {
     "radar": {
       "source": "radolan_rw",
