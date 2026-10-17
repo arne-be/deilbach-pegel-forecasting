@@ -120,7 +120,8 @@ header.site .bar {
   color: color-mix(in oklab, var(--foreground) 70%, transparent);
   transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.topnav a:hover {
+.topnav a:hover,
+.topnav a[aria-current="page"] {
   color: var(--foreground);
 }
 .cta {
@@ -176,13 +177,20 @@ header.site .bar {
   font-weight: 500;
   color: color-mix(in oklab, var(--foreground) 80%, transparent);
 }
-.mobilenav a:hover {
+.mobilenav a:hover,
+.mobilenav a[aria-current="page"] {
   background: var(--muted);
   color: var(--foreground);
 }
-@media (min-width: 768px) {
+/* 1152 not the main site's 768: our nav has a sixth link ("Deilbach Pegel"), which doesn't fit below. */
+@media (min-width: 1152px) {
   .topnav {
     display: flex;
+  }
+  .topnav a,
+  .brand,
+  .cta {
+    white-space: nowrap;
   }
   .cta {
     display: inline-flex;

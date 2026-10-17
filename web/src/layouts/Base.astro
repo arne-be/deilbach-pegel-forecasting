@@ -13,6 +13,7 @@ const site = "https://energiekonzepte-ruhr.de";
 const nav = [
   { href: `${site}/energieberatung`, label: "Energieberatung" },
   { href: `${site}/mieterstrom`, label: "Mieterstrom" },
+  { href: "/", label: "Deilbach Pegel", current: true },
   { href: `${site}/about`, label: "Team" },
   { href: `${site}/wissen`, label: "Wissen" },
   { href: `${site}/kontakt`, label: "Kontakt" },
@@ -41,6 +42,8 @@ const footerNav = [
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content={description} />
     <title>{title}</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preload" href="/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
   </head>
@@ -51,7 +54,7 @@ const footerNav = [
           <img src="/logo.jpg" alt="Energiekonzepte Ruhr" width="40" height="40" /><span>Energiekonzepte Ruhr</span>
         </a>
         <nav class="topnav" aria-label="Hauptmenü">
-          {nav.map((link) => <a href={link.href}>{link.label}</a>)}
+          {nav.map((link) => <a href={link.href} aria-current={link.current ? "page" : undefined}>{link.label}</a>)}
         </nav>
         <a class="cta" href={`${site}/kontakt`}>Kontakt aufnehmen</a>
         <button type="button" class="burger" id="burger" aria-label="Menü" aria-expanded="false" aria-controls="mobilenav">
@@ -63,7 +66,7 @@ const footerNav = [
       <nav class="mobilenav" id="mobilenav" aria-label="Menü" hidden>
         <div class="wrap">
           <a href={`${site}/`}>Home</a>
-          {nav.map((link) => <a href={link.href}>{link.label}</a>)}
+          {nav.map((link) => <a href={link.href} aria-current={link.current ? "page" : undefined}>{link.label}</a>)}
         </div>
       </nav>
     </header>
