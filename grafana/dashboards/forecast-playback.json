@@ -38,6 +38,22 @@
         "query": "SELECT model FROM forecasts GROUP BY model ORDER BY model = 'persistence', model"
       },
       {
+        "name": "lead",
+        "label": "Lead",
+        "type": "custom",
+        "multi": true,
+        "includeAll": true,
+        "query": "1,3,6,12,24",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
         "name": "forecast_id",
         "label": "Shown forecast",
         "type": "query",
@@ -83,6 +99,7 @@
       }
     ]
   },
+  "graphTooltip": 1,
   "panels": [
     {
       "id": 1,
@@ -343,8 +360,8 @@
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Fixed leads: what the model said 1, 3, 6, 12 and 24 h before",
-      "description": "Each line joins the forecasts made a fixed time before their valid time, next to the cleaned observed level. Short leads should hug the observed line; long leads show how early a rise was seen. Zoom out for a longer stretch.",
+      "title": "Fixed leads: what the model said the chosen hours before",
+      "description": "Each line joins the forecasts made a fixed time before their valid time, next to the cleaned observed level. Short leads should hug the observed line; long leads show how early a rise was seen. Pick leads with the 'Lead' variable; zoom out for a longer stretch.",
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "${datasource}"
@@ -385,6 +402,81 @@
                 "value": 2
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "1 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "dark-red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "3 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "6 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "12 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "24 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
           }
         ]
       },
@@ -418,8 +510,173 @@
           },
           "editorMode": "code",
           "rawQuery": true,
-          "format": "table",
-          "rawSql": "SELECT time,\n  max(value) FILTER (WHERE lead = 1) AS \"1 h ahead\",\n  max(value) FILTER (WHERE lead = 3) AS \"3 h ahead\",\n  max(value) FILTER (WHERE lead = 6) AS \"6 h ahead\",\n  max(value) FILTER (WHERE lead = 12) AS \"12 h ahead\",\n  max(value) FILTER (WHERE lead = 24) AS \"24 h ahead\"\nFROM (\n  -- one point per forecast and lead; persistence points don't sit on whole hours\n  SELECT DISTINCT ON (f.id, l.hours) p.valid_at AS time, l.hours AS lead, p.level_cm AS value\n  FROM forecasts f\n  JOIN forecast_points p ON p.forecast_id = f.id\n  CROSS JOIN LATERAL (SELECT round(extract(epoch FROM p.valid_at - f.issued_at) / 3600)::int AS hours) l\n  WHERE f.model = '${model}' AND l.hours IN (1, 3, 6, 12, 24)\n    AND f.issued_at BETWEEN $__timeFrom()::timestamptz - interval '25 hours' AND $__timeTo()\n    AND $__timeFilter(p.valid_at)\n  ORDER BY f.id, l.hours, abs(extract(epoch FROM p.valid_at - f.issued_at) - l.hours * 3600)\n) s\nGROUP BY time\nORDER BY time"
+          "format": "time_series",
+          "rawSql": "SELECT * FROM (\n  -- one point per forecast and lead; persistence points don't sit on whole hours\n  SELECT DISTINCT ON (f.id, l.hours) p.valid_at AS time, l.hours || ' h ahead' AS metric, p.level_cm AS value\n  FROM forecasts f\n  JOIN forecast_points p ON p.forecast_id = f.id\n  CROSS JOIN LATERAL (SELECT round(extract(epoch FROM p.valid_at - f.issued_at) / 3600)::int AS hours) l\n  WHERE f.model = '${model}' AND l.hours IN (${lead:csv})\n    AND f.issued_at BETWEEN $__timeFrom()::timestamptz - interval '25 hours' AND $__timeTo()\n    AND $__timeFilter(p.valid_at)\n  ORDER BY f.id, l.hours, abs(extract(epoch FROM p.valid_at - f.issued_at) - l.hours * 3600)\n) s\nORDER BY time"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Fixed leads: catchment rain, observed and forecast the chosen hours before",
+      "description": "Bars: radar rain per hour, mean over the catchment weighted by radar cells per zone, as the model uses it. Lines: the ICON-D2 catchment mean for the same hour from the newest run that was available that many hours before, so each lead shows the rain forecast the level forecast of the same lead could see.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "lengthmm",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "spanNulls": 10800000,
+            "showPoints": "never",
+            "lineInterpolation": "stepBefore",
+            "axisLabel": "rain per hour"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "observed radar"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "bars"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 60
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "1 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "dark-red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "3 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "6 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "12 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "24 h ahead"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "-- catchment mean weighted by radar cells per zone, as the model does (zone_cell_counts in curated.py)\n-- shortcut: cell counts copied from config/radolan_cells.json, update them if the zones change\nSELECT o.valid_at AS time, 'observed radar' AS metric, sum(o.value * w.cells) / sum(w.cells) AS value\nFROM observations o\nJOIN (VALUES ('radolan_rw:zone:neviges', 21), ('radolan_rw:zone:upper_deilbach', 41), ('radolan_rw:zone:felderbach', 25),\n  ('radolan_rw:zone:middle', 14), ('radolan_rw:zone:lower', 18)) AS w (series_id, cells) ON w.series_id = o.series_id\nWHERE $__timeFilter(o.valid_at)\nGROUP BY 1\nORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "-- per rain hour and lead: the newest ICON-D2 run that was available that many hours before\nSELECT h.t AS time, l.lead || ' h ahead' AS metric, r.value\nFROM generate_series(date_trunc('hour', $__timeFrom()::timestamptz), $__timeTo()::timestamptz, interval '1 hour') AS h (t)\nCROSS JOIN unnest(ARRAY[${lead:csv}]) AS l (lead)\nCROSS JOIN LATERAL (\n  SELECT value FROM input_forecasts\n  WHERE series_id = 'open_meteo_icon_d2:catchment:mean' AND valid_at = h.t\n    AND run_at >= h.t - interval '3 days' AND available_at <= h.t - l.lead * interval '1 hour'\n  ORDER BY run_at DESC\n  LIMIT 1\n) r\nORDER BY 1"
         }
       ]
     }
