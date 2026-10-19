@@ -216,7 +216,7 @@ export class SceneEngine {
     const L = this.shown;
     cut.clip = Number.NEGATIVE_INFINITY;
     let o = sandbags(this.bagT) + barriers(this.barT);
-    const parkUnder = L >= LEVELS.park;
+    const parkUnder = L > LEVELS.park;
     const parked = () =>
       car(60, 176, 230, "sc-car2") + car(60, 22, 76, "sc-car3") + parkSign();
     if (parkUnder) o += carPark() + parked();
