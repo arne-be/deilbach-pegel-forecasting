@@ -519,7 +519,7 @@
       "id": 3,
       "type": "timeseries",
       "title": "Fixed leads: catchment rain, observed and forecast the chosen hours before",
-      "description": "Bars: radar rain per hour, mean over the catchment weighted by radar cells per zone, as the model uses it. Lines: the ICON-D2 catchment mean for the same hour from the newest run that was available that many hours before, so each lead shows the rain forecast the level forecast of the same lead could see.",
+      "description": "Bars: radar rain per hour, mean over the catchment weighted by radar cells per zone, as the model uses it (shifted 10 minutes to the full hour). Lines: the ICON-D2 catchment mean for the same hour from the newest run available at least that many hours before the hour's end, roughly what the level forecast of the same lead could see (issue times are at :30).",
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "${datasource}"
@@ -554,6 +554,10 @@
               {
                 "id": "custom.drawStyle",
                 "value": "bars"
+              },
+              {
+                "id": "custom.barAlignment",
+                "value": -1
               },
               {
                 "id": "custom.fillOpacity",
@@ -665,7 +669,7 @@
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
-          "rawSql": "-- catchment mean weighted by radar cells per zone, as the model does (zone_cell_counts in curated.py)\n-- shortcut: cell counts copied from config/radolan_cells.json, update them if the zones change\nSELECT o.valid_at AS time, 'observed radar' AS metric, sum(o.value * w.cells) / sum(w.cells) AS value\nFROM observations o\nJOIN (VALUES ('radolan_rw:zone:neviges', 21), ('radolan_rw:zone:upper_deilbach', 41), ('radolan_rw:zone:felderbach', 25),\n  ('radolan_rw:zone:middle', 14), ('radolan_rw:zone:lower', 18)) AS w (series_id, cells) ON w.series_id = o.series_id\nWHERE $__timeFilter(o.valid_at)\nGROUP BY 1\nORDER BY 1"
+          "rawSql": "-- catchment mean weighted by radar cells per zone, as the model does (zone_cell_counts in curated.py)\n-- shortcut: cell counts copied from config/radolan_cells.json, update them if the zones change\n-- radar hours end at :50; moved to the full hour so they line up with the ICON-D2 hours\nSELECT date_trunc('hour', o.valid_at) + interval '1 hour' AS time, 'observed radar' AS metric, sum(o.value * w.cells) / sum(w.cells) AS value\nFROM observations o\nJOIN (VALUES ('radolan_rw:zone:neviges', 21), ('radolan_rw:zone:upper_deilbach', 41), ('radolan_rw:zone:felderbach', 25),\n  ('radolan_rw:zone:middle', 14), ('radolan_rw:zone:lower', 18)) AS w (series_id, cells) ON w.series_id = o.series_id\nWHERE $__timeFilter(o.valid_at)\nGROUP BY 1\nHAVING count(*) = 5  -- like the model, no mean for an hour with a zone missing\nORDER BY 1"
         },
         {
           "refId": "B",
@@ -676,7 +680,7 @@
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
-          "rawSql": "-- per rain hour and lead: the newest ICON-D2 run that was available that many hours before\nSELECT h.t AS time, l.lead || ' h ahead' AS metric, r.value\nFROM generate_series(date_trunc('hour', $__timeFrom()::timestamptz), $__timeTo()::timestamptz, interval '1 hour') AS h (t)\nCROSS JOIN unnest(ARRAY[${lead:csv}]) AS l (lead)\nCROSS JOIN LATERAL (\n  SELECT value FROM input_forecasts\n  WHERE series_id = 'open_meteo_icon_d2:catchment:mean' AND valid_at = h.t\n    AND run_at >= h.t - interval '3 days' AND available_at <= h.t - l.lead * interval '1 hour'\n  ORDER BY run_at DESC\n  LIMIT 1\n) r\nORDER BY 1"
+          "rawSql": "-- per rain hour and lead: the newest ICON-D2 run that was available that many hours before\nSELECT h.t AS time, l.lead || ' h ahead' AS metric, r.value\nFROM generate_series(date_trunc('hour', $__timeFrom()::timestamptz), $__timeTo()::timestamptz, interval '1 hour') AS h (t)\nCROSS JOIN unnest(ARRAY[${lead:csv}]) AS l (lead)\nCROSS JOIN LATERAL (\n  SELECT value FROM input_forecasts\n  WHERE series_id = 'open_meteo_icon_d2:catchment:mean' AND valid_at = h.t\n    AND run_at >= h.t - interval '3 days' AND run_at < h.t AND available_at <= h.t - l.lead * interval '1 hour'\n  ORDER BY run_at DESC\n  LIMIT 1\n) r\nORDER BY 1"
         }
       ]
     }
