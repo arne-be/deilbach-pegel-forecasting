@@ -52,29 +52,29 @@
       "number": 2,
       "name": "kritisch",
       "above_cm": 145,
-      "description": "Der Deilbach tritt am Parkplatz Kupferdreh über das Ufer.",
-      "actions": "Mobile Hochwasserbarrieren aufbauen."
+      "description": "",
+      "actions": "Pegel des Deilbachs live beobachten, Pumpe bereitstellen."
     },
     {
       "number": 3,
       "name": "sehr kritisch",
       "above_cm": 165,
-      "description": "Wasser geht über die Mauer.",
-      "actions": "Rückstauventil schließen, Pumpe anschließen, Sandsäcke auslegen."
+      "description": "Der Deilbach tritt am Parkplatz Kupferdreh über das Ufer.",
+      "actions": "Pumpe anschließen, mobile Hochwasserbarrieren aufbauen, Sandsäcke auslegen."
     },
     {
       "number": 4,
       "name": "extrem kritisch",
       "above_cm": 185,
-      "description": "Wasser geht über die Barrieren.",
-      "actions": "Die Sandsäcke halten das Wasser vom Haus fern."
+      "description": "Der Deilbach geht über die Mauer, die Barrieren halten ihn.",
+      "actions": "Evakuierung vorbereiten."
     },
     {
       "number": 5,
       "name": "Chaos",
       "above_cm": 225,
-      "description": "Wasser fließt ins Haus.",
-      "actions": "EG-Wohnung räumen, Strom abschalten."
+      "description": "Wasser geht über die Hochwasserbarrieren.",
+      "actions": "Alles evakuieren, Strom abschalten."
     }
   ],
   "site": {
