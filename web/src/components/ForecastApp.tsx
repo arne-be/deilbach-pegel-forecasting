@@ -104,7 +104,7 @@ function LegalLine({ portal }: { portal: boolean }) {
   );
 }
 
-/** `children` are the static sections ("So entsteht die Vorhersage", "Warum diese Vorhersage?"), placed above the legal line. */
+/** `children` are the static sections ("So entsteht die Vorhersage", "Warum die Vorhersage?"), placed above the legal line. */
 export default function ForecastApp({ children }: { children?: ReactNode }) {
   const [data, setData] = useState<Data | null>(null);
   const [failed, setFailed] = useState(false);
