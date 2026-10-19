@@ -1,0 +1,427 @@
+{
+  "uid": "deilbach-forecast-playback",
+  "title": "Forecast playback",
+  "description": "Past forecasts against what happened. Managed in git (grafana/dashboards/); edits in the UI are overwritten on the next deploy.",
+  "tags": [
+    "deilbach-pegel"
+  ],
+  "timezone": "Europe/Berlin",
+  "refresh": "",
+  "time": {
+    "from": "now-24h",
+    "to": "now+24h"
+  },
+  "editable": true,
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Data source",
+        "type": "datasource",
+        "query": "grafana-postgresql-datasource",
+        "hide": 2,
+        "current": {}
+      },
+      {
+        "name": "model",
+        "label": "Model",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "${datasource}"
+        },
+        "refresh": 1,
+        "sort": 0,
+        "current": {},
+        "definition": "SELECT model FROM forecasts GROUP BY model ORDER BY model = 'persistence', model",
+        "query": "SELECT model FROM forecasts GROUP BY model ORDER BY model = 'persistence', model"
+      },
+      {
+        "name": "forecast_id",
+        "label": "Shown forecast",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "${datasource}"
+        },
+        "refresh": 2,
+        "sort": 0,
+        "current": {},
+        "definition": "SELECT id AS __value, coalesce(to_char(issued_at AT TIME ZONE 'Europe/Berlin', 'DD.MM.YYYY HH24:MI'), 'none') AS __text\nFROM (\n  SELECT id, issued_at FROM forecasts WHERE model = '${model}' AND issued_at <= $__timeFrom()::timestamptz + ($__timeTo()::timestamptz - $__timeFrom()::timestamptz) / 2\n  UNION ALL SELECT -1, NULL\n) f\nORDER BY issued_at DESC NULLS LAST\nLIMIT 1",
+        "query": "SELECT id AS __value, coalesce(to_char(issued_at AT TIME ZONE 'Europe/Berlin', 'DD.MM.YYYY HH24:MI'), 'none') AS __text\nFROM (\n  SELECT id, issued_at FROM forecasts WHERE model = '${model}' AND issued_at <= $__timeFrom()::timestamptz + ($__timeTo()::timestamptz - $__timeFrom()::timestamptz) / 2\n  UNION ALL SELECT -1, NULL\n) f\nORDER BY issued_at DESC NULLS LAST\nLIMIT 1"
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Shown forecast",
+        "enable": true,
+        "iconColor": "orange",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "${datasource}"
+        },
+        "filter": {
+          "exclude": false,
+          "ids": [
+            1
+          ]
+        },
+        "target": {
+          "refId": "Anno",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT issued_at AS time, 'issued' AS text FROM forecasts WHERE id = ${forecast_id}\nUNION ALL\nSELECT newest_observation_at, 'newest observation used' FROM forecasts WHERE id = ${forecast_id}"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Playback: newest forecast at the middle of the time range",
+      "description": "The newest forecast of the chosen model issued before the middle of the time range, with its bands, and the cleaned level observed around it. Step through time with the time picker's shift arrows (half a range per click) or by zooming; the variable 'Shown forecast' names its issue time. The vertical markers are its issue time and its newest observation.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "lengthcm",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "spanNulls": 10800000,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "95 % upper"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "95 % lower"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 8
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "95 % lower"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "90 % upper"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "90 % lower"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 12
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "90 % lower"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "80 % upper"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "80 % lower"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 18
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "80 % lower"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "observed (cleaned)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT o.valid_at AS time, 'observed (cleaned)' AS metric, o.value\nFROM observations o\nWHERE o.series_id = (SELECT station_id || ':cleaned_kalman' FROM forecasts WHERE id = ${forecast_id})\n  AND $__timeFilter(o.valid_at)\nORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT p.valid_at AS time, 'forecast:' || f.model || coalesce(' (' || f.situation || ')', '') AS metric, p.level_cm AS value\nFROM forecast_points p\nJOIN forecasts f ON f.id = p.forecast_id\nWHERE f.id = ${forecast_id}\nORDER BY 1"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT b.valid_at AS time, b.coverage_percent || ' % ' || edge.name AS metric, edge.value\nFROM forecast_bands b\nCROSS JOIN LATERAL (VALUES ('lower', b.lower_cm), ('upper', b.upper_cm)) AS edge (name, value)\nWHERE b.forecast_id = ${forecast_id}\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Fixed leads: what the model said 1, 3, 6, 12 and 24 h before",
+      "description": "Each line joins the forecasts made a fixed time before their valid time, next to the cleaned observed level. Short leads should hug the observed line; long leads show how early a rise was seen. Zoom out for a longer stretch.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 12
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "lengthcm",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "spanNulls": 10800000,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "observed (cleaned)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT o.valid_at AS time, 'observed (cleaned)' AS metric, o.value\nFROM observations o\nWHERE o.series_id IN (SELECT DISTINCT station_id || ':cleaned_kalman' FROM forecasts WHERE model = '${model}')\n  AND $__timeFilter(o.valid_at)\nORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT time,\n  max(value) FILTER (WHERE lead = 1) AS \"1 h ahead\",\n  max(value) FILTER (WHERE lead = 3) AS \"3 h ahead\",\n  max(value) FILTER (WHERE lead = 6) AS \"6 h ahead\",\n  max(value) FILTER (WHERE lead = 12) AS \"12 h ahead\",\n  max(value) FILTER (WHERE lead = 24) AS \"24 h ahead\"\nFROM (\n  -- one point per forecast and lead; persistence points don't sit on whole hours\n  SELECT DISTINCT ON (f.id, l.hours) p.valid_at AS time, l.hours AS lead, p.level_cm AS value\n  FROM forecasts f\n  JOIN forecast_points p ON p.forecast_id = f.id\n  CROSS JOIN LATERAL (SELECT round(extract(epoch FROM p.valid_at - f.issued_at) / 3600)::int AS hours) l\n  WHERE f.model = '${model}' AND l.hours IN (1, 3, 6, 12, 24)\n    AND f.issued_at BETWEEN $__timeFrom()::timestamptz - interval '25 hours' AND $__timeTo()\n    AND $__timeFilter(p.valid_at)\n  ORDER BY f.id, l.hours, abs(extract(epoch FROM p.valid_at - f.issued_at) - l.hours * 3600)\n) s\nGROUP BY time\nORDER BY time"
+        }
+      ]
+    }
+  ]
+}
