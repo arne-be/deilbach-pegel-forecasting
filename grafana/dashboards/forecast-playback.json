@@ -314,7 +314,7 @@
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
-          "rawSql": "SELECT o.valid_at AS time, 'observed (cleaned)' AS metric, o.value\nFROM observations o\nWHERE o.series_id = (SELECT station_id || ':cleaned_kalman' FROM forecasts WHERE id = ${forecast_id})\n  AND $__timeFilter(o.valid_at)\nORDER BY 1"
+          "rawSql": "SELECT o.valid_at AS time, 'observed (cleaned)' AS metric, o.value\nFROM observations o\nWHERE o.series_id IN (SELECT DISTINCT station_id || ':cleaned_kalman' FROM forecasts WHERE model = '${model}')\n  AND $__timeFilter(o.valid_at)\nORDER BY 1"
         },
         {
           "refId": "B",
