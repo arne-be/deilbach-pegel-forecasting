@@ -2,14 +2,16 @@ import { describe, expect, it } from "vitest";
 import { LEVELS, THRESHOLDS } from "./geometry";
 import { muddiness, water } from "./water";
 
-const [cat2 = 0, cat3 = 0, cat4 = 0, cat5 = 0] = THRESHOLDS;
+const [, cat3 = 0, cat4 = 0, cat5 = 0] = THRESHOLDS;
 
 describe("scene", () => {
   it("takes its heights from the category thresholds", () => {
     expect(LEVELS).toMatchObject({
-      park: cat2,
-      wall: cat3,
-      barrierTop: cat4,
+      park: cat3,
+      wall: cat4,
+      barriersUp: cat3,
+      sandbags: cat3,
+      barrierTop: cat5,
       bagTop: cat5,
       floor: cat5,
     });

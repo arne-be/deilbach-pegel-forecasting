@@ -36,10 +36,10 @@ const SKIP_PERIOD = 10000;
 const SKIP_TRAVEL = 7000;
 const WHAT = [
   "Das Wasser bleibt im Bachbett.",
-  "Der Parkplatz ist überschwemmt, die mobilen Barrieren stehen.",
-  "Das Wasser geht über die Mauer, die Barrieren halten es, Sandsäcke liegen um das Haus.",
-  "Das Wasser geht über die Barrieren in den Hof, die Sandsäcke halten das Haus trocken.",
-  "Das Wasser geht über die Sandsäcke und steht am Haus.",
+  "Das Wasser steigt, bleibt aber im Bachbett.",
+  "Der Parkplatz ist überschwemmt, die mobilen Barrieren stehen, Sandsäcke liegen um das Haus.",
+  "Das Wasser geht über die Mauer, die Barrieren halten es.",
+  "Das Wasser geht über die Barrieren und steht am Haus.",
 ];
 
 const categoryIndex = (L: number): number =>

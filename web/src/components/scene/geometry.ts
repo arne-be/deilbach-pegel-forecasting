@@ -12,16 +12,17 @@ if (THRESHOLDS.length !== 4) {
     `The scene draws 5 categories, config has ${categories.length}`,
   );
 }
-const [cat2, cat3, cat4, cat5] = THRESHOLDS as [number, number, number, number];
+const [, cat3, cat4, cat5] = THRESHOLDS as [number, number, number, number];
 
-// The categories are defined by the site, so its heights follow them: the car park floods above category 2,
-// the wall tops out at category 3, barriers hold to category 4, sandbags and the house floor sit at category 5.
+// The categories are defined by the site, so its heights follow them: from category 3 the car park floods,
+// the barriers go up and the sandbags are laid; the wall tops out at category 4; barriers, sandbags and the
+// house floor sit at category 5.
 export const LEVELS = {
-  park: cat2,
-  wall: cat3,
-  barriersUp: cat2,
+  park: cat3,
+  wall: cat4,
+  barriersUp: cat3,
   sandbags: cat3,
-  barrierTop: cat4,
+  barrierTop: cat5,
   bagTop: cat5,
   floor: cat5,
   muddy: cat5,
@@ -208,7 +209,7 @@ export const VB_WIDE = bbox(
   ],
   14,
 );
-// From the front car and the P sign on the car park (category 2) to the house front, its right side trimmed.
+// From the front car and the P sign on the car park (category 3) to the house front, its right side trimmed.
 export const VB_NARROW = (() => {
   const x0 = pt(50, 90, 0)[0];
   const x1 = pt(705, HOUSE.v0, 0)[0];
