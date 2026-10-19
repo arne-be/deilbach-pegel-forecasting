@@ -1,6 +1,5 @@
 // The water at a level and the skip container that drifts on it in category 5.
 import {
-  BAGS,
   BAR_U,
   BED_U,
   CB,
@@ -25,18 +24,12 @@ import {
 
 /** Left edge of the water: the river bank, then the whole car park. */
 const uLeft = (L: number): number =>
-  L >= LEVELS.park
+  L > LEVELS.park
     ? 0
     : PARK_U + ((BED_U - PARK_U) * (LEVELS.park - L)) / LEVELS.park;
-/** Right edge of the water: the wall, then the barriers, then the sandbags, then the house. */
+/** Right edge of the water: the wall, then the barriers, then the house. */
 const uRight = (L: number): number =>
-  L <= LEVELS.wall
-    ? WALL_U0
-    : L <= LEVELS.barrierTop
-      ? BAR_U
-      : L <= LEVELS.bagTop
-        ? BAGS.u0
-        : HOUSE.u0;
+  L <= LEVELS.wall ? WALL_U0 : L <= LEVELS.barrierTop ? BAR_U : HOUSE.u0;
 
 /** Flood water turns muddy brown across the category 5 threshold (0 clear, 1 brown). */
 export const muddiness = (L: number): number => {
@@ -56,8 +49,8 @@ export function water(L: number, stale: boolean): string {
     [uR, LV, L],
     [uL, LV, L],
   ];
-  // Over the barriers the yard floods up to the sandbags (the strip in front of them too); over the bags, up to the house.
-  const frontV = L > LEVELS.bagTop ? HOUSE.v0 : BAGS.v0;
+  // Over the barriers the yard floods up to the house; the sandbags stop no water of their own.
+  const frontV = HOUSE.v0;
   const yard: P3[] | null =
     L > LEVELS.barrierTop
       ? [

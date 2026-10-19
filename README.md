@@ -49,10 +49,12 @@ Levels are relative to the local zero point, 45 cm below the concrete ledge of t
 | Category | Level | What happens |
 |---|---|---|
 | 1 · unkritisch | up to 145 cm | No action needed. |
-| 2 · kritisch | 145–165 cm | From 165 cm: close the backflow valve and connect the pump. The Deilbach overflows at the Kupferdreh car park. |
-| 3 · sehr kritisch | 165–185 cm | From 185 cm water goes over the wall. Set up mobile flood barriers. |
-| 4 · extrem kritisch | 185–225 cm | Barriers and raised wall keep water out of the yard. Lay sandbags in the yard. |
-| 5 · Chaos | above 225 cm | Water flows into the yard. Clear the ground floor flat, switch off power. |
+| 2 · kritisch | 145–165 cm | Watch the Deilbach level live, get the pump ready. |
+| 3 · sehr kritisch | 165–185 cm | The Deilbach overflows at the Kupferdreh car park. Connect the pump, set up the mobile flood barriers and lay sandbags. |
+| 4 · extrem kritisch | 185–225 cm | The Deilbach goes over the wall and the barriers hold it. Prepare the evacuation. |
+| 5 · Chaos | above 225 cm | Water goes over the flood barriers. Evacuate everything, switch off power. |
+
+Each action applies from the start of its category.
 
 ## Plan (first version, one week)
 
