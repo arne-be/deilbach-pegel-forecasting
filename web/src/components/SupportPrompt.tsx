@@ -70,6 +70,7 @@ export default function SupportPrompt({
   const memory = useRef<SupportMemory | null>(null);
   // Set once when the prompt is due; the dialog opens after it rendered with the count.
   const [visits, setVisits] = useState<number | null>(null);
+  const closedByPage = useRef(false);
 
   useEffect(() => {
     const stored = loadMemory();
@@ -81,16 +82,20 @@ export default function SupportPrompt({
 
   useEffect(() => {
     const current = memory.current;
-    if (visits !== null || !current) return;
-    const ask = shouldPrompt(
+    if (!current) return;
+    const due = shouldPrompt(
       current,
       support.prompt_after_visits,
       state,
       categoryNumber,
       Date.now(),
     );
-    if (!ask) return;
-    setVisits(current.visits);
+    if (visits === null && due) setVisits(current.visits);
+    // A refetch turned stale or brought a flood: step aside, but it isn't the visitor's "Später".
+    if (visits !== null && !due && dialog.current?.open) {
+      closedByPage.current = true;
+      dialog.current.close();
+    }
   }, [state, categoryNumber, visits]);
 
   useEffect(() => {
@@ -110,7 +115,10 @@ export default function SupportPrompt({
       ref={dialog}
       className="support-dialog support-prompt"
       aria-labelledby="support-prompt-title"
-      onClose={() => remember({ dismissedMs: Date.now() })}
+      onClose={() => {
+        if (closedByPage.current) closedByPage.current = false;
+        else remember({ dismissedMs: Date.now() });
+      }}
       onClick={closeOnBackdrop}
     >
       <form method="dialog" className="support-card">
