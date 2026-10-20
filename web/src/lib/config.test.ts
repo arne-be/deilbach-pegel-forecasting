@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { fixtures } from "../fixtures";
-import { categories, freshness, historyHours, scaleTopCm } from "./config";
+import {
+  categories,
+  freshness,
+  historyHours,
+  scaleTopCm,
+  support,
+  supportReady,
+} from "./config";
 
 describe("config", () => {
   it("reads categories with ascending bounds below the scale top", () => {
@@ -19,6 +26,16 @@ describe("config", () => {
   it("reads freshness and site settings", () => {
     expect(freshness.observation_max_age_minutes).toBe(90);
     expect(historyHours).toBe(24);
+  });
+
+  it("reads the support offer, hidden until every link is set", () => {
+    expect(support.tiers.map((tier) => tier.id)).toEqual([
+      "zentimeter",
+      "dezimeter",
+      "meter",
+    ]);
+    expect(support.custom_url).toBeNull();
+    expect(supportReady).toBe(false);
   });
 });
 

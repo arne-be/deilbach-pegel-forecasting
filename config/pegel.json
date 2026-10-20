@@ -79,7 +79,21 @@
   ],
   "site": {
     "history_hours": 24,
-    "scale_top_cm": 250
+    "scale_top_cm": 250,
+    "support": {
+      "tiers": [
+        { "id": "zentimeter", "name": "Zentimeter", "eur_per_month": 2, "description": "Klein, aber jeden Monat da.", "url": null },
+        { "id": "dezimeter", "name": "Dezimeter", "eur_per_month": 5, "description": "Trägt einen guten Teil der Kosten.", "url": null },
+        { "id": "meter", "name": "Meter", "eur_per_month": 10, "description": "Für alle, die direkt am Bach wohnen.", "url": null }
+      ],
+      "one_off": [
+        { "eur": 5, "url": null },
+        { "eur": 10, "url": null },
+        { "eur": 20, "url": null }
+      ],
+      "custom_url": null,
+      "prompt_after_visits": 5
+    }
   },
   "cleaning": {
     "gate_sigmas": 4,
