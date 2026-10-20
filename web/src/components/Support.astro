@@ -1,0 +1,350 @@
+---
+// "Unterstützer werden": monthly tiers and one-off amounts as Stripe Payment Links.
+// The Monatlich/Einmalig switch is two radios and CSS, no JavaScript.
+import { support } from "../lib/config";
+
+// Staff is 148 units tall inside a 1-unit border; tier i of n fills (i + 1) / n of it.
+const fillHeight = (index: number) =>
+  (148 * (index + 1)) / support.tiers.length;
+// The middle tier is the highlighted one.
+const featured = Math.floor(support.tiers.length / 2);
+---
+
+<section class="support" id="unterstuetzen" aria-labelledby="support-title">
+  <div class="head">
+    <div>
+      <p class="eyebrow">Unterstützer werden</p>
+      <h2 id="support-title">Jeder Zentimeter zählt.</h2>
+      <p class="lead">
+        Die Vorhersage ist kostenlos und ohne Werbung. Mit einem monatlichen Beitrag tragen Sie Pegel, Daten und Server mit.
+      </p>
+    </div>
+    <fieldset class="switch">
+      <legend class="sr">Zahlungsart</legend>
+      <input class="sr" type="radio" name="support-mode" id="support-monthly" checked />
+      <label for="support-monthly">Monatlich</label>
+      <input class="sr" type="radio" name="support-mode" id="support-once" />
+      <label for="support-once">Einmalig</label>
+    </fieldset>
+  </div>
+
+  <div class="tiers">
+    {
+      support.tiers.map((tier, index) => (
+        <a class:list={["tier", { featured: index === featured }]} href={tier.url}>
+          <svg class="staff" viewBox="0 0 28 150" preserveAspectRatio="none" aria-hidden="true">
+            <rect class="empty" x="1" y="1" width="26" height="148" rx="4" />
+            <rect class="water" x="1" y={149 - fillHeight(index)} width="26" height={fillHeight(index)} rx="4" />
+            <path d="M1 25h12M1 50h18M1 75h12M1 100h18M1 125h12" vector-effect="non-scaling-stroke" />
+          </svg>
+          <span class="name">{tier.name}</span>
+          <span class="price">
+            {tier.eur_per_month}&nbsp;€ <small>/ Monat</small>
+          </span>
+          <span class="desc">{tier.description}</span>
+          <span class="go" aria-hidden="true">{tier.name} wählen</span>
+        </a>
+      ))
+    }
+  </div>
+
+  <div class="once">
+    {support.one_off.map((amount) => <a class="amount" href={amount.url}>{amount.eur}&nbsp;€</a>)}
+    <a class="amount other" href={support.custom_url}>Anderer Betrag</a>
+  </div>
+
+  <p class="fine">Sicher über Stripe · Karte, Apple Pay, Google Pay, PayPal · monatlich jederzeit kündbar</p>
+</section>
+
+<style>
+  .support {
+    --panel-text: var(--brand-foreground);
+    --panel-soft: color-mix(in oklab, var(--brand-foreground) 85%, transparent);
+    --raised: color-mix(in oklab, var(--brand-foreground) 7%, var(--brand-deep));
+    --raised-border: color-mix(in oklab, var(--brand-foreground) 16%, var(--brand-deep));
+    --water: oklch(62% 0.1 232);
+    margin: 64px 0 0;
+    background: var(--brand-deep);
+    color: var(--panel-text);
+    border-radius: 20px;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .eyebrow {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+  h2 {
+    margin: 0 0 10px;
+    font:
+      600 28px / 1.1 "Space Grotesk",
+      system-ui,
+      sans-serif;
+    letter-spacing: -0.015em;
+  }
+  .lead {
+    margin: 0;
+    max-width: 54ch;
+    color: var(--panel-soft);
+  }
+
+  /* Switch: the radios stay in the tab order; the labels are the visible buttons. */
+  .switch {
+    position: relative;
+    margin: 0;
+    border: 0;
+    padding: 4px;
+    border-radius: 9999px;
+    background: color-mix(in oklab, black 20%, var(--brand-deep));
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .switch label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 22px;
+    border-radius: 9999px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--panel-soft);
+    cursor: pointer;
+  }
+  .switch input:checked + label {
+    background: var(--brand-foreground);
+    color: var(--brand-deep);
+  }
+  /* High contrast mode drops the background, so mark the chosen option with an outline. */
+  @media (forced-colors: active) {
+    .switch input:checked + label {
+      outline: 2px solid CanvasText;
+    }
+  }
+  .switch input:focus-visible + label,
+  .support a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .once {
+    display: none;
+  }
+  .support:has(#support-once:checked) .tiers {
+    display: none;
+  }
+  .support:has(#support-once:checked) .once {
+    display: grid;
+  }
+
+  /* Tiers: tappable rows on the phone, cards from 768 px. */
+  .tiers {
+    display: grid;
+    gap: 10px;
+  }
+  .tier {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "staff name price"
+      "staff desc price";
+    align-items: center;
+    column-gap: 14px;
+    min-height: 76px;
+    padding: 10px 16px;
+    border-radius: 14px;
+    background: var(--raised);
+    border: 1px solid var(--raised-border);
+  }
+  .tier.featured {
+    background: var(--brand-foreground);
+    border-color: var(--brand-foreground);
+    color: var(--brand-deep);
+  }
+  .staff {
+    grid-area: staff;
+    width: 16px;
+    height: 56px;
+  }
+  .staff .empty {
+    fill: var(--brand-foreground);
+  }
+  .featured .staff .empty {
+    fill: color-mix(in oklab, var(--brand-deep) 10%, var(--brand-foreground));
+  }
+  .staff .water {
+    fill: var(--water);
+  }
+  .staff path {
+    display: none;
+    stroke: var(--brand-deep);
+    stroke-width: 2;
+  }
+  .name {
+    grid-area: name;
+    align-self: end;
+    font:
+      600 17px / 1.2 "Space Grotesk",
+      system-ui,
+      sans-serif;
+  }
+  .desc {
+    grid-area: desc;
+    align-self: start;
+    font-size: 13px;
+    opacity: 0.85;
+  }
+  .price {
+    grid-area: price;
+    font:
+      600 22px / 1 "Space Grotesk",
+      system-ui,
+      sans-serif;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    text-align: right;
+  }
+  /* Below the amount on the phone, so a long tier name still fits at 320 px. */
+  .price small {
+    display: block;
+    margin-top: 4px;
+    font:
+      500 12px / 1 Manrope,
+      system-ui,
+      sans-serif;
+    letter-spacing: 0;
+    opacity: 0.85;
+  }
+  .go {
+    display: none;
+    grid-area: go;
+    justify-self: start;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 700;
+    border: 1.5px solid var(--panel-soft);
+  }
+  .featured .go {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  .once {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .amount {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60px;
+    border-radius: 14px;
+    border: 1.5px solid var(--raised-border);
+    background: var(--raised);
+    font:
+      600 20px / 1 "Space Grotesk",
+      system-ui,
+      sans-serif;
+  }
+  .amount.other {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-foreground);
+    font:
+      600 15px / 1 Manrope,
+      system-ui,
+      sans-serif;
+  }
+  .fine {
+    margin: 0;
+    font-size: 13px;
+    color: var(--panel-soft);
+  }
+
+  @media (min-width: 768px) {
+    .support {
+      border-radius: 24px;
+      padding: 40px;
+      gap: 28px;
+    }
+    .head {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 32px;
+    }
+    h2 {
+      font-size: 34px;
+    }
+    .switch {
+      flex-shrink: 0;
+    }
+    .tiers {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .tier {
+      grid-template-columns: 28px minmax(0, 1fr);
+      grid-template-areas:
+        "staff name"
+        "staff price"
+        "staff desc"
+        "staff go";
+      align-items: start;
+      column-gap: 20px;
+      padding: 24px;
+      border-radius: 16px;
+    }
+    .staff {
+      width: 28px;
+      height: 150px;
+    }
+    .staff path {
+      display: inline;
+    }
+    .name {
+      font-size: 19px;
+    }
+    .price {
+      font-size: 36px;
+      margin: 10px 0 6px;
+      text-align: left;
+    }
+    .price small {
+      display: inline;
+      font-size: 14px;
+    }
+    .desc {
+      font-size: 14px;
+      margin: 0 0 16px;
+    }
+    .go {
+      display: inline-flex;
+    }
+    .once {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .amount {
+      min-height: 64px;
+      font-size: 22px;
+    }
+    .amount.other {
+      font-size: 16px;
+    }
+  }
+</style>

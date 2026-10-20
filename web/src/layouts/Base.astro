@@ -2,6 +2,7 @@
 // Page shell: header and footer mirror energiekonzepte-ruhr.de, links absolute to the main site.
 import "../styles/tokens.css";
 import "../styles/global.css";
+import { supportReady } from "../lib/config";
 
 interface Props {
   title: string;
@@ -32,6 +33,9 @@ const footerNav = [
   { href: `${site}/about`, label: "Team" },
   { href: `${site}/kontakt`, label: "Kontakt" },
   { href: `${site}/impressum`, label: "Impressum" },
+  ...(supportReady
+    ? [{ href: "/#unterstuetzen", label: "Vorhersage unterstützen" }]
+    : []),
 ];
 ---
 
