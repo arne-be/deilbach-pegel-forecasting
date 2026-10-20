@@ -9,6 +9,7 @@ import {
   shouldPrompt,
 } from "../lib/support";
 import "./Support.css";
+import "./SupportPrompt.css";
 
 const STORAGE_KEY = "deilbach-pegel:support";
 

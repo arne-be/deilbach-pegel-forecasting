@@ -10,6 +10,7 @@ import {
   saveMemory,
 } from "./SupportPrompt";
 import "./Support.css";
+import "./SupportThanks.css";
 
 const CONFETTI_COLOURS = [
   "var(--accent)",
