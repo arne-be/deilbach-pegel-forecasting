@@ -85,8 +85,10 @@ export default function SupportThanks() {
         <h2 id="support-thanks-title">Danke!</h2>
         <p className="support-lead">Sie halten die Vorhersage am Laufen.</p>
         <p className="support-text">
-          Die Quittung kommt per E-Mail von Stripe. Über den Link darin können
-          Sie jederzeit ändern oder kündigen.
+          Die Quittung kommt per E-Mail von Stripe.
+          {/* A one-off gift has nothing to change or cancel. */}
+          {tier &&
+            " Über den Link darin können Sie jederzeit ändern oder kündigen."}
         </p>
         <button type="submit" className="support-back">
           Zur Vorhersage
