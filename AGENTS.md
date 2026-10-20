@@ -51,7 +51,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Forecast and recent history published to S3 (`api/forecast.json`, `api/recent.json`) by the hourly run, read by the API with Neon fallback: `src/pegel/api/responses.py`, `src/pegel/adapters/api_files.py`, `src/pegel/jobs/publish.py`
 - API on Lambda behind CloudFront `/api/*`: `Dockerfile` (api target), `infra/prod/api.tf`, `infra/prod/website.tf`, `.github/workflows/infra.yml`
 - Website on S3 + CloudFront on `deilbach-pegel.energiekonzepte-ruhr.de`, built and synced by the deploy job: `web/`, `infra/prod/website.tf`, `.github/workflows/web.yml`, `docs/setup-domain.md`. The forecast page: verdict, level now, site scene, chart with hover, category cards, freshness and fallback states, `?fixture=<name>[&hover=<iso>]` for screenshots: `web/src/pages/index.astro`, `web/src/components/` (`ForecastApp.tsx` is the one island), `web/src/lib/` (forecast logic, formatting, config, API types), `web/src/fixtures/`
-- Support offer (monthly tiers and one-off amounts as Stripe Payment Links in `site.support`, hidden until every link is set), the support section, the prompt from the fifth visit and the thank-you after Stripe: `config/pegel.json`, `web/src/lib/config.ts`, `web/src/components/Support.astro`, `web/src/lib/support.ts`, `web/src/components/SupportPrompt.tsx`, `SupportThanks.tsx`, `docs/setup-stripe.md`
+- Support offer (monthly tiers and one-off amounts as Stripe Payment Links in `site.support`, hidden until every link is set): `config/pegel.json`, `src/pegel/config.py`, `web/src/lib/config.ts`
 - Agreed mockup of the forecast page (self-contained HTML with sample data): `docs/website/`
 
 ## Layout

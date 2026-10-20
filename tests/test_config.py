@@ -26,6 +26,20 @@ def test_a_support_link_must_be_a_stripe_payment_link(tmp_path: Path) -> None:
         load_config(_config_with(tmp_path / "pegel.json", site=site))
 
 
+def test_a_stripe_test_mode_link_is_rejected(tmp_path: Path) -> None:
+    site = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))["site"]
+    site["support"]["custom_url"] = "https://buy.stripe.com/test_abc"
+    with pytest.raises(ValidationError, match="test-mode"):
+        load_config(_config_with(tmp_path / "pegel.json", site=site))
+
+
+def test_support_tier_ids_must_be_unique(tmp_path: Path) -> None:
+    site = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))["site"]
+    site["support"]["tiers"][1]["id"] = site["support"]["tiers"][0]["id"]
+    with pytest.raises(ValidationError, match="unique"):
+        load_config(_config_with(tmp_path / "pegel.json", site=site))
+
+
 def test_descending_category_bounds_are_rejected(tmp_path: Path) -> None:
     texts = {"description": "d", "actions": "a"}
     categories = [

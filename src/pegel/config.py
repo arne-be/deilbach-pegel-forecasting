@@ -66,6 +66,9 @@ def _check_stripe_link(url: str | None) -> str | None:
     # The page links visitors to these to pay, so only Stripe Payment Links get through.
     if url is not None and not url.startswith(STRIPE_LINK_PREFIX):
         raise ValueError(f"support links must start with {STRIPE_LINK_PREFIX}")
+    # A test-mode link opens a checkout that takes no money.
+    if url is not None and url.startswith(STRIPE_LINK_PREFIX + "test_"):
+        raise ValueError("support links must not be Stripe test-mode links")
     return url
 
 
@@ -93,14 +96,21 @@ class SupportAmount(_Frozen):
 class SupportSettings(_Frozen):
     """The support offer. The page shows none of it until every link is set."""
 
-    tiers: tuple[SupportTier, ...]
-    one_off: tuple[SupportAmount, ...]
+    tiers: tuple[SupportTier, ...] = Field(min_length=1)
+    one_off: tuple[SupportAmount, ...] = Field(min_length=1)
     # Stripe Payment Link where the visitor picks the amount.
     custom_url: str | None = None
     # The support prompt shows from this visit on; null turns it off.
     prompt_after_visits: int | None = Field(default=None, gt=0)
 
     _check_url = field_validator("custom_url")(_check_stripe_link)
+
+    @model_validator(mode="after")
+    def _check_tier_ids(self) -> "SupportSettings":
+        # Ids go into the thank-you link (?danke=<id>), so each must name one tier.
+        if len({tier.id for tier in self.tiers}) != len(self.tiers):
+            raise ValueError("support tier ids must be unique")
+        return self
 
 
 class SiteSettings(_Frozen):
