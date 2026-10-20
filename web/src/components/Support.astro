@@ -42,7 +42,7 @@ const featured = Math.floor(support.tiers.length / 2);
             {tier.eur_per_month}&nbsp;€ <small>/ Monat</small>
           </span>
           <span class="desc">{tier.description}</span>
-          <span class="go">{tier.name} wählen</span>
+          <span class="go" aria-hidden="true">{tier.name} wählen</span>
         </a>
       ))
     }
@@ -126,6 +126,12 @@ const featured = Math.floor(support.tiers.length / 2);
     background: var(--brand-foreground);
     color: var(--brand-deep);
   }
+  /* High contrast mode drops the background, so mark the chosen option with an outline. */
+  @media (forced-colors: active) {
+    .switch input:checked + label {
+      outline: 2px solid CanvasText;
+    }
+  }
   .switch input:focus-visible + label,
   .support a:focus-visible {
     outline: 2px solid var(--accent);
@@ -206,8 +212,6 @@ const featured = Math.floor(support.tiers.length / 2);
       sans-serif;
     letter-spacing: -0.02em;
     white-space: nowrap;
-  }
-  .price {
     text-align: right;
   }
   /* Below the amount on the phone, so a long tier name still fits at 320 px. */
@@ -318,8 +322,6 @@ const featured = Math.floor(support.tiers.length / 2);
     .price {
       font-size: 36px;
       margin: 10px 0 6px;
-    }
-    .price {
       text-align: left;
     }
     .price small {
