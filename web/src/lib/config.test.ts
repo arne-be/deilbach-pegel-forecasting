@@ -28,14 +28,13 @@ describe("config", () => {
     expect(historyHours).toBe(24);
   });
 
-  it("reads the support offer, hidden until every link is set", () => {
+  it("reads the support offer with every link set", () => {
     expect(support.tiers.map((tier) => tier.id)).toEqual([
       "zentimeter",
       "dezimeter",
       "meter",
     ]);
-    expect(support.custom_url).toBeNull();
-    expect(supportReady).toBe(false);
+    expect(supportReady).toBe(true);
   });
 });
 
