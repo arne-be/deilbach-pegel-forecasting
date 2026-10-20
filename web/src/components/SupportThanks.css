@@ -1,0 +1,143 @@
+/* Thank-you card after Stripe (option C): badge, tier chip, one round of confetti. Shell: Support.css. */
+.support-thanks .support-card {
+  width: 520px;
+  padding: 44px 40px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.support-badge {
+  width: 96px;
+  height: 96px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to top,
+    var(--support-water) 62%,
+    var(--support-text) 62%
+  );
+}
+.support-badge svg {
+  width: 100%;
+  height: 100%;
+}
+.support-badge path {
+  fill: none;
+  stroke: var(--support-text);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.support-chip {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: var(--support-row);
+  color: var(--support-eyebrow);
+}
+.support-thanks h2 {
+  font-size: 52px;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+.support-lead {
+  font-size: 18px;
+}
+.support-thanks .support-text {
+  max-width: 40ch;
+  color: oklch(85% 0.01 215);
+}
+.support-back {
+  min-height: 52px;
+  padding: 0 32px;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font:
+    700 15px / 1 Manrope,
+    sans-serif;
+  cursor: pointer;
+}
+.support-note {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--support-quiet);
+}
+@media (max-width: 639px) {
+  .support-thanks .support-card {
+    width: 100%;
+    padding: 36px 24px 28px;
+    gap: 14px;
+  }
+  .support-thanks .support-close {
+    top: 8px;
+    right: 8px;
+  }
+  .support-badge {
+    width: 80px;
+    height: 80px;
+  }
+  .support-thanks h2 {
+    font-size: 44px;
+  }
+  .support-lead {
+    font-size: 17px;
+  }
+  .support-thanks .support-text {
+    font-size: 15px;
+  }
+  .support-back {
+    align-self: stretch;
+    margin-top: 6px;
+  }
+  .support-note {
+    margin-top: 0;
+  }
+}
+
+/* Confetti behind the card: falls once, a few seconds; none for reduced motion. */
+.confetti {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.confetti span {
+  position: absolute;
+  top: -40px;
+  width: 9px;
+  height: 15px;
+  border-radius: 2px;
+  animation-name: support-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: both;
+}
+.confetti .round {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+}
+.confetti .slim {
+  width: 6px;
+  height: 18px;
+}
+@keyframes support-fall {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+  to {
+    transform: translateY(calc(100vh + 80px)) rotate(720deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti {
+    display: none;
+  }
+}
