@@ -28,7 +28,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Radar rain (DWD RADOLAN RW): hourly step `radar_rain` and `pegel backfill-radar`: `src/pegel/adapters/sources/radolan.py`, `src/pegel/core/radar.py`, `src/pegel/jobs/radar.py`
 - `scripts/influx-query.sh` and the docs
 - Grafana Cloud dashboards as code (read-only role `pegel_grafana`): `grafana/dashboards/`, `infra/prod/grafana.tf`, `docs/setup-grafana.md`
-- Grafana forecast playback (newest forecast at the middle of the time range) and fixed-lead lines: `grafana/dashboards/forecast-playback.json`
+- Grafana forecast playback (newest forecast at the middle of the time range) and fixed-lead lines with observed and forecast rain, one `Lead` switch for both: `grafana/dashboards/forecast-playback.json`
 - Live outlier filter exploration (three methods compared, plots, recommendation): `analysis/outliers/`
 - Evaluation dataset as known at each issue time (`pegel build-eval-set`): `src/pegel/core/issue_inputs.py`, `src/pegel/jobs/eval_set.py`
 - Model evaluation contracts (`evaluation` config, folds, dataset and file schemas, model interface): `src/pegel/evaluation/contract.py`, `tests/eval_factory.py`
