@@ -11,6 +11,6 @@ Visitors can support the forecast monthly or once. Each option is a Stripe Payme
 4. **Redirect after payment.** In each link, under "After payment", choose "Don't show confirmation page" and redirect to:
    - monthly links: `https://deilbach-pegel.energiekonzepte-ruhr.de/?danke=<tier id>`, e.g. `?danke=dezimeter`
    - one-off and free amount: `https://deilbach-pegel.energiekonzepte-ruhr.de/?danke=einmalig`
-5. **Customer portal.** Under Settings → Billing → Customer portal, turn it on and allow cancelling and changing the plan. Then the receipt email carries a link to manage the subscription; the page promises "monatlich jederzeit kündbar".
+5. **Customer portal.** Under Settings → Billing → Customer portal, turn it on and allow cancelling and changing the plan. Then the receipt email carries a link to manage the subscription; the page promises "monatlich jederzeit kündbar". Copy the portal's login link (`https://billing.stripe.com/p/login/…`) as `manage_url`: the section and the thank-you then link to it as "Abo verwalten".
 6. **Config.** Paste the seven URLs into `site.support` in `config/pegel.json`: each tier's `url`, each `one_off` amount's `url`, and the free amount as `custom_url`. Merge; the section and the footer link appear with the next deploy. If a link is missing, the page shows none of it.
 7. Pay one small amount yourself with each kind of link and check the redirect and the receipt email. Refund it in the dashboard.

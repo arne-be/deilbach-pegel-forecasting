@@ -92,6 +92,7 @@
         { "eur": 20, "url": "https://buy.stripe.com/aFadRafct9T6frq11W4sE05" }
       ],
       "custom_url": null,
+      "manage_url": "https://billing.stripe.com/p/login/7sYbJ25BT1mA6UU4e84sE00",
       "prompt_after_visits": 5
     }
   },

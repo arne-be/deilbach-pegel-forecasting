@@ -33,6 +33,13 @@ def test_a_stripe_test_mode_link_is_rejected(tmp_path: Path) -> None:
         load_config(_config_with(tmp_path / "pegel.json", site=site))
 
 
+def test_the_manage_link_must_be_a_stripe_customer_portal_link(tmp_path: Path) -> None:
+    site = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))["site"]
+    site["support"]["manage_url"] = "https://buy.stripe.com/abc"
+    with pytest.raises(ValidationError, match="manage link"):
+        load_config(_config_with(tmp_path / "pegel.json", site=site))
+
+
 def test_support_tier_ids_must_be_unique(tmp_path: Path) -> None:
     site = json.loads(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))["site"]
     site["support"]["tiers"][1]["id"] = site["support"]["tiers"][0]["id"]

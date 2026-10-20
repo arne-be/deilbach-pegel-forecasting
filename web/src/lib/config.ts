@@ -35,6 +35,8 @@ export interface Support {
   one_off: SupportAmount[];
   /** Stripe Payment Link where the visitor picks the amount. */
   custom_url: string | null;
+  /** Stripe customer portal where subscribers change or cancel; optional. */
+  manage_url: string | null;
   /** The support prompt shows from this visit on; null turns it off. */
   prompt_after_visits: number | null;
 }
