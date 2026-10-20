@@ -2,6 +2,7 @@
 // hour picked in the chart on to the scene.
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { FixtureName } from "../fixtures";
+import { supportReady } from "../lib/config";
 import {
   categoryFor,
   categoryTags,
@@ -16,6 +17,7 @@ import {
   berlinHourPhrase,
   formatCm,
 } from "../lib/format";
+import { peakCategory } from "../lib/support";
 import type {
   ForecastResponse,
   HistoryPoint,
@@ -25,6 +27,8 @@ import CategoryCards from "./CategoryCards";
 import ForecastChart from "./ForecastChart";
 import LevelNow from "./LevelNow";
 import SiteScene from "./SiteScene";
+import SupportPrompt from "./SupportPrompt";
+import SupportThanks from "./SupportThanks";
 import Verdict, { PORTAL_URL } from "./Verdict";
 import "./ForecastApp.css";
 
@@ -180,6 +184,7 @@ export default function ForecastApp({ children }: { children?: ReactNode }) {
       {main}
       {children}
       <LegalLine portal={portal} />
+      {supportReady && <SupportThanks />}
     </>
   );
 
@@ -209,6 +214,10 @@ export default function ForecastApp({ children }: { children?: ReactNode }) {
   const fresh = state === "fresh";
   const points = fresh ? forecast.points : null;
   const reading = readingText(latestMs, nowMs);
+  const current = categoryFor(latest.level_cm);
+  const forecastVerdict = fresh
+    ? verdict(forecast, latest.level_cm, nowMs)
+    : null;
   // A picked forecast hour is dropped once the forecast is no longer shown, so the scene never
   // labels an old reading with a future time.
   const lastMs = points?.length
@@ -227,8 +236,8 @@ export default function ForecastApp({ children }: { children?: ReactNode }) {
       <div className={state === "stale" ? "hero is-old" : "hero"}>
         <Verdict
           state={state}
-          verdict={fresh ? verdict(forecast, latest.level_cm, nowMs) : null}
-          current={categoryFor(latest.level_cm)}
+          verdict={forecastVerdict}
+          current={current}
           reading={reading}
           nowMs={nowMs}
         />
@@ -255,6 +264,13 @@ export default function ForecastApp({ children }: { children?: ReactNode }) {
         outlineCurrent={state !== "stale"}
         nowMs={nowMs}
       />
+      {/* Fixtures are screenshots, not visits. */}
+      {supportReady && !pinned && (
+        <SupportPrompt
+          state={state}
+          categoryNumber={peakCategory(current.number, forecastVerdict)}
+        />
+      )}
     </>,
     fresh,
   );
