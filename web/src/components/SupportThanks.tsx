@@ -90,6 +90,12 @@ export default function SupportThanks() {
           {/* A one-off gift has nothing to change or cancel. */}
           {tier &&
             " Über den Link darin können Sie jederzeit ändern oder kündigen."}
+          {tier && support.manage_url && (
+            <>
+              {" "}
+              <a href={support.manage_url}>Abo verwalten</a>
+            </>
+          )}
         </p>
         <button type="submit" className="support-back">
           Zur Vorhersage

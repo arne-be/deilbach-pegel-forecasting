@@ -53,7 +53,16 @@ const featured = Math.floor(support.tiers.length / 2);
     <a class="amount other" href={support.custom_url}>Anderer Betrag</a>
   </div>
 
-  <p class="fine">Sicher über Stripe · Karte, Apple Pay, Google Pay, PayPal · monatlich jederzeit kündbar</p>
+  <p class="fine">
+    Sicher über Stripe · Karte, Apple Pay, Google Pay, PayPal · monatlich jederzeit kündbar{
+      support.manage_url && (
+        <>
+          {" · "}
+          <a href={support.manage_url}>Abo verwalten</a>
+        </>
+      )
+    }
+  </p>
 </section>
 
 <style>
@@ -273,6 +282,13 @@ const featured = Math.floor(support.tiers.length / 2);
     margin: 0;
     font-size: 13px;
     color: var(--panel-soft);
+  }
+  /* Inline, so it wraps as text; the padding gives a 44 px tap height without moving the line. */
+  .fine a {
+    padding-block: 14px;
+    color: inherit;
+    text-decoration: underline;
+    white-space: nowrap;
   }
 
   @media (min-width: 768px) {

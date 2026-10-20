@@ -82,16 +82,17 @@
     "scale_top_cm": 250,
     "support": {
       "tiers": [
-        { "id": "zentimeter", "name": "Zentimeter", "eur_per_month": 2, "description": "Klein, aber jeden Monat da.", "url": null },
-        { "id": "dezimeter", "name": "Dezimeter", "eur_per_month": 5, "description": "Trägt einen guten Teil der Kosten.", "url": null },
-        { "id": "meter", "name": "Meter", "eur_per_month": 10, "description": "Für alle, die direkt am Bach wohnen.", "url": null }
+        { "id": "zentimeter", "name": "Zentimeter", "eur_per_month": 2, "description": "Klein, aber jeden Monat da.", "url": "https://buy.stripe.com/7sYbJ25BT1mA6UU4e84sE00" },
+        { "id": "dezimeter", "name": "Dezimeter", "eur_per_month": 5, "description": "Trägt einen guten Teil der Kosten.", "url": "https://buy.stripe.com/6oUaEYe8pe9m932fWQ4sE01" },
+        { "id": "meter", "name": "Meter", "eur_per_month": 10, "description": "Für alle, die direkt am Bach wohnen.", "url": "https://buy.stripe.com/bJeeVe5BT2qE6UU3a44sE02" }
       ],
       "one_off": [
-        { "eur": 5, "url": null },
-        { "eur": 10, "url": null },
-        { "eur": 20, "url": null }
+        { "eur": 5, "url": "https://buy.stripe.com/14A8wQ4xPghugvubGA4sE03" },
+        { "eur": 10, "url": "https://buy.stripe.com/14AaEY4xP1mAdjih0U4sE04" },
+        { "eur": 20, "url": "https://buy.stripe.com/aFadRafct9T6frq11W4sE05" }
       ],
-      "custom_url": null,
+      "custom_url": "https://buy.stripe.com/14A28sc0h7KYdji9ys4sE07",
+      "manage_url": "https://billing.stripe.com/p/login/7sYbJ25BT1mA6UU4e84sE00",
       "prompt_after_visits": 5
     }
   },

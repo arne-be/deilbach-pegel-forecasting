@@ -72,6 +72,17 @@ def _check_stripe_link(url: str | None) -> str | None:
     return url
 
 
+BILLING_PORTAL_PREFIX = "https://billing.stripe.com/p/login/"
+
+
+def _check_billing_portal_link(url: str | None) -> str | None:
+    if url is not None and not url.startswith(BILLING_PORTAL_PREFIX):
+        raise ValueError(f"the manage link must start with {BILLING_PORTAL_PREFIX}")
+    if url is not None and url.startswith(BILLING_PORTAL_PREFIX + "test_"):
+        raise ValueError("the manage link must not be a Stripe test-mode link")
+    return url
+
+
 class SupportTier(_Frozen):
     """A monthly support tier, paid through a recurring Stripe Payment Link."""
 
@@ -100,10 +111,14 @@ class SupportSettings(_Frozen):
     one_off: tuple[SupportAmount, ...] = Field(min_length=1)
     # Stripe Payment Link where the visitor picks the amount.
     custom_url: str | None = None
+    # Stripe customer portal where subscribers change or cancel; optional, the receipt
+    # email links there too.
+    manage_url: str | None = None
     # The support prompt shows from this visit on; null turns it off.
     prompt_after_visits: int | None = Field(default=None, gt=0)
 
     _check_url = field_validator("custom_url")(_check_stripe_link)
+    _check_manage_url = field_validator("manage_url")(_check_billing_portal_link)
 
     @model_validator(mode="after")
     def _check_tier_ids(self) -> "SupportSettings":
