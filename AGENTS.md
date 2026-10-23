@@ -196,6 +196,11 @@ uv run pegel backfill-forecast --from 2024-02-01
 uv run pegel backfill --source lanuv-files --path <folder> --from 2000-01-01 [--station langenberg]
 ```
 
+A gap in the live LANUV ingest (portal down for longer than the 24-hour lookback) is filled from the portal itself, which serves the last seven days:
+```
+uv run pegel backfill --source lanuv --from 2026-10-21 [--station langenberg]
+```
+
 Radar rain loads from DWD's archives: monthly tars (about 180 MB each) before 2025, single hourly files from 2025 on. Downloads stay in the cache folder, so reruns are quick; delete it when done.
 ```
 uv run pegel backfill-radar --from 2023-01-01 [--to 2026-10-01] [--cache-dir ~/.cache/deilbach-pegel/radolan]

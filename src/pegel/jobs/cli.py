@@ -55,7 +55,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         start = _utc_midnight(arguments.start)
         end = _utc_midnight(arguments.end) if arguments.end else datetime.now(UTC)
         if arguments.source == "lanuv-files":
-            _backfill_lanuv_files(config, arguments.path, arguments.station, start, end)
+            if arguments.path is None:
+                raise SystemExit("error: lanuv-files needs --path")
+            _backfill_lanuv(config, LevelFiles(arguments.path), arguments.station, start, end)
+            return 0
+        if arguments.source == "lanuv":
+            _backfill_lanuv(config, lanuv.fetch_levels, arguments.station, start, end)
             return 0
         station = config.station(config.forecast.station_id)
         with sources_from_env() as (fetch, conn):
@@ -132,22 +137,21 @@ def sources_from_env() -> Iterator[tuple[FetchLevels, Conn]]:
         yield partial(fetch_by_source, fetchers), conn
 
 
-def _backfill_lanuv_files(
+def _backfill_lanuv(
     config: PegelConfig,
-    directory: Path | None,
+    fetch: FetchLevels,
     station_id: str | None,
     start: datetime,
     end: datetime,
 ) -> None:
-    """Backfills LANUV stations from open data files. Needs only the database, no Influx."""
+    """Backfills LANUV stations from open data files or the portal. Needs no Influx."""
     stations = [
         station
         for station in config.stations
         if station.source == "lanuv" and station_id in (None, station.id)
     ]
-    if directory is None or not stations:
-        raise SystemExit("error: lanuv-files needs --path and, if given, a LANUV --station")
-    fetch = LevelFiles(directory)
+    if not stations:
+        raise SystemExit(f"error: {station_id!r} is not a LANUV station")
     with connect(_required_env("JOBS_DATABASE_URL")) as conn:
         conn.autocommit = True
         for station in stations:
@@ -205,12 +209,14 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pegel")
     commands = parser.add_subparsers(dest="command", required=True)
     backfill_parser = commands.add_parser("backfill", help="load history in monthly chunks")
-    backfill_parser.add_argument("--source", choices=["influx", "lanuv-files"], required=True)
+    backfill_parser.add_argument(
+        "--source", choices=["influx", "lanuv", "lanuv-files"], required=True
+    )
     backfill_parser.add_argument(
         "--path", type=Path, help="lanuv-files: folder with the extracted LANUV level CSV files"
     )
     backfill_parser.add_argument(
-        "--station", help="lanuv-files: one station id (default: all LANUV stations)"
+        "--station", help="lanuv, lanuv-files: one station id (default: all LANUV stations)"
     )
     backfill_parser.add_argument(
         "--from", dest="start", type=date.fromisoformat, required=True, help="UTC date"
