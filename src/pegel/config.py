@@ -2,13 +2,14 @@
 
 from datetime import date
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     PositiveInt,
+    StringConstraints,
     field_validator,
     model_validator,
 )
@@ -175,7 +176,10 @@ class Freshness(_Frozen):
     # Grafana emails when the newest value of a series (or the newest forecast, key "forecast")
     # is older than this. Only infra/prod/alerts.tf reads it; each limit leaves room for the
     # normal gaps, e.g. a missed hourly Kupferdreh reading or the 3-hourly ICON-D2 runs.
-    alert_max_age_minutes: dict[str, PositiveInt]
+    # Keys go into the alert's SQL as literals, so only series-id characters are allowed.
+    alert_max_age_minutes: dict[
+        Annotated[str, StringConstraints(pattern=r"^[a-z0-9_:]+$")], PositiveInt
+    ]
 
 
 class ApiSettings(_Frozen):

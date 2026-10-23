@@ -32,7 +32,7 @@ pbcopy </dev/null
 
 ## 5. Data source
 
-In Grafana, under Connections → Data sources, add a **PostgreSQL** data source:
+In Grafana, under Connections → Data sources, add a **PostgreSQL** data source named `deilbach-pegel` (the alert rule looks it up by that name):
 
 - **Host:** the pooled host of the Neon `prod` branch (it contains `-pooler`), port `5432`
 - **Database:** `pegel`
@@ -54,10 +54,10 @@ After that, `tofu plan` in pull requests and `tofu apply` on `main` manage the f
 
 Edit it in the Grafana UI until it looks right, then Export → Export as JSON (with "Export for sharing externally" off), save it over the file in `grafana/dashboards/`, remove the `id` field and open a pull request. Edits that only live in the UI are overwritten on the next deploy.
 
-Keep auto-refresh off and don't add alert rules: every query wakes Neon, and the free plan has 100 CU-hours a month. Aggregate with `$__timeGroupAlias(valid_at, $__interval)` and filter with `$__timeFilter(valid_at)`, so a panel never loads raw rows for years.
+Keep auto-refresh off and don't add alert rules beyond the freshness rule below: every query wakes Neon, and the free plan has 100 CU-hours a month. Aggregate with `$__timeGroupAlias(valid_at, $__interval)` and filter with `$__timeFilter(valid_at)`, so a panel never loads raw rows for years.
 
 ## Freshness alerts
 
-`infra/prod/alerts.tf` sets up one Grafana alert rule, "Data stale". It checks the newest value of each series in `freshness.alert_max_age_minutes` (`config/pegel.json`) once an hour, plus the newest forecast (key `forecast`). One email goes to the `BUDGET_EMAIL` address when a series goes stale, a "resolved" one when it's back, and a reminder every 24 hours while it stays stale. A failing query (e.g. Neon unreachable) also alerts.
+`infra/prod/alerts.tf` sets up one Grafana alert rule, "Data stale". It checks the newest value of each series in `freshness.alert_max_age_minutes` (`config/pegel.json`) once an hour, plus the newest forecast (key `forecast`). One email goes to the `BUDGET_EMAIL` address when a series goes stale, a "resolved" one when it's back, and a reminder every 24 hours while it stays stale. A failing query (e.g. Neon unreachable) also alerts. Grafana runs it at its own minute of the hour, not with the hourly job, so it wakes Neon once more per hour: about 15 CU-hours a month.
 
 To change a limit or add a series, edit the config and merge. To try the rule before a merge, POST its queries to `/api/v1/eval` with the tofu token.

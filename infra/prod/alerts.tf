@@ -63,7 +63,7 @@ resource "grafana_rule_group" "freshness" {
 
     notification_settings {
       contact_point   = grafana_contact_point.email.name
-      group_by        = ["alertname"]
+      group_by        = ["alertname", "grafana_folder"]
       repeat_interval = "24h"
     }
 
