@@ -6,6 +6,8 @@ Where the water at the Kupferdreh gauge comes from, how we split that area, and 
 
 Base map © OpenStreetMap contributors. Catchment and rivers from the NRW river map GSK3E.
 
+The interactive version, with layer switches and details on hover, is [`catchment.html`](catchment.html): download it and open it in a browser (GitHub shows only its source). It's the input plan from 2026-10-13 without the forecast ring.
+
 ## Catchment
 
 The catchment above Kupferdreh covers 111.5 km². All rain that falls inside it flows past the gauge. It's built from the sub-catchments of the NRW river map GSK3E. Each sub-catchment names the one it drains into, so the area above a gauge is the sub-catchment holding the gauge plus everything upstream of it.
