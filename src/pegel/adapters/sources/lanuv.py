@@ -14,6 +14,7 @@ from pegel.core.observations import Observation, require_utc
 logger = logging.getLogger(__name__)
 
 # The public portal's last seven days of 5-minute readings. Public data, no credentials.
+PORTAL_DAYS = 7
 WEEK_URL = "https://www.hochwasserportal.nrw/data/internet/stations/100/{station_no}/S/week.json"
 TIMEOUT_SECONDS = 30.0
 MAX_ATTEMPTS = 3

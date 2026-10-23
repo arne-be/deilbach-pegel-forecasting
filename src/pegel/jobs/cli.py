@@ -6,7 +6,7 @@ import os
 import sys
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from functools import partial
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -60,6 +60,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             _backfill_lanuv(config, LevelFiles(arguments.path), arguments.station, start, end)
             return 0
         if arguments.source == "lanuv":
+            if start < datetime.now(UTC) - timedelta(days=lanuv.PORTAL_DAYS):
+                raise SystemExit(
+                    f"error: the portal serves only the last {lanuv.PORTAL_DAYS} days;"
+                    " use lanuv-files for older data"
+                )
             _backfill_lanuv(config, lanuv.fetch_levels, arguments.station, start, end)
             return 0
         station = config.station(config.forecast.station_id)
