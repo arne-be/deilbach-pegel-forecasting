@@ -181,7 +181,7 @@ class RadarRainSettings(_Frozen):
     cells_file: str
     # Each hourly run refetches this many hours, so a late or missed radar file is picked up.
     ingest_lookback_hours: int = Field(gt=0)
-    # How long after its product time a file is reliably in DWD's live folder (docs/catchment.md).
+    # How long after its product time a file is reliably in DWD's archive (docs/catchment.md).
     available_after_minutes: int = Field(ge=0)
 
 

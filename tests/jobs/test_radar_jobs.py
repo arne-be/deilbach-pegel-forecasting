@@ -1,4 +1,3 @@
-import bz2
 import gzip
 import io
 import tarfile
@@ -64,7 +63,7 @@ def test_hourly_step_stores_six_series_for_published_hours_and_reruns_change_not
 ) -> None:
     at_1250 = datetime(2026, 10, 13, 12, 50, tzinfo=UTC)
     client, asked = dwd(
-        {"raa01-rw_10000-2610131250-dwd---bin.bz2": bz2.compress(wet_file(at_1250))}
+        {"raa01-rw_10000-2610131250-dwd---bin.gz": gzip.compress(wet_file(at_1250))}
     )
     step = radar_step(CONFIG, client)
 
@@ -91,12 +90,12 @@ def available_at(conn: Conn) -> list[datetime]:
 
 def test_hourly_step_stamps_the_slot_after_the_fetch(conn: Conn) -> None:
     at_1250 = datetime(2026, 10, 13, 12, 50, tzinfo=UTC)
-    content = bz2.compress(wet_file(at_1250))
+    content = gzip.compress(wet_file(at_1250))
     clock = [datetime(2026, 10, 13, 13, 29, 59, tzinfo=UTC)]
     served_at: list[datetime] = []
 
     def handle(request: httpx.Request) -> httpx.Response:
-        if not request.url.path.endswith("-2610131250-dwd---bin.bz2"):
+        if not request.url.path.endswith("-2610131250-dwd---bin.gz"):
             return httpx.Response(404)
         served_at.append(clock[0])
         # The download ends after the 13:30 slot began, so the stamp must be taken after it.
@@ -155,9 +154,9 @@ def test_one_broken_or_failing_live_file_does_not_cost_the_other_hours(conn: Con
     at_1250 = datetime(2026, 10, 13, 12, 50, tzinfo=UTC)
     client, _ = dwd(
         {
-            "raa01-rw_10000-2610131250-dwd---bin.bz2": bz2.compress(wet_file(at_1250)),
-            "raa01-rw_10000-2610131150-dwd---bin.bz2": b"not bzip2",
-            "raa01-rw_10000-2610131050-dwd---bin.bz2": 500,
+            "raa01-rw_10000-2610131250-dwd---bin.gz": gzip.compress(wet_file(at_1250)),
+            "raa01-rw_10000-2610131150-dwd---bin.gz": b"not gzip",
+            "raa01-rw_10000-2610131050-dwd---bin.gz": 500,
         }
     )
     assert radar_step(CONFIG, client)(conn, ISSUED_AT) == 6
@@ -169,3 +168,13 @@ def test_backfill_fails_when_a_month_has_no_product_at_all(conn: Conn, tmp_path:
     start = datetime(2025, 3, 1, tzinfo=UTC)
     with pytest.raises(RadolanError, match="no radar product found for 2025-03-01"):
         backfill_radar(conn, CONFIG, client, start, start + timedelta(hours=3), tmp_path)
+
+
+def test_hourly_step_logs_an_error_when_no_product_in_the_lookback_is_there(
+    conn: Conn, caplog: pytest.LogCaptureFixture
+) -> None:
+    client, _ = dwd({})
+    assert radar_step(CONFIG, client)(conn, ISSUED_AT) == 0
+    assert [r.message for r in caplog.records if r.levelname == "ERROR"] == [
+        "no radar product in the lookback"
+    ]
