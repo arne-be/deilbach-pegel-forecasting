@@ -1,4 +1,4 @@
-"""Radar rain jobs: the hourly step from the live folder and the backfill from DWD's archives."""
+"""Radar rain jobs: the hourly step and the backfill, both from DWD's archives."""
 
 import logging
 from collections.abc import Callable, Iterable, Iterator
@@ -87,7 +87,7 @@ def radar_step(
     client: httpx.Client,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> HourlyStep:
-    """The hourly step: the last few RW products before the issue time from the live folder.
+    """The hourly step: the last few RW products before the issue time, fetched once each.
 
     Values are available from the issue slot of the fetch, so the run that fetched them may use
     them, even when it reruns a past issue time.
@@ -97,6 +97,17 @@ def radar_step(
         lookback = timedelta(hours=config.rain.radar.ingest_lookback_hours)
         times = product_times(issued_at - lookback, issued_at)
         grids = list(_published(partial(fetch_live, client), times, "radar_rain"))
+        if times and not grids:
+            # One late product is normal; none over the whole lookback means DWD moved or broke
+            # the files, which once hid behind hourly warnings for days.
+            logger.error(
+                "no radar product in the lookback",
+                extra={
+                    "job": "radar_rain",
+                    "issued_at": issued_at.isoformat(),
+                    "tried": len(times),
+                },
+            )
         seen_at = issue_time(now(), config.forecast.issue_minute)
         changed, _ = store_grids(conn, config, grids, "radar_rain", seen_at)
         logger.info(

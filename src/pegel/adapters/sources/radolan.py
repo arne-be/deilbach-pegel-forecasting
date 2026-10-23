@@ -6,7 +6,6 @@ An ASCII header ends with ETX (0x03). Then 900 x 900 little-endian 16-bit words 
 with the south-west cell and going east, then north row by row (chapter 1.2).
 """
 
-import bz2
 import gzip
 import json
 import logging
@@ -26,8 +25,9 @@ from pegel.core.observations import require_utc
 
 logger = logging.getLogger(__name__)
 
-# The live folder keeps about two days; the archives are updated with a delay.
-LIVE_URL = "https://opendata.dwd.de/weather/radar/radolan/rw/raa01-rw_10000-{stamp}-dwd---bin.bz2"
+# The hourly run reads the recent archive: DWD's live folder (weather/radar/radolan/rw) switched
+# to HDF5 on 2026-10-20, while the archive keeps this binary format and gets each hh:50 product
+# 27 to 32 minutes later (346 products, 2026-10-09 to 23).
 _ARCHIVE_URL = "https://opendata.dwd.de/climate_environment/CDC/grids_germany/hourly/radolan"
 RECENT_URL = _ARCHIVE_URL + "/recent/bin/raa01-rw_10000-{stamp}-dwd---bin.gz"
 HISTORICAL_URL = _ARCHIVE_URL + "/historical/bin/{year}/RW{year}{month:02d}.tar.gz"
@@ -146,8 +146,8 @@ def load_cells(path: Path) -> dict[str, list[int]]:
 
 
 def fetch_live(client: httpx.Client, product_time: datetime) -> RadolanGrid | None:
-    """The RW product from the live folder, or None if it isn't published (yet). One try only."""
-    url = LIVE_URL.format(stamp=_stamp(product_time))
+    """The newest RW product from the recent archive, None if not published (yet). One try only."""
+    url = RECENT_URL.format(stamp=_stamp(product_time))
     raw = _get(
         client,
         url,
@@ -156,7 +156,7 @@ def fetch_live(client: httpx.Client, product_time: datetime) -> RadolanGrid | No
         timeout_seconds=LIVE_TIMEOUT_SECONDS,
         budget_seconds=LIVE_BUDGET_SECONDS,
     )
-    return None if raw is None else parse_rw(bz2.decompress(raw), product_time)
+    return None if raw is None else parse_rw(gzip.decompress(raw), product_time)
 
 
 def fetch_recent(

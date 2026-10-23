@@ -115,12 +115,13 @@ def client_answering(*responses: httpx.Response) -> tuple[httpx.Client, list[str
 
 
 def test_live_file_is_fetched() -> None:
-    body = bz2.compress(rw_file(PRODUCT_TIME))
+    body = gzip.compress(rw_file(PRODUCT_TIME))
     client, urls = client_answering(httpx.Response(200, content=body))
     grid = fetch_live(client, PRODUCT_TIME)
     assert grid is not None and grid.product_time == PRODUCT_TIME
     assert urls == [
-        "https://opendata.dwd.de/weather/radar/radolan/rw/raa01-rw_10000-2610130950-dwd---bin.bz2"
+        "https://opendata.dwd.de/climate_environment/CDC/grids_germany/hourly/radolan"
+        "/recent/bin/raa01-rw_10000-2610130950-dwd---bin.gz"
     ]
 
 
