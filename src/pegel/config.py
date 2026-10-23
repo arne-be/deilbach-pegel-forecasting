@@ -2,9 +2,17 @@
 
 from datetime import date
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "pegel.json"
 
@@ -165,6 +173,13 @@ class CleaningSettings(_Frozen):
 class Freshness(_Frozen):
     observation_max_age_minutes: int = Field(gt=0)
     forecast_max_age_minutes: int = Field(gt=0)
+    # Grafana emails when the newest value of a series (or the newest forecast, key "forecast")
+    # is older than this. Only infra/prod/alerts.tf reads it; each limit leaves room for the
+    # normal gaps, e.g. a missed hourly Kupferdreh reading or the 3-hourly ICON-D2 runs.
+    # Keys go into the alert's SQL as literals, so only series-id characters are allowed.
+    alert_max_age_minutes: dict[
+        Annotated[str, StringConstraints(pattern=r"^[a-z0-9_:]+$")], PositiveInt
+    ]
 
 
 class ApiSettings(_Frozen):

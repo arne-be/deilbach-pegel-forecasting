@@ -109,7 +109,16 @@
   },
   "freshness": {
     "observation_max_age_minutes": 90,
-    "forecast_max_age_minutes": 90
+    "forecast_max_age_minutes": 90,
+    "alert_max_age_minutes": {
+      "kupferdreh:level": 240,
+      "langenberg:level": 180,
+      "nierenhof:level": 180,
+      "neviges:level": 180,
+      "radolan_rw:catchment:max": 180,
+      "open_meteo_icon_d2:catchment:mean": 360,
+      "forecast": 150
+    }
   },
   "api": {
     "history_first_day": "2023-03-06",
