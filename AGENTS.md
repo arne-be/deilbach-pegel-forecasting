@@ -18,7 +18,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Hourly job on Lambda: `Dockerfile` (jobs target), `src/pegel/jobs/lambda_handler.py`, `src/pegel/adapters/secrets.py`, `infra/prod/`, `.github/workflows/infra.yml`, `docs/setup-aws.md`
 - API `GET /api/history` and `GET /api/forecast` (FastAPI): `src/pegel/api/`, `src/pegel/core/history.py`
 - LANUV stations and value parser: `config/pegel.json`, `src/pegel/adapters/sources/lanuv.py`
-- ICON-D2 rain forecast from Open-Meteo, hourly step and `backfill-forecast`: `src/pegel/adapters/sources/open_meteo.py`, `src/pegel/core/rain_forecast.py`, `src/pegel/jobs/rain_forecast.py`
+- ICON-D2 rain forecast from Open-Meteo, hourly step and `backfill-forecast` (archive, or whole runs with `--source runs`): `src/pegel/adapters/sources/open_meteo.py`, `src/pegel/core/rain_forecast.py`, `src/pegel/jobs/rain_forecast.py`
 - Hourly live ingest of the upstream LANUV gauges (failures logged, never block the forecast): `src/pegel/adapters/sources/lanuv.py` (`fetch_levels`), `src/pegel/jobs/pipeline.py`
 - LANUV level history from open data CSV files (`pegel backfill --source lanuv-files`): `src/pegel/adapters/sources/lanuv_files.py`
 - Live Kalman outlier filter for the forecast station's level (`kupferdreh:cleaned_kalman`, `pegel clean`): `src/pegel/core/cleaning.py`, `src/pegel/jobs/pipeline.py`
@@ -189,9 +189,10 @@ uv run pegel clean --from 2023-03-01 [--to 2026-01-01]
 
 The upstream LANUV gauges load from the open data files instead: download `Ruhreinzugsgebiet-NRW-W_{decade}_EPSG25832_CSV.zip` from https://www.opengeodata.nrw.de/produkte/umwelt_klima/wasser/oberflaechengewaesser/hydro/w/, extract the `*_Wasserstand_cm.csv` files of our stations into a folder outside the repo, and pass it with `--path`. Without `--station` it loads all LANUV stations. From 2000 the data is regular (15 minutes or finer); before that Langenberg is sparse.
 
-The ICON-D2 rain forecast archive comes from Open-Meteo. It needs only the jobs database, no Influx; details in `docs/catchment.md`:
+ICON-D2 rain forecasts come from Open-Meteo in two forms: the archive (Previous Runs, from 2024, two lead times per hour, series `open_meteo_previous_runs:*`) and whole runs (Single Runs, from 2026-04-02, all 48 lead times, the live series `open_meteo_icon_d2:*`). Both need only the jobs database, no Influx; details in `docs/catchment.md` ("Two sources"):
 ```
 uv run pegel backfill-forecast --from 2024-02-01
+uv run pegel backfill-forecast --source runs --from 2026-04-02   # whole runs into the live series
 ```
 ```
 uv run pegel backfill --source lanuv-files --path <folder> --from 2000-01-01 [--station langenberg]
