@@ -87,7 +87,24 @@ Why every second point: on three rainy days in 2024 and 2026, the mean of 9 poin
 
 Forecasts per zone are left out for now. Single zones would get only 1 to 3 points. Open-Meteo keeps its archive, so we can fetch all points later and test whether zones help.
 
-Series ids carry the source: `open_meteo_icon_d2:catchment:mean` and `open_meteo_icon_d2:ring:p90`. The code is `src/pegel/core/rain_forecast.py`, `src/pegel/adapters/sources/open_meteo.py` and `src/pegel/jobs/rain_forecast.py`.
+The code is `src/pegel/core/rain_forecast.py`, `src/pegel/adapters/sources/open_meteo.py` and `src/pegel/jobs/rain_forecast.py`.
+
+#### Two sources
+
+The forecasts come from two Open-Meteo APIs and go into two pairs of series. The series ids start with the source:
+
+| | Whole runs | Archive |
+|---|---|---|
+| Series | `open_meteo_icon_d2:catchment:mean`, `open_meteo_icon_d2:ring:p90` | `open_meteo_previous_runs:catchment:mean`, `open_meteo_previous_runs:ring:p90` |
+| API | Single Runs (`single-runs-api.open-meteo.com`) | Previous Runs (`previous-runs-api.open-meteo.com`) |
+| What a run has | all 48 lead times, like the live forecast | per hour only two values, from runs 1–3 h and 25–27 h earlier |
+| `run_at` | the run's start | approximate, from a rule |
+| From | 2026-04-02 | 2024-02-01 |
+| Filled by | the hourly step, and `pegel backfill-forecast --source runs` | `pegel backfill-forecast` (`--source archive`, the default) |
+
+Whole runs from the hourly step and from the backfill share the same series. Only `available_at` tells them apart: the hourly step stamps a run with the issue slot of its fetch (usually run + 90 min), the backfill with the slot the live system would have used (run + 150 min).
+
+**For training,** the evaluation dataset (`pegel build-eval-set`) reads both sources and takes, for each issue time and hour, the newest run known then; on the same `run_at` the whole run wins. So before 2026-04-02 a model sees only the archive's stitched values (see "What a model sees" below). From then on, once the run backfill has loaded those months, it sees whole runs, as live.
 
 #### Which run a forecast comes from
 
@@ -95,14 +112,14 @@ Open-Meteo's model metadata says which run is the newest: `https://api.open-mete
 
 The hourly step reads the metadata first. It then wants every run of the last 24 hours, up to the newest, that the live catchment series doesn't have yet. If there is none, it stops: no forecast request. Otherwise it fetches them newest first, at most 4 per hour: the level forecast needs the newest run, older ones only matter for training, so after a long outage the next hours fetch the rest. A run only 24 hours late still covers half the horizon; older ones are left to the run backfill below.
 
-Each run comes from Open-Meteo's Single Runs API (`single-runs-api.open-meteo.com/v1/forecast`), which takes the forecast parameters plus `run=2026-10-13T09:00`. The live forecast API only serves the newest run, so a missed run was lost before. Single Runs keeps runs from about 5 April 2026 on (checked 2026-10-25) and answers HTTP 400 for older ones. It doesn't take `start_hour`, so we ask for `forecast_hours=50`: the hours from the run start to run + 49 h. For run 09:00 on 2026-10-13 it gave the same values as the live API. It served the 18:00 run before the metadata named it, so going by the metadata never asks too early.
+Each run comes from Open-Meteo's Single Runs API (`single-runs-api.open-meteo.com/v1/forecast`), which takes the forecast parameters plus `run=2026-10-13T09:00`. The live forecast API only serves the newest run, so a missed run was lost before. Single Runs keeps runs from 2026-04-02 00 UTC on (checked 2026-10-25) and answers HTTP 400 for older ones. It doesn't take `start_hour`, so we ask for `forecast_hours=50`: the hours from the run start to run + 49 h. For run 09:00 on 2026-10-13 it gave the same values as the live API. It served the 18:00 run before the metadata named it, so going by the metadata never asks too early.
 
 Each run is checked before it's stored: the hours run from run + 1 h without a gap, and each point has data from run + 1 h to exactly run + 48 h and none after. A shortened answer, or one from another run, ends early or late, and nothing of that run is stored.
 
 Whole runs missed by the hourly step, or from before it started, load into the same live series:
 
 ```
-uv run pegel backfill-forecast --source runs --from 2026-04-05 [--to 2026-10-13]
+uv run pegel backfill-forecast --source runs --from 2026-04-02 [--to 2026-10-13]
 ```
 
 It fetches every run starting in the window that the live series doesn't have, oldest first, through the same request and checks as the hourly step, so each run has all 48 lead times. It leaves the last 24 hours before Open-Meteo's newest run to the hourly step. Each run gets the `available_at` the live system would have given it, the same rule as the archive below (run + 150 min with the defaults). One run is 70 calls; at one request a minute it stops before 9,000 calls (128 runs, 16 days, about 2 hours) and prints the date to resume from. From April to October 2026 that's about 13 invocations, one a day, to stay below Open-Meteo's 10,000 calls a day. A failing run is logged and skipped, and three in a row stop the backfill with a date to resume from; rerunning the same window fetches only what's missing.
@@ -149,6 +166,7 @@ So live, short hours get short, sharp forecasts; in the archive every hour gets 
 - **Coverage is fine.** The archive always has a known value up to 22½ to 24½ hours ahead, so the 24 hourly sums of the evaluation dataset are complete.
 - **The backtest is fair between models**, since all get the same day-old forecasts.
 - **Live will differ.** A model trained on day-old forecasts learned to trust them little, so live it may underuse good short-range rain.
+- **From 2026-04-02 there are whole runs.** After the run backfill, training on those months sees what live sees (see "Two sources" above).
 
 Backfill:
 

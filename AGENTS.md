@@ -189,10 +189,10 @@ uv run pegel clean --from 2023-03-01 [--to 2026-01-01]
 
 The upstream LANUV gauges load from the open data files instead: download `Ruhreinzugsgebiet-NRW-W_{decade}_EPSG25832_CSV.zip` from https://www.opengeodata.nrw.de/produkte/umwelt_klima/wasser/oberflaechengewaesser/hydro/w/, extract the `*_Wasserstand_cm.csv` files of our stations into a folder outside the repo, and pass it with `--path`. Without `--station` it loads all LANUV stations. From 2000 the data is regular (15 minutes or finer); before that Langenberg is sparse.
 
-The ICON-D2 rain forecast archive comes from Open-Meteo. It needs only the jobs database, no Influx; details in `docs/catchment.md`:
+ICON-D2 rain forecasts come from Open-Meteo in two forms: the archive (Previous Runs, from 2024, two lead times per hour, series `open_meteo_previous_runs:*`) and whole runs (Single Runs, from 2026-04-02, all 48 lead times, the live series `open_meteo_icon_d2:*`). Both need only the jobs database, no Influx; details in `docs/catchment.md` ("Two sources"):
 ```
 uv run pegel backfill-forecast --from 2024-02-01
-uv run pegel backfill-forecast --source runs --from 2026-04-05   # whole runs into the live series
+uv run pegel backfill-forecast --source runs --from 2026-04-02   # whole runs into the live series
 ```
 ```
 uv run pegel backfill --source lanuv-files --path <folder> --from 2000-01-01 [--station langenberg]
