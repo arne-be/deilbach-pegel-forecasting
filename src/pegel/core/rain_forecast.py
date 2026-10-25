@@ -153,7 +153,8 @@ def run_values(
 ) -> list[InputForecastValue]:
     """The series for each hour with run_at < valid_at <= run_at + horizon, all points required.
 
-    `available_at` is the issue slot in which we fetched the run.
+    `available_at` is when the run counts as available: the issue slot of its fetch in the
+    hourly job, the slot the live system would have used in the backfill.
     """
     last_hour = run_at + timedelta(hours=horizon_hours)
     result = []

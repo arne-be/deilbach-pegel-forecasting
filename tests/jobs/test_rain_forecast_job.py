@@ -314,3 +314,25 @@ def test_run_backfill_stops_at_the_rate_limit(conn: Conn) -> None:
         )
     assert (result.changed, result.resume_from) == (96, date(2026, 10, 11))
     assert fake.runs == [day, day + timedelta(hours=3)]
+
+
+def test_run_backfill_stops_after_three_failed_runs_in_a_row(conn: Conn) -> None:
+    day = datetime(2026, 10, 11, tzinfo=UTC)
+    failing: dict[datetime, tuple[int, Any]] = {
+        day + timedelta(hours=hours): (503, {}) for hours in (3, 9, 12, 15)
+    }
+    fake = FakeOpenMeteo(RUN_AT, failing)
+    with fake.client() as client:
+        result = backfill_runs(
+            client,
+            conn,
+            SETTINGS,
+            POINTS,
+            date(2026, 10, 11),
+            date(2026, 10, 12),
+            MINUTE,
+            sleep=lambda _: None,
+        )
+    # 03:00 fails alone; 09:00, 12:00 and 15:00 fail in a row and stop it before 18:00.
+    assert (result.changed, result.failed, result.resume_from) == (2 * 96, 4, date(2026, 10, 11))
+    assert stored_runs(conn) == [day, day + timedelta(hours=6)]

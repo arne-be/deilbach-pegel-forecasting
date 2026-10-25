@@ -53,6 +53,9 @@ ARCHIVE_MAX_CALLS = 9000
 # Day 0 values of the last hours aren't final until their run is out (about 85 min after it
 # starts); before that the archive serves longer lead times under the same variable.
 ARCHIVE_SETTLE_TIME = timedelta(hours=3)
+# A failing run can take three attempts but counts once against the budget; stopping after a
+# few in a row keeps a flaky Open-Meteo from using up the day's calls the hourly job needs.
+MAX_FAILED_RUNS_IN_A_ROW = 3
 
 
 def hourly_step(
@@ -226,7 +229,8 @@ class RunsResult:
     changed: int
     calls: float
     failed: int
-    # The first day not loaded when the call budget ran out or Open-Meteo refused, else None.
+    # The first day not loaded when the call budget ran out, Open-Meteo refused or runs kept
+    # failing, else None.
     resume_from: date | None
 
 
@@ -244,9 +248,9 @@ def backfill_runs(
     """Loads the runs starting in the UTC days [first_day, end_day) that the live series doesn't
     have, oldest first, from Single Runs: every lead time, like the hourly job stores them.
 
-    Each run gets the available_at the live system would have given it. The last CATCH_UP stays
-    with the hourly job, which stamps runs by their fetch. A failing run is logged and skipped;
-    a rerun tries it again.
+    Each run gets the available_at the live system would have given it. Runs after
+    newest - CATCH_UP stay with the hourly job, which stamps runs by their fetch. A failing run
+    is logged and skipped, a rerun tries it again; MAX_FAILED_RUNS_IN_A_ROW stop the backfill.
     """
     start = datetime(first_day.year, first_day.month, first_day.day, tzinfo=UTC)
     end = datetime(end_day.year, end_day.month, end_day.day, tzinfo=UTC)
@@ -260,6 +264,7 @@ def backfill_runs(
     # A run spans three calendar days but stays far below 14, so it weighs one call per point.
     weight = open_meteo.request_weight(len(points), 3, 1)
     changed, calls, failed = 0, 0.0, 0
+    failing: list[datetime] = []
     for run_at in runs:
         if calls + weight > ARCHIVE_MAX_CALLS:
             return RunsResult(changed, calls, failed, run_at.date())
@@ -285,4 +290,9 @@ def backfill_runs(
         except (open_meteo.OpenMeteoError, RunMismatchError):
             logger.exception("rain forecast run failed, a rerun tries it again", extra=context)
             failed += 1
+            failing.append(run_at)
+            if len(failing) == MAX_FAILED_RUNS_IN_A_ROW:
+                return RunsResult(changed, calls, failed, failing[0].date())
+            continue
+        failing.clear()
     return RunsResult(changed, calls, failed, None)
