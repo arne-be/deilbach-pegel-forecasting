@@ -101,7 +101,7 @@ Each run is checked before it's stored: the hours run from run + 1 h without a g
 
 Only run < valid_at ≤ run + 48 h is stored. `precipitation` is the sum of the preceding hour (Open-Meteo docs), so the time Open-Meteo gives is already `valid_at`. Each run is available from the issue slot of its fetch: a run caught up late is stored as late.
 
-The request uses `cell_selection=nearest`. Without it Open-Meteo may pick a neighbouring cell with a better-matching elevation; one of our 70 points came back 0.02° off.
+The request uses `cell_selection=nearest`. Without it Open-Meteo may pick a neighbouring cell with a better-matching elevation; one of our 70 points came back 0.02° off. Since 23 Oct 2026 Open-Meteo answers with coordinates up to about 0.016° away from our points, so the job no longer compares them and takes the cell Open-Meteo picks.
 
 Each request (metadata and runs) gets two tries of at most 60 seconds, 5 seconds apart, on a timeout, network error or 5xx. From Lambda, single requests have timed out and got HTTP 503; the first request for a new run once took longer than 15 seconds. HTTP 429 isn't retried. A failing run stops the catch-up for this hour and keeps the runs stored before it; the next hour tries the missing runs again. After 2 minutes the step starts no older run, since a slow Open-Meteo can take about 2 minutes per run and the level forecast must still fit in the Lambda's 15 minutes.
 
