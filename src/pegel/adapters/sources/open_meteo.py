@@ -108,7 +108,7 @@ def parse_points(
 ) -> dict[str, PointSeries]:
     """Checks a multi-location answer has one location per requested point and reads each variable.
 
-    Open-Meteo snaps each point to its own grid cell, so the returned coordinates differ.
+    Open-Meteo snaps each point to its own grid cell, so the returned coordinates may differ.
     """
     locations = [body] if isinstance(body, dict) else body
     if not isinstance(locations, list) or len(locations) != len(points):
