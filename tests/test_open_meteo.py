@@ -114,11 +114,11 @@ def test_rejects_wrong_number_of_locations() -> None:
         parse_points(body, POINTS, ["precipitation"])
 
 
-def test_rejects_a_location_off_the_requested_point() -> None:
+def test_accepts_the_cell_open_meteo_snaps_to() -> None:
     body = fixture("single_run_2026-10-13T09.json")
-    body[2]["longitude"] = 7.04
-    with pytest.raises(OpenMeteoError):
-        parse_points(body, POINTS, ["precipitation"])
+    body[2]["latitude"], body[2]["longitude"] = 51.228477, 7.008086
+    series = parse_points(body, POINTS, ["precipitation"])["precipitation"]
+    assert len(series.values) == len(POINTS)
 
 
 @pytest.mark.parametrize("value", [-0.1, "1.0", True])

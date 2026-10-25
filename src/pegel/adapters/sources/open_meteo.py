@@ -33,9 +33,6 @@ MAX_ATTEMPTS = 3
 LIVE_TIMEOUT_SECONDS = 60.0
 LIVE_ATTEMPTS = 2
 BACKOFF_BASE_SECONDS = 5.0
-# The points are ICON-D2 grid points; with nearest cell selection Open-Meteo answers with the
-# same coordinates (rounded to float32). Its default picks a neighbour with a better elevation.
-COORDINATE_TOLERANCE_DEG = 0.005
 
 
 class OpenMeteoError(Exception):
@@ -109,14 +106,17 @@ def fetch_archive(
 def parse_points(
     body: Any, points: Sequence[GridPoint], variables: Sequence[str]
 ) -> dict[str, PointSeries]:
-    """Checks a multi-location answer against the requested points and reads each variable."""
+    """Checks a multi-location answer has one location per requested point and reads each variable.
+
+    Open-Meteo snaps each point to its own grid cell, so the returned coordinates differ.
+    """
     locations = [body] if isinstance(body, dict) else body
     if not isinstance(locations, list) or len(locations) != len(points):
         raise OpenMeteoError(f"expected {len(points)} locations")
     times: list[datetime] | None = None
     values: dict[str, list[list[float | None]]] = {variable: [] for variable in variables}
-    for location, point in zip(locations, points, strict=True):
-        hourly = _check_location(location, point, variables)
+    for location in locations:
+        hourly = _check_location(location, variables)
         location_times = _parse_times(hourly["time"])
         if times is None:
             times = location_times
@@ -129,16 +129,11 @@ def parse_points(
     return {variable: PointSeries(times, values[variable]) for variable in variables}
 
 
-def _check_location(location: Any, point: GridPoint, variables: Sequence[str]) -> dict[str, Any]:
+def _check_location(location: Any, variables: Sequence[str]) -> dict[str, Any]:
     if not isinstance(location, dict):
         raise OpenMeteoError("location is not an object")
     if location.get("utc_offset_seconds") != 0:
         raise OpenMeteoError("answer is not in UTC")
-    latitude, longitude = location.get("latitude"), location.get("longitude")
-    if not isinstance(latitude, int | float) or not isinstance(longitude, int | float):
-        raise OpenMeteoError("location has no coordinates")
-    if max(abs(latitude - point.lat), abs(longitude - point.lon)) > COORDINATE_TOLERANCE_DEG:
-        raise OpenMeteoError(f"got {latitude},{longitude} for point {point.lat},{point.lon}")
     hourly, units = location.get("hourly"), location.get("hourly_units")
     if not isinstance(hourly, dict) or not isinstance(units, dict) or "time" not in hourly:
         raise OpenMeteoError("location has no hourly data")
@@ -179,6 +174,7 @@ def _params(points: Sequence[GridPoint], hourly: str) -> dict[str, str]:
         "hourly": hourly,
         "models": MODEL,
         "timezone": "UTC",
+        # Its default picks a neighbour with a better-matching elevation.
         "cell_selection": "nearest",
     }
 
