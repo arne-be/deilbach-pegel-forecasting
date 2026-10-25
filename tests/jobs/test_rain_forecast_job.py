@@ -12,7 +12,7 @@ from pegel.adapters.sources import open_meteo
 from pegel.config import load_config
 from pegel.core.rain_forecast import GridPoint
 from pegel.core.schedule import issue_time
-from pegel.jobs.rain_forecast import backfill_archive, ingest_new_runs
+from pegel.jobs.rain_forecast import backfill_archive, backfill_runs, ingest_new_runs
 
 Conn = psycopg.Connection[TupleRow]
 SETTINGS = load_config().rain.forecast
@@ -212,3 +212,105 @@ def test_archive_backfill_stops_at_the_call_budget(conn: Conn, monkeypatch: Any)
     assert result.resume_from == date(2024, 11, 15)
     assert result.calls == 3
     assert sleeps == []
+
+
+def runs_from(first: datetime, count: int) -> list[datetime]:
+    return [first + timedelta(hours=3 * step) for step in range(count)]
+
+
+def test_run_backfill_loads_missing_runs_oldest_first_and_leaves_a_day_to_the_hourly_job(
+    conn: Conn,
+) -> None:
+    fake = FakeOpenMeteo(RUN_AT)
+    sleeps: list[float] = []
+    with fake.client() as client:
+        first = backfill_runs(
+            client,
+            conn,
+            SETTINGS,
+            POINTS,
+            date(2026, 10, 12),
+            date(2026, 10, 14),
+            MINUTE,
+            sleep=sleeps.append,
+        )
+        fake.runs.clear()
+        rest = backfill_runs(
+            client,
+            conn,
+            SETTINGS,
+            POINTS,
+            date(2026, 10, 11),
+            date(2026, 10, 14),
+            MINUTE,
+            sleep=sleeps.append,
+        )
+    day_before = datetime(2026, 10, 11, tzinfo=UTC)
+    # The hourly job keeps the runs after RUN_AT - 24 h, here 2026-10-12 09:00.
+    assert (first.changed, first.failed, first.resume_from) == (4 * 96, 0, None)
+    assert fake.runs == runs_from(day_before, 8)
+    assert (rest.changed, rest.calls) == (8 * 96, 8 * 3)
+    assert stored_runs(conn) == runs_from(day_before, 12)
+    assert [row[1:] for row in stored(conn)] == [
+        (12 * 48, timedelta(hours=1), timedelta(hours=48))
+    ] * 2
+
+
+def test_backfilled_runs_are_available_at_the_first_hourly_run_after_the_delay(conn: Conn) -> None:
+    with FakeOpenMeteo(RUN_AT).client() as client:
+        backfill_runs(
+            client,
+            conn,
+            SETTINGS,
+            POINTS,
+            date(2026, 10, 11),
+            date(2026, 10, 12),
+            30,
+            sleep=lambda _: None,
+        )
+    delays = conn.execute(
+        "SELECT DISTINCT available_at - run_at FROM input_forecasts ORDER BY 1"
+    ).fetchall()
+    assert delays == [(timedelta(minutes=150),)]
+
+
+def test_run_backfill_skips_a_failing_run_and_stops_at_the_call_budget(
+    conn: Conn, monkeypatch: Any
+) -> None:
+    monkeypatch.setattr("pegel.jobs.rain_forecast.ARCHIVE_MAX_CALLS", 9)
+    day = datetime(2026, 10, 11, tzinfo=UTC)
+    fake = FakeOpenMeteo(RUN_AT, {day + timedelta(hours=3): (503, {})})
+    sleeps: list[float] = []
+    with fake.client() as client:
+        result = backfill_runs(
+            client,
+            conn,
+            SETTINGS,
+            POINTS,
+            date(2026, 10, 11),
+            date(2026, 10, 12),
+            MINUTE,
+            sleep=sleeps.append,
+        )
+    assert (result.changed, result.calls, result.failed) == (2 * 96, 9, 1)
+    assert result.resume_from == date(2026, 10, 11)
+    assert stored_runs(conn) == [day, day + timedelta(hours=6)]
+    assert sleeps == [60.0, 60.0]
+
+
+def test_run_backfill_stops_at_the_rate_limit(conn: Conn) -> None:
+    day = datetime(2026, 10, 11, tzinfo=UTC)
+    fake = FakeOpenMeteo(RUN_AT, {day + timedelta(hours=3): (429, {"reason": "Daily limit"})})
+    with fake.client() as client:
+        result = backfill_runs(
+            client,
+            conn,
+            SETTINGS,
+            POINTS,
+            date(2026, 10, 11),
+            date(2026, 10, 12),
+            MINUTE,
+            sleep=lambda _: None,
+        )
+    assert (result.changed, result.resume_from) == (96, date(2026, 10, 11))
+    assert fake.runs == [day, day + timedelta(hours=3)]

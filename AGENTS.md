@@ -18,7 +18,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - Hourly job on Lambda: `Dockerfile` (jobs target), `src/pegel/jobs/lambda_handler.py`, `src/pegel/adapters/secrets.py`, `infra/prod/`, `.github/workflows/infra.yml`, `docs/setup-aws.md`
 - API `GET /api/history` and `GET /api/forecast` (FastAPI): `src/pegel/api/`, `src/pegel/core/history.py`
 - LANUV stations and value parser: `config/pegel.json`, `src/pegel/adapters/sources/lanuv.py`
-- ICON-D2 rain forecast from Open-Meteo, hourly step and `backfill-forecast`: `src/pegel/adapters/sources/open_meteo.py`, `src/pegel/core/rain_forecast.py`, `src/pegel/jobs/rain_forecast.py`
+- ICON-D2 rain forecast from Open-Meteo, hourly step and `backfill-forecast` (archive, or whole runs with `--source runs`): `src/pegel/adapters/sources/open_meteo.py`, `src/pegel/core/rain_forecast.py`, `src/pegel/jobs/rain_forecast.py`
 - Hourly live ingest of the upstream LANUV gauges (failures logged, never block the forecast): `src/pegel/adapters/sources/lanuv.py` (`fetch_levels`), `src/pegel/jobs/pipeline.py`
 - LANUV level history from open data CSV files (`pegel backfill --source lanuv-files`): `src/pegel/adapters/sources/lanuv_files.py`
 - Live Kalman outlier filter for the forecast station's level (`kupferdreh:cleaned_kalman`, `pegel clean`): `src/pegel/core/cleaning.py`, `src/pegel/jobs/pipeline.py`
@@ -192,6 +192,7 @@ The upstream LANUV gauges load from the open data files instead: download `Ruhre
 The ICON-D2 rain forecast archive comes from Open-Meteo. It needs only the jobs database, no Influx; details in `docs/catchment.md`:
 ```
 uv run pegel backfill-forecast --from 2024-02-01
+uv run pegel backfill-forecast --source runs --from 2026-04-05   # whole runs into the live series
 ```
 ```
 uv run pegel backfill --source lanuv-files --path <folder> --from 2000-01-01 [--station langenberg]

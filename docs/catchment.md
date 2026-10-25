@@ -93,11 +93,19 @@ Series ids carry the source: `open_meteo_icon_d2:catchment:mean` and `open_meteo
 
 Open-Meteo's model metadata says which run is the newest: `https://api.open-meteo.com/data/dwd_icon_d2/static/meta.json` has `last_run_initialisation_time` (the run's start, Unix seconds) and `last_run_availability_time` (when Open-Meteo started serving it). Runs start at 00, 03, … 21 UTC and come out about 85 minutes later (run 09:00 was served from 10:25).
 
-The hourly step reads the metadata first. It then wants every run of the last 24 hours, up to the newest, that the live catchment series doesn't have yet. If there is none, it stops: no forecast request. Otherwise it fetches them newest first, at most 4 per hour: the level forecast needs the newest run, older ones only matter for training, so after a long outage the next hours fetch the rest. A run only 24 hours late still covers half the horizon; older ones are left to the archive.
+The hourly step reads the metadata first. It then wants every run of the last 24 hours, up to the newest, that the live catchment series doesn't have yet. If there is none, it stops: no forecast request. Otherwise it fetches them newest first, at most 4 per hour: the level forecast needs the newest run, older ones only matter for training, so after a long outage the next hours fetch the rest. A run only 24 hours late still covers half the horizon; older ones are left to the run backfill below.
 
-Each run comes from Open-Meteo's Single Runs API (`single-runs-api.open-meteo.com/v1/forecast`), which takes the forecast parameters plus `run=2026-10-13T09:00`. The live forecast API only serves the newest run, so a missed run was lost before. Single Runs keeps runs from about May 2026 on and answers HTTP 400 for older ones. It doesn't take `start_hour`, so we ask for `forecast_hours=50`: the hours from the run start to run + 49 h. For run 09:00 on 2026-10-13 it gave the same values as the live API. It served the 18:00 run before the metadata named it, so going by the metadata never asks too early.
+Each run comes from Open-Meteo's Single Runs API (`single-runs-api.open-meteo.com/v1/forecast`), which takes the forecast parameters plus `run=2026-10-13T09:00`. The live forecast API only serves the newest run, so a missed run was lost before. Single Runs keeps runs from about 5 April 2026 on (checked 2026-10-25) and answers HTTP 400 for older ones. It doesn't take `start_hour`, so we ask for `forecast_hours=50`: the hours from the run start to run + 49 h. For run 09:00 on 2026-10-13 it gave the same values as the live API. It served the 18:00 run before the metadata named it, so going by the metadata never asks too early.
 
 Each run is checked before it's stored: the hours run from run + 1 h without a gap, and each point has data from run + 1 h to exactly run + 48 h and none after. A shortened answer, or one from another run, ends early or late, and nothing of that run is stored.
+
+Whole runs missed by the hourly step, or from before it started, load into the same live series:
+
+```
+uv run pegel backfill-forecast --source runs --from 2026-04-05 [--to 2026-10-13]
+```
+
+It fetches every run starting in the window that the live series doesn't have, oldest first, through the same request and checks as the hourly step, so each run has all 48 lead times. It leaves the last 24 hours before Open-Meteo's newest run to the hourly step. Each run gets the `available_at` the live system would have given it, the same rule as the archive below (run + 150 min with the defaults). One run is 70 calls; at one request a minute it stops before 9,000 calls (128 runs, 16 days, about 2 hours) and prints the date to resume from. From April to October 2026 that's about 12 invocations, one a day, to stay below Open-Meteo's 10,000 calls a day. A failing run is logged and skipped; rerunning the same window fetches only what's missing.
 
 Only run < valid_at ≤ run + 48 h is stored. `precipitation` is the sum of the preceding hour (Open-Meteo docs), so the time Open-Meteo gives is already `valid_at`. Each run is available from the issue slot of its fetch: a run caught up late is stored as late.
 

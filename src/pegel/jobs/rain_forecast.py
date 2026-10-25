@@ -1,4 +1,4 @@
-"""ICON-D2 rain forecasts: the newest run in the hourly job, and the archive backfill."""
+"""ICON-D2 rain forecasts: the newest run in the hourly job, and the run and archive backfills."""
 
 import logging
 import time
@@ -13,6 +13,7 @@ from pegel.adapters.storage.input_forecasts import stored_runs_since, upsert_inp
 from pegel.adapters.storage.series import ensure_series
 from pegel.config import RainForecastSettings, config_file
 from pegel.core.rain_forecast import (
+    RUN_INTERVAL,
     GridPoint,
     RunMismatchError,
     archive_values,
@@ -22,7 +23,7 @@ from pegel.core.rain_forecast import (
     missing_runs,
     run_values,
 )
-from pegel.core.schedule import issue_time
+from pegel.core.schedule import issue_time, scheduled_available_at
 from pegel.jobs.pipeline import Conn, HourlyStep
 
 logger = logging.getLogger(__name__)
@@ -110,8 +111,13 @@ def ingest_run(
     issue_minute: int,
     run_at: datetime,
     context: dict[str, str],
+    *,
+    available_at: datetime | None = None,
 ) -> int:
-    """Fetches, checks and stores one run. Returns the changed row count."""
+    """Fetches, checks and stores one run. Returns the changed row count.
+
+    Without `available_at` the run is available from the issue slot of its fetch.
+    """
     # One hour past the horizon, so check_run can tell a shortened answer from a whole run.
     series = open_meteo.fetch_run(client, points, run_at, settings.horizon_hours + 1)
     seen_at = issue_time(datetime.now(UTC), issue_minute)
@@ -123,7 +129,7 @@ def ingest_run(
         run_at,
         settings.horizon_hours,
         settings.ring_percentile,
-        seen_at,
+        available_at or seen_at,
     )
     changed = upsert_input_forecasts(conn, values, seen_at)
     logger.info(
@@ -213,3 +219,70 @@ def backfill_archive(
         )
         chunk_start = chunk_end
     return ArchiveResult(changed, calls, None)
+
+
+@dataclass(frozen=True)
+class RunsResult:
+    changed: int
+    calls: float
+    failed: int
+    # The first day not loaded when the call budget ran out or Open-Meteo refused, else None.
+    resume_from: date | None
+
+
+def backfill_runs(
+    client: httpx.Client,
+    conn: Conn,
+    settings: RainForecastSettings,
+    points: Sequence[GridPoint],
+    first_day: date,
+    end_day: date,
+    issue_minute: int,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+) -> RunsResult:
+    """Loads the runs starting in the UTC days [first_day, end_day) that the live series doesn't
+    have, oldest first, from Single Runs: every lead time, like the hourly job stores them.
+
+    Each run gets the available_at the live system would have given it. The last CATCH_UP stays
+    with the hourly job, which stamps runs by their fetch. A failing run is logged and skipped;
+    a rerun tries it again.
+    """
+    start = datetime(first_day.year, first_day.month, first_day.day, tzinfo=UTC)
+    end = datetime(end_day.year, end_day.month, end_day.day, tzinfo=UTC)
+    last = min(open_meteo.latest_run(client) - CATCH_UP, end - RUN_INTERVAL)
+    if last < start:
+        return RunsResult(0, 0.0, 0, None)
+    stored = stored_runs_since(conn, catchment_series_id(settings.source), start)
+    runs = missing_runs(last, stored, last - start)[::-1]
+    ensure_series(conn, forecast_series(settings.source, settings.ring_percentile, LIVE_NOTE))
+    available_after = timedelta(minutes=settings.available_after_minutes)
+    # A run spans three calendar days but stays far below 14, so it weighs one call per point.
+    weight = open_meteo.request_weight(len(points), 3, 1)
+    changed, calls, failed = 0, 0.0, 0
+    for run_at in runs:
+        if calls + weight > ARCHIVE_MAX_CALLS:
+            return RunsResult(changed, calls, failed, run_at.date())
+        if calls:
+            sleep(ARCHIVE_SECONDS_BETWEEN_REQUESTS)
+        calls += weight
+        context = {"job": "rain_forecast_backfill", "run_at": run_at.isoformat()}
+        available_at = scheduled_available_at(run_at, available_after, issue_minute)
+        try:
+            changed += ingest_run(
+                client,
+                conn,
+                settings,
+                points,
+                issue_minute,
+                run_at,
+                context,
+                available_at=available_at,
+            )
+        except open_meteo.RateLimitedError:
+            logger.exception("open-meteo rate limit", extra=context)
+            return RunsResult(changed, calls, failed, run_at.date())
+        except (open_meteo.OpenMeteoError, RunMismatchError):
+            logger.exception("rain forecast run failed, a rerun tries it again", extra=context)
+            failed += 1
+    return RunsResult(changed, calls, failed, None)

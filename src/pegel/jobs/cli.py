@@ -47,6 +47,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     config = load_config()
     if arguments.command == "backfill-forecast":
         end = arguments.end or datetime.now(UTC).date()
+        if arguments.source == "runs":
+            return _backfill_forecast_runs(config, arguments.start, end)
         return _backfill_forecast(config, arguments.start, end)
     if arguments.command == "backfill-radar":
         _backfill_radar(config, arguments)
@@ -187,6 +189,29 @@ def _backfill_forecast(config: PegelConfig, start: date, end: date) -> int:
     return 1
 
 
+def _backfill_forecast_runs(config: PegelConfig, start: date, end: date) -> int:
+    """Loads whole ICON-D2 runs into the live series. Needs only the database and Open-Meteo."""
+    settings = config.rain.forecast
+    points = open_meteo.load_points(config_file(settings.points_file))
+    with httpx.Client() as client, connect(_required_env("JOBS_DATABASE_URL")) as conn:
+        conn.autocommit = True
+        result = rain_forecast.backfill_runs(
+            client, conn, settings, points, start, end, config.forecast.issue_minute
+        )
+    loaded_until = result.resume_from or end
+    print(
+        f"Forecast runs {start} to {loaded_until} (exclusive): {result.changed} rows stored, "
+        f"{result.failed} runs failed, about {result.calls:.0f} Open-Meteo calls"
+    )
+    if result.resume_from is not None:
+        print(f"Stopped early (call budget or rate limit). Resume with --from {result.resume_from}")
+        return 1
+    if result.failed:
+        print("Some runs failed (see the log); rerun the same window to retry them.")
+        return 1
+    return 0
+
+
 def _backfill_radar(config: PegelConfig, arguments: argparse.Namespace) -> None:
     """Backfills radar rain from DWD's archives. Needs only the database, no Influx."""
     start = _utc_midnight(arguments.start)
@@ -237,6 +262,13 @@ def _parser() -> argparse.ArgumentParser:
     )
     forecast_parser.add_argument(
         "--to", dest="end", type=date.fromisoformat, help="UTC date, exclusive (default: today)"
+    )
+    forecast_parser.add_argument(
+        "--source",
+        choices=["archive", "runs"],
+        default="archive",
+        help="archive: Previous Runs from 2024 into its own series; runs: every whole run from"
+        " Single Runs into the live series (default: %(default)s)",
     )
     radar_parser = commands.add_parser("backfill-radar", help="load radar rain from DWD archives")
     radar_parser.add_argument(
