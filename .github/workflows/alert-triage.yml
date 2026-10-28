@@ -103,6 +103,17 @@ jobs:
           echo "::add-mask::$key"
           echo "ANTHROPIC_API_KEY=$key" >> "$GITHUB_ENV"
 
+      # Logs only the key's length, the HTTP status and the API's error (none of them secret),
+      # so an API refusal is visible without printing Claude's output.
+      - name: Check the Anthropic API
+        run: |
+          echo "key length: ${#ANTHROPIC_API_KEY}"
+          status="$(curl -sS -o api-check.json -w '%{http_code}' https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" -H 'anthropic-version: 2023-06-01' -H 'content-type: application/json' \
+            -d "{\"model\":\"$CLAUDE_MODEL\",\"max_tokens\":5,\"messages\":[{\"role\":\"user\",\"content\":\"ok\"}]}")"
+          echo "HTTP $status: $(jq -c '.error // "ok"' api-check.json)"
+          rm -f api-check.json
+
       - name: Diagnose
         id: claude
         uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
