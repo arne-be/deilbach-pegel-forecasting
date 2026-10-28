@@ -151,6 +151,22 @@ jobs:
             4. What to do next, if anything.
             Never quote hostnames, connection strings, tokens or credentials.
 
+      # shortcut: debugging "Credit balance is too low" from the action; remove once solved.
+      # Runs the action's Claude Code binary directly on a trivial prompt and logs only
+      # is_error and, on error, the error text (never a diagnosis).
+      - name: Check Claude Code directly
+        if: ${{ !cancelled() }}
+        env:
+          AWS_ACCESS_KEY_ID: ""
+          AWS_SECRET_ACCESS_KEY: ""
+          AWS_SESSION_TOKEN: ""
+        run: |
+          for dir in "$RUNNER_TEMP" "$GITHUB_WORKSPACE"; do
+            (cd "$dir" && ~/.local/bin/claude -p "Reply with the word ok." --model "$CLAUDE_MODEL" --max-turns 1 --tools Read --output-format json) >cli-check.json 2>cli-check.err || true
+            echo "$dir: $(jq -c '{is_error, error: (if .is_error then .result else null end), apiKeySource: .apiKeySource}' cli-check.json 2>/dev/null || echo 'no json'), stderr: $(head -c 300 cli-check.err)"
+          done
+          rm -f cli-check.json cli-check.err
+
       - name: Send the diagnosis
         if: ${{ !cancelled() }}
         env:
