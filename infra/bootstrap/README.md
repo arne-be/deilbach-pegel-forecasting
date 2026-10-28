@@ -4,10 +4,12 @@ Creates what `infra/prod` and CI need before they can run:
 
 - the S3 bucket for the `infra/prod` state (`deilbach-pegel-tofu-state-<account id>`, key `prod/terraform.tfstate`, OpenTofu's S3 locking),
 - the GitHub OIDC provider,
-- the role `deilbach-pegel-github-plan` for `tofu plan` in pull requests (read only, no secret values except the Grafana token),
+- the role `deilbach-pegel-github-plan` for `tofu plan` in pull requests (read only, no secret values except the Grafana and GitHub dispatch tokens),
 - the role `deilbach-pegel-github-deploy` for deploys from `main` (only resources named `deilbach-pegel*`; it also reads the secret `deilbach-pegel/migrate-database-url` to migrate the prod database),
 - the permissions boundary `deilbach-pegel-workload-boundary` (`boundary.tf`): the deploy role may only create or change `deilbach-pegel*` roles that carry it, so it can't create an admin role for itself,
-- the empty secret `deilbach-pegel/grafana-token`, which both roles can read ([docs/setup-grafana.md](../docs/setup-grafana.md)).
+- the role `deilbach-pegel-github-triage` for the alert triage workflow (`triage.tf`), only from the GitHub environment `alert-triage`: it reads the secrets `deilbach-pegel/anthropic-api-key` and `deilbach-pegel/api-database-url` and the hourly Lambda log, and publishes to the SNS topic `deilbach-pegel-alert-triage`. Nothing else, not even read-only access,
+- the empty secret `deilbach-pegel/grafana-token`, which the plan and deploy roles can read ([docs/setup-grafana.md](../docs/setup-grafana.md)),
+- the empty secret `deilbach-pegel/github-dispatch-token`, a GitHub token with which Grafana starts the alert triage workflow; the plan and deploy roles can read it. `infra/prod` can't plan until it has a value ([docs/setup-grafana.md](../docs/setup-grafana.md)).
 
 You apply it by hand once, with admin credentials. CI never touches it. The state of this folder stays local, because it creates the bucket a remote backend would need.
 
@@ -29,6 +31,7 @@ Then set the GitHub repository variables from the outputs:
 gh variable set TF_STATE_BUCKET --body "$(tofu output -raw tf_state_bucket)"
 gh variable set AWS_PLAN_ROLE_ARN --body "$(tofu output -raw aws_plan_role_arn)"
 gh variable set AWS_DEPLOY_ROLE_ARN --body "$(tofu output -raw aws_deploy_role_arn)"
+gh variable set AWS_TRIAGE_ROLE_ARN --body "$(tofu output -raw aws_triage_role_arn)"
 ```
 
 Keep a copy of the local state, so later changes here don't start from scratch. The state holds no secrets:

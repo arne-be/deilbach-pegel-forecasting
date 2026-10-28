@@ -41,6 +41,47 @@ resource "grafana_contact_point" "email" {
     addresses    = [var.budget_email]
     single_email = true
   }
+
+  # Starts the triage workflow, which emails a diagnosis through SNS (docs/decisions/0010).
+  webhook {
+    url                       = "https://api.github.com/repos/arne-be/deilbach-pegel-prediction/actions/workflows/alert-triage.yml/dispatches"
+    authorization_scheme      = "Bearer"
+    authorization_credentials = data.aws_secretsmanager_secret_version.github_dispatch_token.secret_string
+    headers = {
+      Accept                 = "application/vnd.github+json"
+      "X-GitHub-Api-Version" = "2022-11-28"
+    }
+    disable_resolve_message = true
+
+    # GitHub's dispatch body. Hand-built JSON instead of coll.Dict/data.ToJSON, which Grafana
+    # Cloud doesn't list as generally available; the regex keeps each value JSON-safe and
+    # inside the workflow's own check. Alerts without an item (DatasourceError) send their name.
+    payload {
+      template = <<-EOT
+        {"ref":"main","inputs":{"items":"{{ range $i, $alert := .Alerts.Firing }}{{ if $i }},{{ end }}{{ reReplaceAll "[^A-Za-z0-9_:.-]" "" (or $alert.Labels.item $alert.Labels.alertname) }}{{ end }}"}}
+      EOT
+    }
+  }
+}
+
+# Where the triage workflow sends its diagnosis.
+resource "aws_sns_topic" "alert_triage" {
+  name = "deilbach-pegel-alert-triage"
+}
+
+# Email subscriptions stay pending until the link in AWS's confirmation email is clicked.
+resource "aws_sns_topic_subscription" "alert_triage_email" {
+  topic_arn = aws_sns_topic.alert_triage.arn
+  protocol  = "email"
+  endpoint  = var.budget_email
+}
+
+# Fine-grained GitHub token (Actions read/write on this repo only), put in by hand
+# (docs/setup-grafana.md). The secret is created in infra/bootstrap/; plans fail until it has a value.
+# shortcut: the token lands in the prod state (private S3), because the webhook has no write-only
+# field in grafana provider 4.46.0; switch to an ephemeral resource once it has one.
+data "aws_secretsmanager_secret_version" "github_dispatch_token" {
+  secret_id = "deilbach-pegel/github-dispatch-token"
 }
 
 resource "grafana_rule_group" "freshness" {

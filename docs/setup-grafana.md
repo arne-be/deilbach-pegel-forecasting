@@ -61,3 +61,39 @@ Keep auto-refresh off and don't add alert rules beyond the freshness rule below:
 `infra/prod/alerts.tf` sets up one Grafana alert rule, "Data stale". It checks the newest value of each series in `freshness.alert_max_age_minutes` (`config/pegel.json`) once an hour, plus the newest forecast (key `forecast`). One email goes to the `BUDGET_EMAIL` address when a series goes stale, a "resolved" one when it's back, and a reminder every 24 hours while it stays stale. A failing query (e.g. Neon unreachable) also alerts. Grafana runs it at its own minute of the hour, not with the hourly job, so it wakes Neon once more per hour: about 15 CU-hours a month.
 
 To change a limit or add a series, edit the config and merge. To try the rule before a merge, POST its queries to `/api/v1/eval` with the tofu token.
+
+## Alert triage
+
+When "Data stale" fires, the same contact point also calls GitHub, which starts `.github/workflows/alert-triage.yml`. The workflow collects evidence (newest value per series, the last 3 hours of the hourly Lambda log, the LANUV portal's state), lets Claude (Anthropic API) read it with the repo (read-only tools), and emails the diagnosis through the SNS topic `deilbach-pegel-alert-triage`. The Grafana email stays as it is; the diagnosis comes a few minutes later. Reasons in [decision 0010](decisions/0010-alert-triage.md).
+
+These steps are done by hand once, in this order.
+
+1. Create the GitHub environment `alert-triage`, limited to `main`, before the role that trusts it exists (otherwise a branch push could create the environment without the branch policy):
+   ```
+   gh api -X PUT repos/arne-be/deilbach-pegel-prediction/environments/alert-triage -F 'deployment_branch_policy[protected_branches]=false' -F 'deployment_branch_policy[custom_branch_policies]=true'
+   gh api -X POST repos/arne-be/deilbach-pegel-prediction/environments/alert-triage/deployment-branch-policies -f name=main -f type=branch
+   ```
+2. Apply `infra/bootstrap/` ([README](../infra/bootstrap/README.md)): it creates the role `deilbach-pegel-github-triage` and the empty secret `deilbach-pegel/github-dispatch-token`. Set the variable `AWS_TRIAGE_ROLE_ARN` as the README says.
+3. On GitHub, under Settings → Developer settings → Fine-grained tokens, create a token for the repository `arne-be/deilbach-pegel-prediction` only, with the permission **Actions: Read and write** and nothing else. Copy it and put it in the secret from the clipboard. `tofu plan` fails until the secret has a value, so do this before merging:
+   ```
+   tmp=$(mktemp)
+   pbpaste > "$tmp"
+   aws secretsmanager put-secret-value --secret-id deilbach-pegel/github-dispatch-token --secret-string "file://$tmp"
+   rm "$tmp"
+   pbcopy </dev/null
+   ```
+   Note the token's expiry date: when it runs out, the alerts still email but no diagnosis follows. Renew it the same way.
+4. In the Anthropic console (console.anthropic.com), create an API key named `deilbach-pegel-alert-triage` and set a monthly spend limit. Copy the key and put it in the secret from the clipboard:
+   ```
+   aws secretsmanager put-secret-value --secret-id deilbach-pegel/anthropic-api-key --secret-string "$(pbpaste)" --query Name --output text
+   pbcopy </dev/null
+   ```
+5. Merge. The deploy creates the SNS topic, its email subscription and the webhook.
+6. AWS sends a confirmation email to the `BUDGET_EMAIL` address. Click its link, or no diagnosis arrives.
+
+To test, start a run by hand, or press "Test" on the contact point `deilbach-pegel email` in Grafana (that sends a test alert to both the email and the webhook):
+```
+gh workflow run alert-triage.yml -f items=langenberg:level
+```
+
+The repo is public, so its Actions logs are too. The workflow never prints the evidence or Claude's answer; read them in the email. Never rerun it with debug logging: the Claude step then prints its whole conversation, Lambda tracebacks included.
