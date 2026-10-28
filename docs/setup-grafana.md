@@ -68,8 +68,13 @@ When "Data stale" fires, the same contact point also calls GitHub, which starts 
 
 These steps are done by hand once, in this order.
 
-1. Apply `infra/bootstrap/` ([README](../infra/bootstrap/README.md)): it creates the role `deilbach-pegel-github-triage` and the empty secret `deilbach-pegel/github-dispatch-token`. Set the variable `AWS_TRIAGE_ROLE_ARN` as the README says.
-2. On GitHub, under Settings → Developer settings → Fine-grained tokens, create a token for the repository `arne-be/deilbach-pegel-prediction` only, with the permission **Actions: Read and write** and nothing else. Copy it and put it in the secret from the clipboard. `tofu plan` fails until the secret has a value, so do this before merging:
+1. Create the GitHub environment `alert-triage`, limited to `main`, before the role that trusts it exists (otherwise a branch push could create the environment without the branch policy):
+   ```
+   gh api -X PUT repos/arne-be/deilbach-pegel-prediction/environments/alert-triage -F 'deployment_branch_policy[protected_branches]=false' -F 'deployment_branch_policy[custom_branch_policies]=true'
+   gh api -X POST repos/arne-be/deilbach-pegel-prediction/environments/alert-triage/deployment-branch-policies -f name=main -f type=branch
+   ```
+2. Apply `infra/bootstrap/` ([README](../infra/bootstrap/README.md)): it creates the role `deilbach-pegel-github-triage` and the empty secret `deilbach-pegel/github-dispatch-token`. Set the variable `AWS_TRIAGE_ROLE_ARN` as the README says.
+3. On GitHub, under Settings → Developer settings → Fine-grained tokens, create a token for the repository `arne-be/deilbach-pegel-prediction` only, with the permission **Actions: Read and write** and nothing else. Copy it and put it in the secret from the clipboard. `tofu plan` fails until the secret has a value, so do this before merging:
    ```
    tmp=$(mktemp)
    pbpaste > "$tmp"
@@ -78,11 +83,6 @@ These steps are done by hand once, in this order.
    pbcopy </dev/null
    ```
    Note the token's expiry date: when it runs out, the alerts still email but no diagnosis follows. Renew it the same way.
-3. Create the GitHub environment `alert-triage`, limited to `main`:
-   ```
-   gh api -X PUT repos/arne-be/deilbach-pegel-prediction/environments/alert-triage -F 'deployment_branch_policy[protected_branches]=false' -F 'deployment_branch_policy[custom_branch_policies]=true'
-   gh api -X POST repos/arne-be/deilbach-pegel-prediction/environments/alert-triage/deployment-branch-policies -f name=main -f type=branch
-   ```
 4. If this AWS account has never used an Anthropic model on Bedrock, open the Bedrock console in `eu-central-1` once and submit Anthropic's use case form.
 5. Merge. The deploy creates the SNS topic, its email subscription and the webhook.
 6. AWS sends a confirmation email to the `BUDGET_EMAIL` address. Click its link, or no diagnosis arrives.
