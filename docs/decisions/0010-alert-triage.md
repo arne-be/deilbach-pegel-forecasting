@@ -20,6 +20,6 @@
 ## Accepted
 
 - **The GitHub token is in the prod state.** The webhook's credentials have no write-only field in grafana provider 4.46.0, so the token is read with a normal data source and stored in state (private, encrypted S3 bucket). Its Actions read/write scope can't be narrowed further: besides starting workflows it can rerun, cancel and delete runs in this repo, including rerunning an old `infra` deploy (prod rolls back to that commit) or rerunning this workflow with debug logging. If it leaks, revoke it on GitHub. A required reviewer on the deploy job would close the rollback path. Move it to an ephemeral value once the provider allows it.
-- **Actions logs are public.** The workflow never prints evidence, logs or Claude's output, and Claude's full-output option stays off. Rerunning with debug logging would print them, so don't.
+- **Actions logs are public.** The workflow never prints evidence, logs or Claude's output: Claude Code runs as a plain CLI with its output in a file. (`claude-code-action` refused every run with "Credit balance is too low" although the same key and Claude Code worked on the same runner.)
 - The token expires and must be renewed by hand. When it runs out, the Grafana email still arrives, only without a diagnosis.
 - Each alert costs one Claude run of up to 15 turns, a few cents.

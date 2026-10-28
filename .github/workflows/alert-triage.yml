@@ -103,38 +103,19 @@ jobs:
           echo "::add-mask::$key"
           echo "ANTHROPIC_API_KEY=$key" >> "$GITHUB_ENV"
 
-      # Logs only the key's length, the HTTP status and the API's error (none of them secret),
-      # so an API refusal is visible without printing Claude's output.
-      - name: Check the Anthropic API
-        run: |
-          echo "key length: ${#ANTHROPIC_API_KEY}"
-          status="$(curl -sS -o api-check.json -w '%{http_code}' https://api.anthropic.com/v1/messages \
-            -H "x-api-key: $ANTHROPIC_API_KEY" -H 'anthropic-version: 2023-06-01' -H 'content-type: application/json' \
-            -d "{\"model\":\"$CLAUDE_MODEL\",\"max_tokens\":5,\"messages\":[{\"role\":\"user\",\"content\":\"ok\"}]}")"
-          echo "HTTP $status: $(jq -c '.error // "ok"' api-check.json)"
-          rm -f api-check.json
+      # claude-code-action reported "Credit balance is too low" on every run although the key,
+      # the balance and Claude Code itself work from the same runner; the plain CLI is simpler.
+      - name: Install Claude Code
+        run: npm install -g --no-fund --no-audit @anthropic-ai/claude-code@2.1.296 >/dev/null
 
+      # Output goes to a file only, never to the public log, so even a debug rerun can't print it.
       - name: Diagnose
-        id: claude
-        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
         # Claude needs no AWS access; keep the role's credentials out of its environment.
         env:
           AWS_ACCESS_KEY_ID: ""
           AWS_SECRET_ACCESS_KEY: ""
           AWS_SESSION_TOKEN: ""
-        with:
-          anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
-          # The workflow token instead of the Claude GitHub App; read-only by the permissions above.
-          github_token: ${{ github.token }}
-          # Keep both off: the Actions log and step summary of a public repo are public.
-          show_full_output: "false"
-          display_report: "false"
-          claude_args: |
-            --model ${{ env.CLAUDE_MODEL }}
-            --max-turns 15
-            --tools Read,Grep,Glob
-            --allowedTools Read,Grep,Glob
-          prompt: |
+          PROMPT: |
             The Grafana alert "Data stale" fired for this project's data. evidence.md in the
             working directory holds the evidence collected just now: the newest value of each
             series, the hourly Lambda log of the last 3 hours and the LANUV portal's state.
@@ -150,34 +131,18 @@ jobs:
             3. Whether it is upstream (source down or late) or ours (bug, deploy, AWS, Neon).
             4. What to do next, if anything.
             Never quote hostnames, connection strings, tokens or credentials.
-
-      # shortcut: debugging "Credit balance is too low" from the action; remove once solved.
-      # Runs the action's Claude Code binary directly on a trivial prompt and logs only
-      # is_error and, on error, the error text (never a diagnosis).
-      - name: Check Claude Code directly
-        if: ${{ !cancelled() }}
-        env:
-          AWS_ACCESS_KEY_ID: ""
-          AWS_SECRET_ACCESS_KEY: ""
-          AWS_SESSION_TOKEN: ""
         run: |
-          for dir in "$RUNNER_TEMP" "$GITHUB_WORKSPACE"; do
-            (cd "$dir" && ~/.local/bin/claude -p "Reply with the word ok." --model "$CLAUDE_MODEL" --max-turns 1 --tools Read --output-format json) >cli-check.json 2>cli-check.err || true
-            echo "$dir: $(jq -c '{is_error, error: (if .is_error then .result else null end), apiKeySource: .apiKeySource}' cli-check.json 2>/dev/null || echo 'no json'), stderr: $(head -c 300 cli-check.err)"
-          done
-          rm -f cli-check.json cli-check.err
+          claude -p "$PROMPT" --model "$CLAUDE_MODEL" --max-turns 15 \
+            --tools Read,Grep,Glob --allowedTools Read,Grep,Glob \
+            --output-format json >claude-result.json 2>/dev/null || true
 
       - name: Send the diagnosis
         if: ${{ !cancelled() }}
         env:
           ITEMS: ${{ inputs.items }}
-          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          diagnosis=""
-          if [[ -n "$EXECUTION_FILE" && -f "$EXECUTION_FILE" ]]; then
-            diagnosis="$(jq -r '[.[] | select(.type == "result")] | last | .result // empty' "$EXECUTION_FILE")"
-          fi
+          diagnosis="$(jq -r 'if .is_error then "Claude failed: " + .result else .result // empty end' claude-result.json 2>/dev/null || true)"
           if [[ -z "$diagnosis" ]]; then
             diagnosis="The triage run produced no diagnosis. Check the run: $RUN_URL"
           fi

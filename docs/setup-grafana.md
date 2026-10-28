@@ -96,4 +96,4 @@ To test, start a run by hand, or press "Test" on the contact point `deilbach-peg
 gh workflow run alert-triage.yml -f items=langenberg:level
 ```
 
-The repo is public, so its Actions logs are too. The workflow never prints the evidence or Claude's answer; read them in the email. Never rerun it with debug logging: the Claude step then prints its whole conversation, Lambda tracebacks included.
+The repo is public, so its Actions logs are too. The workflow never prints the evidence or Claude's answer; read them in the email. Claude's output goes to a file, never to the log.
