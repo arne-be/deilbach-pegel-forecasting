@@ -12,3 +12,8 @@ output "aws_deploy_role_arn" {
   description = "Role for deploys from main. GitHub variable AWS_DEPLOY_ROLE_ARN."
   value       = aws_iam_role.github_deploy.arn
 }
+
+output "aws_triage_role_arn" {
+  description = "Role for the alert triage workflow. GitHub variable AWS_TRIAGE_ROLE_ARN."
+  value       = aws_iam_role.github_triage.arn
+}

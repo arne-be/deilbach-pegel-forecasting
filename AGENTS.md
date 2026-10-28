@@ -29,6 +29,7 @@ Everything else in this file is the agreed plan. Folders and commands become rea
 - `scripts/influx-query.sh` and the docs
 - Grafana Cloud dashboards as code (read-only role `pegel_grafana`): `grafana/dashboards/`, `infra/prod/grafana.tf`, `docs/setup-grafana.md`
 - Freshness alerts by email (Grafana rule "Data stale", limits in `freshness.alert_max_age_minutes`): `infra/prod/alerts.tf`, `docs/setup-grafana.md`
+- Alert triage: Grafana's webhook starts a read-only Claude run on Bedrock that emails a diagnosis of "Data stale" through SNS: `.github/workflows/alert-triage.yml`, `infra/prod/alerts.tf`, `docs/setup-grafana.md`, `docs/decisions/0010-alert-triage.md`
 - Grafana forecast playback (newest forecast at the middle of the time range) and fixed-lead lines with observed and forecast rain, one `Lead` switch for both: `grafana/dashboards/forecast-playback.json`
 - Live outlier filter exploration (three methods compared, plots, recommendation): `analysis/outliers/`
 - Evaluation dataset as known at each issue time (`pegel build-eval-set`): `src/pegel/core/issue_inputs.py`, `src/pegel/jobs/eval_set.py`

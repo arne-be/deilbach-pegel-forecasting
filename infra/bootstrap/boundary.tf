@@ -19,12 +19,16 @@ data "aws_iam_policy_document" "workload_boundary" {
     resources = ["arn:aws:secretsmanager:${local.region_account}:secret:deilbach-pegel/*"]
   }
 
-  # The owner connection string and the Grafana token are for CI only.
+  # The owner connection string, the Grafana token and the GitHub token are for CI only.
   statement {
-    sid       = "NoCiSecrets"
-    effect    = "Deny"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = [local.migrate_secret_arn, aws_secretsmanager_secret.grafana_token.arn]
+    sid     = "NoCiSecrets"
+    effect  = "Deny"
+    actions = ["secretsmanager:GetSecretValue"]
+    resources = [
+      local.migrate_secret_arn,
+      aws_secretsmanager_secret.grafana_token.arn,
+      aws_secretsmanager_secret.github_dispatch_token.arn,
+    ]
   }
 
   statement {

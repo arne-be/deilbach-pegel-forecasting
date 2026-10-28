@@ -1,6 +1,8 @@
-# The two CI roles. Plan: read only, pull requests from this repo. Deploy:
+# The CI roles. Plan: read only, pull requests from this repo. Deploy:
 # manages deilbach-pegel* resources, only from main. Both can read the Grafana
-# token and no other secret value, because tofu plan needs it for the dashboards.
+# and GitHub dispatch tokens and no other secret value, because tofu plan needs
+# them for the dashboards and the alert webhook. Triage: the alert triage
+# workflow (triage.tf), only from the alert-triage environment.
 # A fork's pull request gets no OIDC token from GitHub, and infra.yml skips the
 # AWS steps for forks. The trust policy alone would let one in, so never run
 # infra.yml on pull_request_target.
@@ -9,6 +11,7 @@ data "aws_iam_policy_document" "github_trust" {
   for_each = {
     plan   = "${local.github_subject_prefix}:pull_request"
     deploy = "${local.github_subject_prefix}:ref:refs/heads/main"
+    triage = "${local.github_subject_prefix}:environment:alert-triage"
   }
 
   statement {
@@ -56,6 +59,14 @@ resource "aws_iam_role_policy_attachment" "read_only" {
 
 # --- Plan role ---
 
+locals {
+  # tofu plan in infra/prod reads these: the grafana provider and the alert webhook need them.
+  plan_secret_arns = [
+    aws_secretsmanager_secret.grafana_token.arn,
+    aws_secretsmanager_secret.github_dispatch_token.arn,
+  ]
+}
+
 data "aws_iam_policy_document" "github_plan" {
   statement {
     sid       = "StateLockFiles"
@@ -64,16 +75,16 @@ data "aws_iam_policy_document" "github_plan" {
   }
 
   statement {
-    sid       = "GrafanaToken"
+    sid       = "PlanTokens"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.grafana_token.arn]
+    resources = local.plan_secret_arns
   }
 
   statement {
     sid           = "NoOtherSecretValues"
     effect        = "Deny"
     actions       = ["secretsmanager:GetSecretValue"]
-    not_resources = [aws_secretsmanager_secret.grafana_token.arn]
+    not_resources = local.plan_secret_arns
   }
 }
 
@@ -162,6 +173,12 @@ data "aws_iam_policy_document" "github_deploy" {
   }
 
   statement {
+    sid       = "Sns"
+    actions   = ["sns:*"]
+    resources = ["arn:aws:sns:${local.region_account}:deilbach-pegel*"]
+  }
+
+  statement {
     sid       = "Budgets"
     actions   = ["budgets:*"]
     resources = ["arn:aws:budgets::${local.account_id}:budget/deilbach-pegel*"]
@@ -194,11 +211,11 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = ["*"]
   }
 
-  # Grafana reads its token; the deploy job migrates the prod database. ReadOnlyAccess has no secret values.
+  # tofu reads the plan tokens; the deploy job migrates the prod database. ReadOnlyAccess has no secret values.
   statement {
     sid       = "ReadableSecrets"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.grafana_token.arn, local.migrate_secret_arn]
+    resources = concat(local.plan_secret_arns, [local.migrate_secret_arn])
   }
 
   # An explicit deny beats any allow, so it has to leave out the secrets above.
@@ -206,7 +223,7 @@ data "aws_iam_policy_document" "github_deploy" {
     sid           = "NoOtherSecretValues"
     effect        = "Deny"
     actions       = ["secretsmanager:GetSecretValue"]
-    not_resources = [aws_secretsmanager_secret.grafana_token.arn, local.migrate_secret_arn]
+    not_resources = concat(local.plan_secret_arns, [local.migrate_secret_arn])
   }
 
   # The CI roles must not be able to widen their own permissions or trust.
