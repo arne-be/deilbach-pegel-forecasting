@@ -1,12 +1,6 @@
 # Role for .github/workflows/alert-triage.yml: reads the evidence for a stale-data
-# alert, asks Claude on Bedrock for a diagnosis and emails it via SNS. Nothing else:
+# alert, asks Claude (Anthropic API) for a diagnosis and emails it via SNS. Nothing else:
 # no ReadOnlyAccess, because the workflow's output goes by email and its logs are public.
-
-locals {
-  # The workflow passes the profile ID (eu.<model>) to Bedrock. The profile routes each
-  # call to one of the EU regions, so the model ARN allows any of them.
-  triage_model = "anthropic.claude-sonnet-5-5"
-}
 
 resource "aws_iam_role" "github_triage" {
   name               = "deilbach-pegel-github-triage"
@@ -15,12 +9,9 @@ resource "aws_iam_role" "github_triage" {
 
 data "aws_iam_policy_document" "github_triage" {
   statement {
-    sid     = "Bedrock"
-    actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
-    resources = [
-      "arn:aws:bedrock:${local.region_account}:inference-profile/eu.${local.triage_model}",
-      "arn:aws:bedrock:eu-*::foundation-model/${local.triage_model}",
-    ]
+    sid       = "AnthropicApiKey"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.anthropic_api_key.arn]
   }
 
   statement {

@@ -1,5 +1,5 @@
 # Started by the Grafana alert "Data stale" (infra/prod/alerts.tf). Collects evidence, lets
-# Claude (read-only, on Bedrock) diagnose it and emails the diagnosis through SNS.
+# Claude (read-only, Anthropic API) diagnose it and emails the diagnosis through SNS.
 # The repo is public, so its Actions logs are too: never print the evidence, the logs or
 # Claude's output here. Details in docs/decisions/0010-alert-triage.md.
 name: alert-triage
@@ -22,10 +22,7 @@ concurrency:
 
 env:
   AWS_REGION: eu-central-1
-  # EU cross-region inference profile for Sonnet.
-  BEDROCK_MODEL: eu.anthropic.claude-sonnet-5-5
-  # Claude Code uses a small model for background work; the role only allows the Sonnet profile.
-  ANTHROPIC_DEFAULT_HAIKU_MODEL: eu.anthropic.claude-sonnet-5-5
+  CLAUDE_MODEL: claude-sonnet-5-5
 
 defaults:
   run:
@@ -100,18 +97,29 @@ jobs:
               echo "- $station_id: newest $newest, $last_modified" >&3
             done
 
+      - name: Read the Anthropic API key
+        run: |
+          key="$(aws secretsmanager get-secret-value --secret-id deilbach-pegel/anthropic-api-key --query SecretString --output text)"
+          echo "::add-mask::$key"
+          echo "ANTHROPIC_API_KEY=$key" >> "$GITHUB_ENV"
+
       - name: Diagnose
         id: claude
         uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
+        # Claude needs no AWS access; keep the role's credentials out of its environment.
+        env:
+          AWS_ACCESS_KEY_ID: ""
+          AWS_SECRET_ACCESS_KEY: ""
+          AWS_SESSION_TOKEN: ""
         with:
-          use_bedrock: "true"
+          anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
           # The workflow token instead of the Claude GitHub App; read-only by the permissions above.
           github_token: ${{ github.token }}
           # Keep both off: the Actions log and step summary of a public repo are public.
           show_full_output: "false"
           display_report: "false"
           claude_args: |
-            --model ${{ env.BEDROCK_MODEL }}
+            --model ${{ env.CLAUDE_MODEL }}
             --max-turns 15
             --tools Read,Grep,Glob
             --allowedTools Read,Grep,Glob

@@ -7,7 +7,7 @@ Creates what `infra/prod` and CI need before they can run:
 - the role `deilbach-pegel-github-plan` for `tofu plan` in pull requests (read only, no secret values except the Grafana and GitHub dispatch tokens),
 - the role `deilbach-pegel-github-deploy` for deploys from `main` (only resources named `deilbach-pegel*`; it also reads the secret `deilbach-pegel/migrate-database-url` to migrate the prod database),
 - the permissions boundary `deilbach-pegel-workload-boundary` (`boundary.tf`): the deploy role may only create or change `deilbach-pegel*` roles that carry it, so it can't create an admin role for itself,
-- the role `deilbach-pegel-github-triage` for the alert triage workflow (`triage.tf`), only from the GitHub environment `alert-triage`: it calls Claude Sonnet on Bedrock (EU inference profile), reads the hourly Lambda log and the secret `deilbach-pegel/api-database-url`, and publishes to the SNS topic `deilbach-pegel-alert-triage`. Nothing else, not even read-only access,
+- the role `deilbach-pegel-github-triage` for the alert triage workflow (`triage.tf`), only from the GitHub environment `alert-triage`: it reads the secrets `deilbach-pegel/anthropic-api-key` and `deilbach-pegel/api-database-url` and the hourly Lambda log, and publishes to the SNS topic `deilbach-pegel-alert-triage`. Nothing else, not even read-only access,
 - the empty secret `deilbach-pegel/grafana-token`, which the plan and deploy roles can read ([docs/setup-grafana.md](../docs/setup-grafana.md)),
 - the empty secret `deilbach-pegel/github-dispatch-token`, a GitHub token with which Grafana starts the alert triage workflow; the plan and deploy roles can read it. `infra/prod` can't plan until it has a value ([docs/setup-grafana.md](../docs/setup-grafana.md)).
 

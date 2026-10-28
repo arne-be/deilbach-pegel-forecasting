@@ -64,7 +64,7 @@ To change a limit or add a series, edit the config and merge. To try the rule be
 
 ## Alert triage
 
-When "Data stale" fires, the same contact point also calls GitHub, which starts `.github/workflows/alert-triage.yml`. The workflow collects evidence (newest value per series, the last 3 hours of the hourly Lambda log, the LANUV portal's state), lets Claude on Amazon Bedrock read it with the repo (read-only tools), and emails the diagnosis through the SNS topic `deilbach-pegel-alert-triage`. The Grafana email stays as it is; the diagnosis comes a few minutes later. Reasons in [decision 0010](decisions/0010-alert-triage.md).
+When "Data stale" fires, the same contact point also calls GitHub, which starts `.github/workflows/alert-triage.yml`. The workflow collects evidence (newest value per series, the last 3 hours of the hourly Lambda log, the LANUV portal's state), lets Claude (Anthropic API) read it with the repo (read-only tools), and emails the diagnosis through the SNS topic `deilbach-pegel-alert-triage`. The Grafana email stays as it is; the diagnosis comes a few minutes later. Reasons in [decision 0010](decisions/0010-alert-triage.md).
 
 These steps are done by hand once, in this order.
 
@@ -83,7 +83,11 @@ These steps are done by hand once, in this order.
    pbcopy </dev/null
    ```
    Note the token's expiry date: when it runs out, the alerts still email but no diagnosis follows. Renew it the same way.
-4. If this AWS account has never used an Anthropic model on Bedrock, open the Bedrock console in `eu-central-1` once and submit Anthropic's use case form.
+4. In the Anthropic console (console.anthropic.com), create an API key named `deilbach-pegel-alert-triage` and set a monthly spend limit. Copy the key and put it in the secret from the clipboard:
+   ```
+   aws secretsmanager put-secret-value --secret-id deilbach-pegel/anthropic-api-key --secret-string "$(pbpaste)" --query Name --output text
+   pbcopy </dev/null
+   ```
 5. Merge. The deploy creates the SNS topic, its email subscription and the webhook.
 6. AWS sends a confirmation email to the `BUDGET_EMAIL` address. Click its link, or no diagnosis arrives.
 

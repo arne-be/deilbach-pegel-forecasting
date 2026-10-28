@@ -126,3 +126,10 @@ resource "aws_secretsmanager_secret" "github_dispatch_token" {
   name        = "deilbach-pegel/github-dispatch-token"
   description = "GitHub token that starts the alert triage workflow, used by OpenTofu"
 }
+
+# Anthropic API key for the alert triage workflow. Only the triage role reads it.
+# The value is put in by hand (docs/setup-grafana.md).
+resource "aws_secretsmanager_secret" "anthropic_api_key" {
+  name        = "deilbach-pegel/anthropic-api-key"
+  description = "Anthropic API key for the alert triage workflow"
+}
