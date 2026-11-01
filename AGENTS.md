@@ -199,7 +199,7 @@ uv run pegel backfill-forecast --source runs --from 2026-04-02   # whole runs in
 uv run pegel backfill --source lanuv-files --path <folder> --from 2000-01-01 [--station langenberg]
 ```
 
-A gap in the live LANUV ingest (portal down for longer than the 24-hour lookback) is filled from the portal itself, which serves the last seven days:
+The hourly run refetches the last seven days of the LANUV gauges (all the portal serves; still one request per station), so a gap shorter than that (portal or our job down) fills itself on the next run. To fill one right away, backfill from the portal; older gaps need the open data files above:
 ```
 uv run pegel backfill --source lanuv --from 2026-10-21 [--station langenberg]
 ```
